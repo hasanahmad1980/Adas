@@ -9,7 +9,9 @@
 
 - Updated standalone AIO to **2.0.4-experimental.1**, including its buffered presentation path and improved windowed DLAA detection.
 - Updated DLSS5 Bridge to **1.4.11**, including recovery from temporary GPU stalls instead of disabling neural rendering for the rest of the session.
-- Updated the complete matched Feeder beta set to **0.14.0-beta.1**. Its new crash reports identify NVIDIA driver 616.64 failures with RenoDX v4.6/v4.7 consumers, and repair keeps the compatible v4.55 consumer.
+- Updated the complete matched Feeder beta set to **0.14.0-beta.2**, including the matched 32-bit host protocol, deadlock recovery, D3D11 crash breadcrumbs, and stricter ReShade add-on validation.
+- Added managed **DLSS 5 OpenGL Bridge 1.0.5**, verified **OneClick 0.11.13** launch, and a separate **mainline OptiScaler beta/nightly** install choice.
+- Ported the essential RHI 2.6.1 reliability changes without restoring its UI: zero-byte DLSS runtimes are rejected and current D3D12 game/config overrides are included.
 - Added simple persistent neural-rendering and appearance controls for the native stable and ShortFuse experimental routes. The full ReShade interface is no longer required for normal on/off configuration.
 - Preserved automatic 32-bit Vulkan layer validation and persistent OptiScaler NR enablement. Adas continues to use its own tracked installer and rollback instead of importing RHI's interface or an untracked ASI-loader chain.
 - Kept Visual Enhancer as a separate media-processing application; its very large GPU-specific runtime packs do not improve game injection or guaranteed game FPS and are not added to the installer.

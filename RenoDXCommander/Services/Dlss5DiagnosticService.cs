@@ -164,11 +164,14 @@ internal static partial class Dlss5DiagnosticService
             required.Add(Path.Combine(addonPath, renoDxName));
             if (mode is Dlss5DeploymentMode.NativeDirectX11 or Dlss5DeploymentMode.NativeVulkan)
                 required.Add(Path.Combine(addonPath, Dlss5ComponentService.BridgeAddon));
+            if (plan.InstallOpenGlBridge)
+                required.Add(Path.Combine(addonPath, Dlss5ComponentService.OpenGlBridgeAddon));
         }
 
         foreach (var path in required.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (!File.Exists(path))
+            var isRuntime = Path.GetFileName(path).StartsWith("nvngx_", StringComparison.OrdinalIgnoreCase);
+            if (!File.Exists(path) || isRuntime && !Dlss5ComponentService.IsUsableRuntimeFile(path))
             {
                 problems.Add($"A required file is missing or may have been quarantined: {Path.GetRelativePath(root, path)}. Run Repair automatically.");
                 continue;

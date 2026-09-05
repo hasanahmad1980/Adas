@@ -32,6 +32,7 @@ public sealed partial class Dlss5ComponentService
     public const string BridgeAddon = "dlss5-bridge.addon64";
     public const string BridgeConfig = "dlss5-bridge.cfg";
     public const string BridgeLog = "dlss5-bridge.log";
+    public const string OpenGlBridgeAddon = "dlss5-opengl-bridge.addon64";
 
     private const string ObsoleteBridgeAddon = "dlss5-dx11-bridge.addon64";
     private const string ObsoleteBridgeConfig = "dlss5-dx11-bridge.cfg";
@@ -46,7 +47,9 @@ public sealed partial class Dlss5ComponentService
     private const string FeederRenoDxVersion = "feeder-pinned-v4.55";
     internal const string BridgeVersion = "v1.4.11";
     private const string BundledFeederVersion = "0.7.0";
-    internal const string BundledFeederBetaVersion = "0.14.0-beta.1";
+    internal const string BundledFeederBetaVersion = "0.14.0-beta.2";
+    internal const string OpenGlBridgeVersion = "1.0.5";
+    internal const string OneClickVersion = "0.11.13";
     private const string BundledStableReShadeVersion = "6.8.0";
     private const string BundledLegacyReShadeVersion = "6.3.3";
     private const string DgVoodooRepo = "dege-diosg/dgVoodoo2";
@@ -76,6 +79,19 @@ public sealed partial class Dlss5ComponentService
         bool is64Bit,
         Dlss5InstallProfile profile = Dlss5InstallProfile.MaximumQuality)
     {
+        if (profile == Dlss5InstallProfile.OpenGlBridge && SupportsOpenGlBridge(mode, is64Bit))
+        {
+            return new(
+                Dlss5RenoDxPackage.Native470,
+                InstallFeeder: false,
+                InstallDx11Bridge: false,
+                PatchFeederForUnifiedName: false,
+                ProfileName: $"OpenGL Bridge {OpenGlBridgeVersion} + RenoDX v4.70")
+            {
+                InstallOpenGlBridge = true,
+            };
+        }
+
         if ((profile == Dlss5InstallProfile.LatestFeederBeta || mode == Dlss5DeploymentMode.Dx10Feeder)
             && IsFeederMode(mode))
         {
@@ -129,6 +145,7 @@ public sealed partial class Dlss5ComponentService
             Dlss5InstallProfile.OptiScalerNeuralRendering => !version.Contains($"NR {OptiScalerNrVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.OptiScalerNrBeforeSr => !version.Contains(OptiScalerSplitVersion, StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.LatestFeederBeta => !version.Contains($"Feeder {BundledFeederBetaVersion}", StringComparison.OrdinalIgnoreCase),
+            Dlss5InstallProfile.OpenGlBridge => !version.Contains($"OpenGL Bridge {OpenGlBridgeVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.MaximumQuality when record.Mode is Dlss5DeploymentMode.NativeDirectX11 or Dlss5DeploymentMode.NativeVulkan
                 => !version.Contains($"Bridge {BridgeVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.MaximumQuality when IsFeederMode(record.Mode)
@@ -338,8 +355,8 @@ public sealed partial class Dlss5ComponentService
         {
             var hostedRuntimePath = Path.Combine(path, "host64");
             var missingHostedRuntimes = new[] { "nvngx_dlssnr.dll", "nvngx_dlss.dll" }
-                .Where(name => !File.Exists(Path.Combine(hostedRuntimePath, name))
-                    && !File.Exists(Path.Combine(path, name)))
+                .Where(name => !IsUsableRuntimeFile(Path.Combine(hostedRuntimePath, name))
+                    && !IsUsableRuntimeFile(Path.Combine(path, name)))
                 .ToArray();
             if (missingHostedRuntimes.Length > 0)
                 throw new FileNotFoundException(
@@ -364,6 +381,7 @@ public sealed partial class Dlss5ComponentService
             _ => bundledRenoDx,
         };
         var bundledBridge = Path.Combine(GetBundledComponentDirectory(), BridgeAddon);
+        var bundledOpenGlBridge = Path.Combine(GetBundledComponentDirectory(), OpenGlBridgeAddon);
         var stagedBridge = Path.Combine(GetComponentStagingPath(), BridgeAddon);
         var stagingVersionFile = Path.Combine(GetComponentStagingPath(), "version.txt");
         var hasUserBridgeImport = File.Exists(stagingVersionFile)
@@ -392,6 +410,12 @@ public sealed partial class Dlss5ComponentService
             if (!File.Exists(selectedBridge))
                 throw new FileNotFoundException($"The DLSS 5 Bridge {BridgeVersion} package is missing from Adas.", selectedBridge);
             ValidateComponent(BridgeAddon, selectedBridge);
+        }
+        if (compatibilityPlan.InstallOpenGlBridge)
+        {
+            if (!File.Exists(bundledOpenGlBridge))
+                throw new FileNotFoundException($"The OpenGL Bridge {OpenGlBridgeVersion} package is missing from Adas.", bundledOpenGlBridge);
+            ValidateComponent(OpenGlBridgeAddon, bundledOpenGlBridge);
         }
 
         record.Mode = assessment.Mode;
@@ -480,6 +504,12 @@ public sealed partial class Dlss5ComponentService
         {
             var bridgeDestination = Path.Combine(addonDeployPath, BridgeAddon);
             InstallTrackedFile(selectedBridge, bridgeDestination, path, record);
+            installed.Add(bridgeDestination);
+        }
+        if (compatibilityPlan.InstallOpenGlBridge)
+        {
+            var bridgeDestination = Path.Combine(addonDeployPath, OpenGlBridgeAddon);
+            InstallTrackedFile(bundledOpenGlBridge, bridgeDestination, path, record);
             installed.Add(bridgeDestination);
         }
         RemoveIncompatibleDlssAddons(path, addonDeployPath, compatibilityPlan, record);
@@ -968,6 +998,19 @@ public sealed partial class Dlss5ComponentService
             or Dlss5DeploymentMode.Dx9ViaDxvkFeeder
             or Dlss5DeploymentMode.Dx10Feeder;
 
+    internal static bool SupportsOpenGlBridge(Dlss5DeploymentMode mode, bool is64Bit)
+        => is64Bit && mode == Dlss5DeploymentMode.OpenGlFeeder;
+
+    internal static bool IsUsableRuntimeFile(string path)
+    {
+        try
+        {
+            return File.Exists(path) && new FileInfo(path).Length > 0;
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+    }
+
     internal static bool ShouldRefreshReShade(string? configuredChannel, string? installedVersion)
         => AuxInstallService.IsLegacyVersion(configuredChannel)
             && !string.Equals(configuredChannel, installedVersion, StringComparison.OrdinalIgnoreCase);
@@ -1139,6 +1182,7 @@ public sealed partial class Dlss5ComponentService
         // The beta applies only to Feeder routes. The unified ShortFuse package
         // does not replace the native Vulkan bridge contract.
         if ((!IsFeederMode(mode) && profile == Dlss5InstallProfile.LatestFeederBeta)
+            || (profile == Dlss5InstallProfile.OpenGlBridge && !SupportsOpenGlBridge(mode, is64Bit))
             || (mode == Dlss5DeploymentMode.NativeVulkan
                 && profile == Dlss5InstallProfile.ExperimentalUnified))
             return Dlss5InstallProfile.MaximumQuality;
@@ -1719,7 +1763,7 @@ public sealed partial class Dlss5ComponentService
     {
         if (style is < 0 or > 2)
             throw new ArgumentOutOfRangeException(nameof(style));
-        if (profile is not (Dlss5InstallProfile.MaximumQuality or Dlss5InstallProfile.ExperimentalUnified))
+        if (profile is not (Dlss5InstallProfile.MaximumQuality or Dlss5InstallProfile.ExperimentalUnified or Dlss5InstallProfile.OpenGlBridge))
             throw new ArgumentException("This profile does not use RenoDX's native settings.", nameof(profile));
 
         var iniPath = Path.Combine(Path.GetFullPath(root), "ReShade.ini");
@@ -1846,6 +1890,7 @@ public sealed partial class Dlss5ComponentService
             || fileName.StartsWith("renodx-dlss.addon", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("dlss5-feed", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("dlss5-bridge", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith("dlss5-opengl-bridge", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("dlss5-dx11-bridge", StringComparison.OrdinalIgnoreCase)
             || value.Trim().Equals("DLSS 5 Neural Rendering", StringComparison.OrdinalIgnoreCase)
             || value.Trim().StartsWith("DLSS 5 Feed", StringComparison.OrdinalIgnoreCase);
@@ -2313,6 +2358,8 @@ public sealed partial class Dlss5ComponentService
         };
         if (compatibilityPlan.InstallDx11Bridge)
             keep.Add(BridgeAddon);
+        if (compatibilityPlan.InstallOpenGlBridge)
+            keep.Add(OpenGlBridgeAddon);
 
         var managedNames = new[]
         {
@@ -2320,6 +2367,7 @@ public sealed partial class Dlss5ComponentService
             RenoDxDeploymentName,
             "renodx-dlss5(2).addon64",
             BridgeAddon,
+            OpenGlBridgeAddon,
             ObsoleteBridgeAddon,
         };
         var paths = managedNames

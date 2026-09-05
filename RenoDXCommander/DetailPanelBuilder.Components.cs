@@ -232,12 +232,14 @@ public partial class DetailPanelBuilder
             var installedRecord = installedPath == null ? null : Dlss5ComponentService.LoadRecord(installedPath);
             var installedProfile = installedRecord?.Profile;
             var aioInstalled = installedMode != Dlss5DeploymentMode.None && installedProfile == Dlss5InstallProfile.StandaloneAio;
+            var openGlBridgeInstalled = installedMode != Dlss5DeploymentMode.None && installedProfile == Dlss5InstallProfile.OpenGlBridge;
             var updateAvailable = Dlss5ComponentService.IsComponentUpdateAvailable(installedRecord);
 
             _window.DetailDlss5Row.Visibility = Visibility.Visible;
             var optiNrInstalled = Dlss5ComponentService.IsOptiScalerNrProfile(installedProfile);
             _window.DetailDlss5Status.Text = updateAvailable ? "Update\nReady" : installedMode != Dlss5DeploymentMode.None
-                ? optiNrInstalled ? "OptiScaler NR\nInstalled" : aioInstalled ? "AIO\nInstalled" : installedMode switch
+                ? optiNrInstalled ? "OptiScaler NR\nInstalled" : aioInstalled ? "AIO\nInstalled"
+                    : openGlBridgeInstalled ? "OpenGL Bridge\nInstalled" : installedMode switch
                 {
                     Dlss5DeploymentMode.NativeDirectX12 => "Native\nInstalled",
                     Dlss5DeploymentMode.NativeDirectX11 => "Native\nInstalled",
