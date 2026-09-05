@@ -43,6 +43,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IDlssStreamlineService _dlssStreamlineService;
     private readonly DlssPresetService _dlssPresetService;
     private readonly DofFixService _dofFixService;
+    private readonly MfgUnlockService _mfgUnlockService;
     private readonly AutoUpdateService _autoUpdateService;
     private readonly CustomReShadeHashService _customReShadeHashService;
     private readonly SeenWikiModsService _seenWikiModsService;
@@ -540,6 +541,7 @@ public partial class MainViewModel : ObservableObject
         IPeHeaderService peHeaderService,
         IUpdateService updateService,
         IShaderPackService shaderPackService,
+        IAddonPackService addonPackService,
         ILumaService lumaService,
         IReShadeUpdateService rsUpdateService,
         INormalReShadeUpdateService normalRsUpdateService,
@@ -589,7 +591,7 @@ public partial class MainViewModel : ObservableObject
         _dllOverrideService = dllOverrideService;
         _gameNameService = gameNameService;
         _gameInitializationService = gameInitializationService;
-        _addonPackService = new AddonPackService(http);
+        _addonPackService = addonPackService;
         _nexusModsService = nexusModsService;
         _pcgwService = pcgwService;
         _uwFixService = uwFixService;
@@ -602,6 +604,7 @@ public partial class MainViewModel : ObservableObject
         _dlssStreamlineService = dlssStreamlineService;
         _dlssPresetService = dlssPresetService;
         _dofFixService = App.Services.GetRequiredService<DofFixService>();
+        _mfgUnlockService = App.Services.GetRequiredService<MfgUnlockService>();
         _autoUpdateService = App.Services.GetRequiredService<AutoUpdateService>();
         _autoUpdateService.SetViewModel(this);
         _customReShadeHashService = App.Services.GetRequiredService<CustomReShadeHashService>();

@@ -68,6 +68,164 @@ public class CoreLogicTests
         Assert.Null(MainViewModel.ResolveAutoReShadeFilename(apis));
     }
 
+    [Fact]
+    public void ResolveReShadeInstallPolicy_Dx9Feeder_KeepsTranslationChainAndSuiteShaders()
+    {
+        var policy = Dlss5ComponentService.ResolveReShadeInstallPolicy(
+            Dlss5DeploymentMode.Dx9Feeder,
+            Dlss5InstallProfile.LatestFeederBeta);
+
+        Assert.False(policy.BlockInstall);
+        Assert.Equal("dxgi.dll", policy.ProxyName);
+        Assert.True(policy.PreserveSuiteShaders);
+    }
+
+    [Fact]
+    public void ResolveReShadeInstallPolicy_OptiScalerPipeline_BlocksIndependentReplacement()
+    {
+        var policy = Dlss5ComponentService.ResolveReShadeInstallPolicy(
+            Dlss5DeploymentMode.NativeDirectX12,
+            Dlss5InstallProfile.OptiScalerNeuralRendering);
+
+        Assert.True(policy.BlockInstall);
+        Assert.Contains("DLSS 5", policy.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplyInstalledReShadeRecord_RefreshesCardAfterSuiteInstall()
+    {
+        var card = new GameCardViewModel { InstallPath = @"E:\Games\Example" };
+        var record = new AuxInstalledRecord
+        {
+            InstallPath = card.InstallPath,
+            InstalledAs = "dxgi.dll",
+        };
+
+        MainViewModel.ApplyInstalledReShadeRecord(card, record, "6.8.0");
+
+        Assert.Same(record, card.RsRecord);
+        Assert.Equal(GameStatus.Installed, card.RsStatus);
+        Assert.Equal("dxgi.dll", card.RsInstalledFile);
+        Assert.Equal("6.8.0", card.RsInstalledVersion);
+    }
+
+    [Fact]
+    public void ShouldRemovePreviousReShadeProxy_DlssPipelineOwnsOldSlot_DoesNotDeleteTranslator()
+    {
+        Assert.False(AuxInstallService.ShouldRemovePreviousReShadeProxy(
+            "d3d9.dll",
+            "dxgi.dll",
+            dlssPipelineOwnsFiles: true));
+    }
+
+    [Fact]
+    public void ShouldRemovePreviousReShadeProxy_NoDlssPipeline_RemovesObsoleteProxy()
+    {
+        Assert.True(AuxInstallService.ShouldRemovePreviousReShadeProxy(
+            "d3d9.dll",
+            "dxgi.dll",
+            dlssPipelineOwnsFiles: false));
+    }
+
+    [Fact]
+    public void ResolveReShadeChannelValue_UsesDefaultGameOverrideForManualEntry()
+    {
+        var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["L.A. Noire|"] = "6.3.3",
+        };
+
+        Assert.Equal("6.3.3", MainViewModel.ResolveReShadeChannelValue(overrides, "L.A. Noire", "Manual"));
+    }
+
+    [Fact]
+    public void ResolveReShadeChannelValue_DoesNotForceAnOldVersionByGameTitle()
+    {
+        var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal("Stable", MainViewModel.ResolveReShadeChannelValue(overrides, "L.A. Noire", "Manual"));
+    }
+
+    [Fact]
+    public void CreateDirectLaunchInfo_UsesTheExecutableDirectory()
+    {
+        var info = MainWindow.CreateDirectLaunchInfo(@"E:\Games\Example\game.exe", "-safe");
+        Assert.Equal(@"E:\Games\Example", info.WorkingDirectory);
+        Assert.Equal("-safe", info.Arguments);
+        Assert.True(info.UseShellExecute);
+    }
+
+    [Fact]
+    public void FindGameExe_IgnoresLargerUninstaller()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"adas-game-exe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var gameExe = Path.Combine(root, "PowerWashSimulator.exe");
+            File.WriteAllBytes(gameExe, new byte[64]);
+            File.WriteAllBytes(Path.Combine(root, "unins000.exe"), new byte[1024]);
+
+            Assert.Equal(gameExe, new PeHeaderService().FindGameExe(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void FindGameExe_PrefersNestedGameBinaryOverRootLauncher()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"adas-nested-game-exe-{Guid.NewGuid():N}");
+        var binary = Path.Combine(root, "Bin64");
+        Directory.CreateDirectory(binary);
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "GameLauncher.exe"), new byte[64]);
+            var gameExe = Path.Combine(binary, "Game.x64.exe");
+            File.WriteAllBytes(gameExe, new byte[1024]);
+
+            Assert.Equal(gameExe, new PeHeaderService().FindGameExe(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(MachineType.I386, false, false)]
+    [InlineData(MachineType.x64, true, true)]
+    [InlineData(MachineType.Native, false, true)]
+    public void DlssProbe_UsesExecutableArchitectureOverStaleCardMetadata(
+        MachineType detected,
+        bool cardIs32Bit,
+        bool expectedIs64Bit)
+    {
+        Assert.Equal(
+            expectedIs64Bit,
+            Dlss5CompatibilityService.ResolveActualIs64Bit(detected, cardIs32Bit));
+    }
+
+    [Fact]
+    public void AddonArchitectureGuard_RejectsX64PayloadFor32BitGame()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"adas-addon-arch-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var addon = Path.Combine(root, "wrong.addon32");
+        try
+        {
+            WriteMinimalPe(addon, MachineType.x64);
+            Assert.False(AddonPackService.IsAddonArchitectureCompatible(addon, is32Bit: true));
+            Assert.True(AddonPackService.IsAddonArchitectureCompatible(addon, is32Bit: false));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // 2. ViewLayout.NextViewLayout — Detail ↔ Compact cycle (no Grid)
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -404,6 +562,18 @@ public class CoreLogicTests
             || (c.RefStatus == GameStatus.UpdateAvailable && !c.ExcludeFromUpdateAllRef)
             || (c.LumaStatus == GameStatus.UpdateAvailable)
             || (c.DofFixStatus == GameStatus.UpdateAvailable && !c.ExcludeFromUpdateAllDofFix);
+    }
+
+    private static void WriteMinimalPe(string path, MachineType machine)
+    {
+        var bytes = new byte[512];
+        bytes[0] = (byte)'M';
+        bytes[1] = (byte)'Z';
+        BitConverter.GetBytes(0x80).CopyTo(bytes, 0x3c);
+        bytes[0x80] = (byte)'P';
+        bytes[0x81] = (byte)'E';
+        BitConverter.GetBytes((ushort)machine).CopyTo(bytes, 0x84);
+        File.WriteAllBytes(path, bytes);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

@@ -90,7 +90,7 @@ public partial class MainViewModel
             return false;
         if (fileName.StartsWith("renodx-upgrade", StringComparison.OrdinalIgnoreCase))
             return false;
-        if (fileName.StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase))
+        if (fileName.StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase))
             return false;
         if (fileName.StartsWith("renodx-universal_ue", StringComparison.OrdinalIgnoreCase))
             return false;
@@ -493,6 +493,15 @@ public partial class MainViewModel
             {
                 graphicsApi = cachedApi.Primary;
                 detectedApis = cachedApi.All;
+                // A cached multi-renderer executable only describes capability.
+                // Reconcile it with the same runtime/config evidence used by install.
+                if (detectedApis.Count != 1)
+                {
+                    var environment = GraphicsEnvironmentService.Detect(installPath);
+                    graphicsApi = environment.Api;
+                    detectedApis = environment.SupportedApis;
+                    CacheGameApi(installPath, graphicsApi, detectedApis);
+                }
             }
 
             // For WindowsApps (Xbox/Game Pass) Unreal Engine 5+ games, infer DX12.
@@ -724,6 +733,15 @@ public partial class MainViewModel
                     newCard.DofFixStatus = GameStatus.Installed;
                     newCard.DofFixInstalledVersion = _dofFixService.StagedVersion;
                 }
+            }
+
+            // MFG Ada Unlock detection (RTX 40-series only; lightweight File.Exists check)
+            newCard.IsMfgUnlockEligible = FeatureFlags.MfgUnlock && Dlss5CompatibilityService.IsAdaGpuDetected;
+            if (newCard.IsMfgUnlockEligible && !string.IsNullOrEmpty(installPath) && Directory.Exists(installPath)
+                && _mfgUnlockService.IsInstalledIn(installPath))
+            {
+                newCard.MfgUnlockStatus = GameStatus.Installed;
+                newCard.MfgUnlockInstalledVersion = _mfgUnlockService.StagedVersion;
             }
 
             // DLSS / Streamline: restore from cached paths (fast — just reads file versions, no directory scan)

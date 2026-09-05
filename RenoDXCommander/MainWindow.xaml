@@ -6,7 +6,7 @@
     xmlns:vm="using:RenoDXCommander.ViewModels"
     xmlns:converters="using:RenoDXCommander.Converters"
     xmlns:controls="using:RenoDXCommander.Controls"
-    Title="RHI">
+    Title="Adas">
     <Grid RequestedTheme="Dark" Background="{StaticResource SurfaceBaseBrush}" AllowDrop="True" DragOver="Grid_DragOver" Drop="Grid_Drop">
         <Grid.Resources>
             <x:Double x:Key="CardItemWidth">390</x:Double>
@@ -20,7 +20,8 @@
         </Grid.RowDefinitions>
 
         <!--  ROW 0: TOOLBAR  -->
-        <Border Grid.Row="0" Padding="16,10" Background="{StaticResource SurfaceHeaderBrush}"
+        <Border x:Name="LegacyToolbar" Grid.Row="0" Padding="16,10" Background="{StaticResource SurfaceHeaderBrush}"
+                Visibility="Collapsed"
                 BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -36,9 +37,9 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock FontSize="15" FontWeight="Bold">
-                            <Run Text="RHI" Foreground="{StaticResource AccentTealBrush}"/>
+                            <Run Text="Adas" Foreground="{StaticResource AccentTealBrush}"/>
                         </TextBlock>
-                        <TextBlock Text="Simplified PC Gaming" FontSize="10" Foreground="{StaticResource AccentTealDimBrush}"/>
+                        <TextBlock Text="Smart DLSS 5 setup for your game library" FontSize="10" Foreground="{StaticResource AccentTealDimBrush}"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -101,7 +102,7 @@
                             <MenuFlyout Placement="Bottom">
                                 <MenuFlyoutItem Text="RenoDX Wiki" Click="LinkRenoDxWiki_Click"/>
                                 <MenuFlyoutItem Text="Luma Wiki" Click="LinkLumaWiki_Click"/>
-                                <MenuFlyoutItem Text="RHI GitHub" Click="LinkRhiGithub_Click"/>
+                                <MenuFlyoutItem Text="Source on GitHub" Click="LinkRhiGithub_Click"/>
                                 <MenuFlyoutItem Text="ReLimiter GitHub" Click="LinkReLimiterGithub_Click"/>
                             </MenuFlyout>
                         </Button.Flyout>
@@ -692,6 +693,52 @@
                                     </Button>
                                 </Grid>
 
+                                <!-- Adas DLSS 5 Suite row -->
+                                <Grid x:Name="DetailDlss5Row" x:FieldModifier="internal" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="36"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="DLSS 5 Suite" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="DetailDlss5Status" x:FieldModifier="internal" Grid.Column="1" FontSize="11"
+                                               TextWrapping="Wrap" VerticalAlignment="Center" HorizontalTextAlignment="Center"/>
+                                    <Button x:Name="DetailDlss5InfoBtn" x:FieldModifier="internal" Grid.Column="2"
+                                            Content="Info" FontSize="11" Padding="6,2,6,2"
+                                            Background="{StaticResource AccentBlueBgBrush}"
+                                            Foreground="{StaticResource AccentBlueBrush}"
+                                            BorderBrush="{StaticResource AccentBlueBorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" Width="36" Height="32"
+                                            Click="Dlss5InfoButton_Click"/>
+                                    <Button x:Name="DetailDlss5ManageBtn" x:FieldModifier="internal" Grid.Column="3"
+                                            Content="Review &amp; Install" Click="Dlss5ManageButton_Click"
+                                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                            Background="{StaticResource AccentPurpleBgBrush}"
+                                            Foreground="{StaticResource AccentPurpleBrush}"
+                                            BorderBrush="{StaticResource AccentPurpleBorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" FontSize="12" Height="32"/>
+                                    <Button x:Name="DetailDlss5CogBtn" x:FieldModifier="internal" Grid.Column="4"
+                                            Click="Dlss5CogButton_Click"
+                                            Background="{StaticResource SurfaceOverlayBrush}" Foreground="{StaticResource TextSecondaryBrush}"
+                                            BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                            CornerRadius="8" Width="36" Height="32" Padding="0"
+                                            ToolTipService.ToolTip="DLSS 5 configuration and diagnostics">
+                                        <TextBlock Text="⚙" FontSize="14" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button x:Name="DetailDlss5DeleteBtn" x:FieldModifier="internal" Grid.Column="5"
+                                            Click="Dlss5UninstallButton_Click"
+                                            Background="{StaticResource AccentRedBgBrush}" Foreground="{StaticResource AccentRedBrush}"
+                                            BorderBrush="{StaticResource AccentPurpleBorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" Width="36" Height="32" Padding="0"
+                                            ToolTipService.ToolTip="Remove suite-managed DLSS 5 files" Opacity="0" IsHitTestVisible="False">
+                                        <TextBlock Text="✕" FontSize="12" HorizontalAlignment="Center" Foreground="{StaticResource AccentRedBrush}"/>
+                                    </Button>
+                                </Grid>
+
                                 <!-- Labeled separator: HDR mods — choose one or both -->
                                 <Grid x:Name="DetailHdrModSeparator" x:FieldModifier="internal" Margin="0,4,0,4" ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -717,7 +764,7 @@
                                         <ColumnDefinition Width="36"/>
                                         <ColumnDefinition Width="36"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="DetailRdxLabel" x:FieldModifier="internal" Grid.Column="0" Text="RenoDX" FontSize="12"
+                                    <TextBlock x:Name="DetailRdxLabel" x:FieldModifier="internal" Grid.Column="0" Text="RenoDX game mod" FontSize="12"
                                                Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                                     <TextBlock x:Name="DetailRdxStatus" x:FieldModifier="internal" Grid.Column="1" FontSize="12"
                                                VerticalAlignment="Center" HorizontalTextAlignment="Center"
@@ -855,6 +902,52 @@
                                             BorderBrush="{StaticResource AccentPurpleBorderBrush}" BorderThickness="1"
                                             CornerRadius="8" Width="36" Height="32" Padding="0"
                                             ToolTipService.ToolTip="Remove DOF Fix" Opacity="0" IsHitTestVisible="False">
+                                        <TextBlock Text="✕" FontSize="12" HorizontalAlignment="Center" Foreground="{StaticResource AccentRedBrush}"/>
+                                    </Button>
+                                </Grid>
+
+                                <!-- MFG Ada Unlock row (RTX 40-series only) -->
+                                <Grid x:Name="DetailMfgUnlockRow" x:FieldModifier="internal" ColumnSpacing="8" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="36"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="DetailMfgUnlockLabel" x:FieldModifier="internal" Grid.Column="0" Text="MFG Unlock" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="DetailMfgUnlockStatus" x:FieldModifier="internal" Grid.Column="1" FontSize="12"
+                                               VerticalAlignment="Center" HorizontalTextAlignment="Center"
+                                               PointerPressed="DetailMfgUnlockStatus_PointerPressed"
+                                               PointerEntered="LinkText_PointerEntered" PointerExited="LinkText_PointerExited"/>
+                                    <Button x:Name="DetailMfgUnlockInfoBtn" x:FieldModifier="internal" Grid.Column="2"
+                                            Content="Info" FontSize="11" Padding="6,2,6,2"
+                                            Background="{StaticResource SurfaceOverlayBrush}"
+                                            Foreground="{StaticResource TextSecondaryBrush}"
+                                            BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                            CornerRadius="8" Width="36" Height="32"
+                                            Click="MfgUnlockInfoButton_Click"/>
+                                    <Button x:Name="DetailMfgUnlockInstallBtn" x:FieldModifier="internal" Grid.Column="3"
+                                            Click="InstallMfgUnlockButton_Click"
+                                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                            CornerRadius="8" FontSize="12" Height="32"/>
+                                    <Button x:Name="DetailMfgUnlockCogBtn" x:FieldModifier="internal" Grid.Column="4"
+                                            Visibility="Collapsed"
+                                            Click="MfgUnlockCogButton_Click"
+                                            Background="{StaticResource SurfaceOverlayBrush}" Foreground="{StaticResource TextSecondaryBrush}"
+                                            BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                            CornerRadius="8" Width="36" Height="32" Padding="0"
+                                            ToolTipService.ToolTip="MFG Unlock Settings">
+                                        <TextBlock Text="⚙" FontSize="14" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button x:Name="DetailMfgUnlockDeleteBtn" x:FieldModifier="internal" Grid.Column="5"
+                                            Click="UninstallMfgUnlockButton_Click"
+                                            Background="{StaticResource AccentRedBgBrush}" Foreground="{StaticResource AccentRedBrush}"
+                                            BorderBrush="{StaticResource AccentPurpleBorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" Width="36" Height="32" Padding="0"
+                                            ToolTipService.ToolTip="Remove MFG Unlock" Opacity="0" IsHitTestVisible="False">
                                         <TextBlock Text="✕" FontSize="12" HorizontalAlignment="Center" Foreground="{StaticResource AccentRedBrush}"/>
                                     </Button>
                                 </Grid>
@@ -1111,6 +1204,11 @@
                                                  Foreground="{StaticResource AccentBlueBrush}" Background="{StaticResource SurfaceToolbarBrush}"/>
                                     <TextBlock x:Name="DetailDofFixMessage" x:FieldModifier="internal" FontSize="10" Foreground="{StaticResource AccentBlueBrush}"
                                                Visibility="Collapsed" TextWrapping="Wrap"/>
+                                    <ProgressBar x:Name="DetailMfgUnlockProgress" x:FieldModifier="internal" Visibility="Collapsed"
+                                                 Maximum="100" Height="3" CornerRadius="2"
+                                                 Foreground="{StaticResource AccentBlueBrush}" Background="{StaticResource SurfaceToolbarBrush}"/>
+                                    <TextBlock x:Name="DetailMfgUnlockMessage" x:FieldModifier="internal" FontSize="10" Foreground="{StaticResource AccentBlueBrush}"
+                                               Visibility="Collapsed" TextWrapping="Wrap"/>
                                     <ProgressBar x:Name="DetailDxvkProgress" x:FieldModifier="internal" Visibility="Collapsed"
                                                  Maximum="100" Height="3" CornerRadius="2"
                                                  Foreground="{StaticResource AccentBlueBrush}" Background="{StaticResource SurfaceToolbarBrush}"/>
@@ -1261,7 +1359,7 @@
                                     <TextBlock Text="Automatic Updates" FontSize="13" FontWeight="SemiBold"
                                                Foreground="{StaticResource TextPrimaryBrush}"/>
                                     <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                               Text="When enabled, RHI silently installs component updates in the background after each update check. Games that are running when an update is detected will be retried automatically once they close. Does not apply to app updates."/>
+                                               Text="When enabled, Adas silently installs component updates in the background after each update check. Games that are running when an update is detected will be retried automatically once they close. Does not apply to app updates."/>
                                     <ComboBox x:Name="AutoUpdateComponentsCombo" x:FieldModifier="internal"
                                               FontSize="12" HorizontalAlignment="Stretch"
                                               ToolTipService.ToolTip="Automatically install ReShade, RenoDX, ReLimiter, DC, OptiScaler, RE Framework, Luma, DXVK and DOF Fix updates silently in the background"
@@ -1459,7 +1557,7 @@
                                                VerticalAlignment="Center"/>
                                     <ComboBox Grid.Column="1" x:Name="HdrAutoToggleCombo" x:FieldModifier="internal"
                                               FontSize="12" HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                                              ToolTipService.ToolTip="When On, Windows HDR is automatically enabled when launching a game through RHI and disabled when the game exits."
+                                              ToolTipService.ToolTip="When On, Windows HDR is automatically enabled when launching a game through Adas and disabled when the game exits."
                                               SelectionChanged="HdrAutoToggleCombo_SelectionChanged">
                                         <ComboBoxItem Content="Off"/>
                                         <ComboBoxItem Content="On"/>
@@ -1627,7 +1725,7 @@
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <TextBlock TextWrapping="Wrap" FontSize="11"
                                                    Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                                   Text="Register RHI as the nxm:// handler so Nexus &quot;Mod Manager Download&quot; buttons open directly in RHI."/>
+                                                   Text="Register Adas as the nxm:// handler so Nexus &quot;Mod Manager Download&quot; buttons open directly in Adas."/>
                                     </StackPanel>
 
                                     <!-- Row 1 Left: API key input + Connect/Disconnect buttons -->
@@ -2268,7 +2366,7 @@
                                         <TextBlock Text="Shader Management" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                                   Text="Control how RHI manages shader files across your games."/>
+                                                   Text="Control how Adas manages shader files across your games."/>
                                     </StackPanel>
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -2285,10 +2383,10 @@
                                                    Foreground="{StaticResource InlineDescriptionBrush}" Margin="0,0,0,3"/>
                                         <ComboBox Grid.Row="1" Grid.Column="0" x:Name="CustomShadersCombo" x:FieldModifier="internal"
                                                   FontSize="12" HorizontalAlignment="Stretch"
-                                                  ToolTipService.ToolTip="RHI Managed: deploy built-in shader packs to all games.&#10;Custom: use your own shader directory.&#10;Off: RHI never touches shaders on any game."
+                                                  ToolTipService.ToolTip="Adas Managed: deploy built-in shader packs to all games.&#10;Custom: use your own shader directory.&#10;Off: Adas never touches shaders on any game."
                                                   SelectionChanged="CustomShadersCombo_SelectionChanged">
                                             <ComboBoxItem Content="Off"/>
-                                            <ComboBoxItem Content="RHI Managed"/>
+                                            <ComboBoxItem Content="Adas Managed"/>
                                             <ComboBoxItem Content="Custom"/>
                                         </ComboBox>
                                         <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CacheAllShadersCombo" x:FieldModifier="internal"
@@ -2312,7 +2410,7 @@
                                         <TextBlock Text="Addon Watch Folder" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                                   Text="RHI watches this folder for RenoDX addon files (.addon64/.addon32) and archives. Defaults to your Downloads folder."/>
+                                                   Text="Adas watches this folder for RenoDX addon files (.addon64/.addon32) and archives. Defaults to your Downloads folder."/>
                                     </StackPanel>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
@@ -2502,7 +2600,7 @@
                                         <TextBlock Text="Admin Mode" FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                                   Text="Creates a scheduled task to launch RHI with elevated privileges. Required for ReBAR, Low Latency Ultra, and Smooth Motion driver settings. The Drop Helper enables Discord drag-and-drop when running elevated."/>
+                                                   Text="Creates a scheduled task to launch Adas with elevated privileges. Required for ReBAR, Low Latency Ultra, and Smooth Motion driver settings. The Drop Helper enables Discord drag-and-drop when running elevated."/>
                                     </StackPanel>
                                     <Grid Grid.Row="1" ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -2585,7 +2683,7 @@
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Data &amp; Custom Files" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="20">
-                                    All RHI data is stored in AppData. Drop custom ReShade, DLSS, or Streamline DLLs into the Custom folder to use them as per-game overrides. The Logs folder contains session usage logs useful for troubleshooting.
+                                    All Adas data is stored in AppData. Drop custom ReShade, DLSS, or Streamline DLLs into the Custom folder to use them as per-game overrides. The Logs folder contains session usage logs useful for troubleshooting.
                                 </TextBlock>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button x:Name="OpenAppDataBtn" Content="AppData Folder" Click="OpenAppDataFolder_Click"
@@ -2668,23 +2766,23 @@
                                     <Image Source="icon.ico" Width="48" Height="48"/>
                                     <StackPanel VerticalAlignment="Center" Spacing="4">
                                         <TextBlock FontSize="20" FontWeight="Bold">
-                                            <Run Text="RHI" Foreground="{StaticResource AccentTealBrush}"/>
+                                            <Run Text="Adas" Foreground="{StaticResource AccentTealBrush}"/>
                                         </TextBlock>
                                         <TextBlock x:Name="AboutVersionText" x:FieldModifier="internal" FontSize="12" Foreground="{StaticResource InlineDescriptionBrush}"/>
                                     </StackPanel>
                                 </StackPanel>
 
                                 <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextTertiaryBrush}" LineHeight="20"
-                                           Text="The all-in-one game enhancement toolkit for PC. Auto-detects games from 8 storefronts and provides one-click management for ReShade, HDR mods, shaders, DLSS/Streamline, frame limiters, NVIDIA driver profiles, and more — all from one place."/>
+                                           Text="Adas — an all-in-one PC game enhancement toolkit with a smart per-game DLSS 5 installer, unified DX9/DX11/DX12 support, safety gates, and DLSSNR signature repair."/>
 
                                 <!-- What it does -->
                                 <Border Background="{StaticResource SurfaceToolbarBrush}" CornerRadius="8" Padding="14,10"
                                         BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="What RHI manages" FontSize="12" FontWeight="SemiBold"
+                                        <TextBlock Text="What Adas manages" FontSize="12" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                                   Text="ReShade &amp; shader packs · RenoDX HDR mods · Luma Framework · DLSS/Streamline version swaps &amp; presets · NVIDIA driver profile settings (VSync, Low Latency, ReBAR, Smooth Motion, Power) · OptiScaler · ReLimiter &amp; Display Commander frame limiters · RE Framework · DXVK · UE-Extended native HDR · Per-game overrides for everything."/>
+                                                   Text="Every feature: ReShade &amp; shader packs · RenoDX HDR mods · Luma Framework · DLSS/Streamline version swaps &amp; presets · NVIDIA driver profiles · OptiScaler · frame limiters · RE Framework · DXVK · native HDR · plus route-aware RenoDX DLSS profiles, DLSS5 Bridge and Feeder, DLSSNR repair, guided imports, backups, rollback, and diagnostics."/>
                                     </StackPanel>
                                 </Border>
 
@@ -2696,7 +2794,7 @@
                                         <TextBlock Text="Single-player only" FontSize="12" FontWeight="SemiBold"
                                                    Foreground="{StaticResource AccentRedBrush}"/>
                                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource InlineDescriptionBrush}" LineHeight="18"
-                                                   Text="RHI installs ReShade with full addon support, OptiScaler, and can swap DLSS/Streamline DLLs. These modifications may be flagged by anti-cheat in online or multiplayer games. Uninstall ReShade, OptiScaler, and restore DLSS/Streamline defaults before playing online."/>
+                                                   Text="Adas hard-blocks its DLSS 5 workflow when it finds anti-cheat or multiplayer evidence. Other inherited components can still modify game files, so use this application only with single-player games and remove modifications before going online."/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -3019,12 +3117,227 @@
             </Grid>
 
             <!-- end FaqPanel -->
+
+            <!-- Adas simple shell. The older component manager stays loaded only
+                 for compatibility with existing services; it is not exposed. -->
+            <Grid x:Name="SimpleShellPanel" Canvas.ZIndex="100" Background="#0B0E14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Padding="28,20" Background="#10151D"
+                        BorderBrush="#252D39" BorderThickness="0,0,0,1">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Adas" FontSize="24" FontWeight="SemiBold" Foreground="#F5F7FA"/>
+                            <TextBlock Text="DLSS 5 setup without the component maze" FontSize="12" Foreground="#95A1B2"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Content="Add game" Click="AddGameButton_Click" Padding="14,8"
+                                    Background="#19212C" BorderBrush="#344154" Foreground="#DCE5F2"/>
+                            <Button x:Name="SimpleRefreshButton" Content="Refresh" Click="RefreshButton_Click" Padding="14,8"
+                                    Background="#19212C" BorderBrush="#344154" Foreground="#DCE5F2"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="#0E1219" BorderBrush="#252D39" BorderThickness="0,0,1,0">
+                        <Grid Padding="18,20">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBox x:Name="SimpleSearchBox" PlaceholderText="Find a game" TextChanged="SimpleSearchBox_TextChanged"
+                                     Background="#151B24" BorderBrush="#2C3747" Foreground="#E8EDF5" Padding="11,8"/>
+                            <TextBlock Grid.Row="1" x:Name="SimpleGameCountText" Margin="2,12,0,8"
+                                       Text="Games" FontSize="11" Foreground="#718096"/>
+                            <ListView Grid.Row="2" x:Name="SimpleGameList" SelectionMode="Single"
+                                      SelectionChanged="SimpleGameList_SelectionChanged" Background="Transparent" Padding="0">
+                                <ListView.Resources>
+                                    <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#1B2D43"/>
+                                    <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#223A56"/>
+                                    <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#151B24"/>
+                                </ListView.Resources>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:GameCardViewModel">
+                                        <StackPanel Padding="8,7" Spacing="3">
+                                            <TextBlock Text="{x:Bind GameName}" FontSize="13" Foreground="#E9EEF6"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                            <TextBlock Text="{x:Bind InstallPathDisplay}" FontSize="10" Foreground="#69778A"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Column="1" Padding="36,28">
+                        <Grid x:Name="SimpleEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                <TextBlock Text="Choose a game" FontSize="22" FontWeight="SemiBold" Foreground="#DDE4ED"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Adas will detect its renderer and choose one compatible setup."
+                                           Foreground="#7F8B9C" TextWrapping="Wrap" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ScrollViewer x:Name="SimpleDetailScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                            <StackPanel MaxWidth="760" HorizontalAlignment="Center" Spacing="18">
+                                <StackPanel Spacing="4">
+                                    <TextBlock x:Name="SimpleGameName" FontSize="28" FontWeight="SemiBold" Foreground="#F4F7FB"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="SimpleInstallPath" FontFamily="Consolas" FontSize="11" Foreground="#708096"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <Border Background="#111721" BorderBrush="#283444" BorderThickness="1" CornerRadius="12" Padding="22">
+                                    <StackPanel Spacing="15">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock x:Name="SimpleSetupTitle" Text="Checking this game" FontSize="18"
+                                                           FontWeight="SemiBold" Foreground="#EAF0F7"/>
+                                                <TextBlock x:Name="SimpleSetupSummary" Text="Detecting the renderer and existing files…"
+                                                           Foreground="#98A6B8" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="1" x:Name="SimpleRendererBadge" Background="#172435"
+                                                    BorderBrush="#315174" BorderThickness="1" CornerRadius="10" Padding="10,6"
+                                                    VerticalAlignment="Top">
+                                                <TextBlock x:Name="SimpleRendererText" Text="Detecting" FontSize="11" Foreground="#A9D2FF"/>
+                                            </Border>
+                                        </Grid>
+
+                                        <ProgressBar x:Name="SimpleInstallProgress" Minimum="0" Maximum="100" Height="4"
+                                                     Visibility="Collapsed" Foreground="#4BA3FF"/>
+                                        <TextBlock x:Name="SimpleActionStatus" Foreground="#9AA9BB" TextWrapping="Wrap"/>
+
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="SimpleInstallButton" Content="Install best setup"
+                                                    Click="SimpleInstallButton_Click" Padding="18,11"
+                                                    Background="#1876D2" BorderBrush="#2F91EF" Foreground="White" FontWeight="SemiBold"/>
+                                            <Button Grid.Column="1" x:Name="SimpleLaunchButton" Content="Launch"
+                                                    Click="SimpleLaunchButton_Click" Padding="16,11"
+                                                    Background="#173323" BorderBrush="#28573B" Foreground="#9DE4B2"/>
+                                            <Button Grid.Column="2" x:Name="SimpleRemoveButton" Content="Remove &amp; restore"
+                                                    Click="SimpleRemoveButton_Click" Padding="16,11"
+                                                    Visibility="Collapsed"
+                                                    Background="#271A1E" BorderBrush="#5B313A" Foreground="#F0A9B5"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- MFG Ada Unlock (RTX 40-series only) -->
+                                <Border x:Name="SimpleMfgUnlockCard" Visibility="Collapsed"
+                                        Background="#111721" BorderBrush="#283444" BorderThickness="1" CornerRadius="12" Padding="22">
+                                    <StackPanel Spacing="14">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock x:Name="SimpleMfgUnlockTitle" Text="MFG Ada Unlock" FontSize="18"
+                                                           FontWeight="SemiBold" Foreground="#EAF0F7"/>
+                                                <TextBlock x:Name="SimpleMfgUnlockSummary"
+                                                           Foreground="#98A6B8" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Background="#1D1526" BorderBrush="#4A3A66" BorderThickness="1"
+                                                    CornerRadius="10" Padding="10,6" VerticalAlignment="Top">
+                                                <TextBlock Text="RTX 40 · Multi Frame Gen" FontSize="11" Foreground="#C9B6F2"/>
+                                            </Border>
+                                        </Grid>
+                                        <TextBlock x:Name="SimpleMfgUnlockStatus" Foreground="#9AA9BB" TextWrapping="Wrap"/>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="SimpleMfgUnlockInstallButton" Content="Install MFG Unlock"
+                                                    Click="SimpleMfgUnlockInstall_Click" Padding="18,11"
+                                                    Background="#3A2860" BorderBrush="#5A44A0" Foreground="#D9C9FF" FontWeight="SemiBold"/>
+                                            <Button Grid.Column="1" x:Name="SimpleMfgUnlockSettingsButton" Content="Settings"
+                                                    Click="SimpleMfgUnlockSettings_Click" Padding="16,11" Visibility="Collapsed"
+                                                    Background="#172435" BorderBrush="#315174" Foreground="#A9D2FF"/>
+                                            <Button Grid.Column="2" x:Name="SimpleMfgUnlockRemoveButton" Content="Remove"
+                                                    Click="SimpleMfgUnlockRemove_Click" Padding="16,11" Visibility="Collapsed"
+                                                    Background="#271A1E" BorderBrush="#5B313A" Foreground="#F0A9B5"/>
+                                        </Grid>
+                                        <TextBlock Text="Single-player only. Requires ReShade with add-on support and a game using DLSS Frame Generation."
+                                                   FontSize="11" Foreground="#806C52" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Expander Header="Advanced" Background="#0E141C" Foreground="#AAB5C3">
+                                    <StackPanel Spacing="12" Padding="4,12,4,4">
+                                        <TextBlock Text="Automatic detection is preferred. Use an override only when the detected renderer is wrong."
+                                                   Foreground="#7F8B9C" TextWrapping="Wrap"/>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="SimpleRendererOverride" Header="Renderer override"
+                                                      PlaceholderText="Automatic" HorizontalAlignment="Stretch"/>
+                                            <Button Grid.Column="1" Content="Apply" Click="SimpleApplyRendererOverride_Click"
+                                                    VerticalAlignment="Bottom" Padding="14,8"/>
+                                            <Button Grid.Column="2" Content="Use automatic" Click="SimpleClearRendererOverride_Click"
+                                                    VerticalAlignment="Bottom" Padding="14,8"/>
+                                        </Grid>
+                                        <Button Content="Open game folder" Click="SimpleOpenFolder_Click"
+                                                HorizontalAlignment="Left" Padding="14,8"/>
+                                        <Button Content="Try another method (experimental)"
+                                                Click="SimpleExperimentalMethods_Click"
+                                                HorizontalAlignment="Left" Padding="14,8"
+                                                Background="#1A1725" BorderBrush="#463A66" Foreground="#C9B6F2"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <Button x:Name="SimpleFullCleanupButton" Content="Full cleanup…"
+                                                    Click="SimpleFullCleanupButton_Click" Padding="14,8"
+                                                    Background="#271A1E" BorderBrush="#5B313A" Foreground="#F0A9B5"
+                                                    ToolTipService.ToolTip="Restore tracked originals and remove recognized DLSS 5/ReShade files from this game and its subfolders"/>
+                                            <Button x:Name="SimpleRemoveGameFromListButton" Content="Remove game from list…"
+                                                    Click="SimpleRemoveGameFromListButton_Click" Padding="14,8"
+                                                    ToolTipService.ToolTip="Remove this entry from Adas without deleting the game"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
+
+                                <TextBlock Text="Use only for offline or single-player games. Modified renderers can trigger anti-cheat."
+                                           FontSize="11" Foreground="#806C52" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </Grid>
         </Grid>
 
         <!-- end Row 1 content area -->
 
         <!--  ROW 2: STATUS BAR  -->
-        <Border Grid.Row="2" Padding="20,6" Background="{StaticResource SurfaceStatusBarBrush}"
+        <Border x:Name="LegacyStatusBar" Grid.Row="2" Padding="20,6" Background="{StaticResource SurfaceStatusBarBrush}"
+                Visibility="Collapsed"
                 BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -3051,6 +3364,12 @@
                             Foreground="{StaticResource TextDisabledBrush}" FontSize="11"
                             Padding="8,2" VerticalAlignment="Center"
                             ToolTipService.ToolTip="View recent patch notes"/>
+                    <Button Content="MOTD"
+                            Click="MotdButton_Click"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{StaticResource TextDisabledBrush}" FontSize="11"
+                            Padding="8,2" VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Show message of the day"/>
                 </StackPanel>
             </Grid>
         </Border>

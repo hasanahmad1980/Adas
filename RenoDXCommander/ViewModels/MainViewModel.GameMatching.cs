@@ -291,6 +291,22 @@ public partial class MainViewModel
     }
 
     /// <summary>
+    /// Revalidates the executable immediately before a binary install. Saved
+    /// metadata and user overrides are useful for display, but must never cause
+    /// an x64 DLL to be copied into an x86 process (or vice versa).
+    /// </summary>
+    internal bool ResolveInstallIs32Bit(GameCardViewModel card)
+    {
+        var detected = _peHeaderService.DetectGameArchitecture(card.InstallPath);
+        return detected switch
+        {
+            MachineType.I386 => true,
+            MachineType.x64 => false,
+            _ => card.Is32Bit,
+        };
+    }
+
+    /// <summary>
     /// Detects the graphics API for a game install path.
     /// Checks manifest overrides first, then Unity boot.config, PE imports,
     /// engine DLLs, subdirectory exes, D3D12 Agility SDK folders, and finally
@@ -342,6 +358,11 @@ public partial class MainViewModel
             }
         }
 
+        // Automatic selection is centralized and evidence-based. Engine type and
+        // game title are descriptive metadata, not proof of the active renderer.
+        return GraphicsEnvironmentService.Detect(installPath).Api;
+
+#pragma warning disable CS0162 // Retained temporarily for persisted manual/manifest migration helpers.
         // Skip WindowsApps for filesystem scanning — always access-denied
         if (installPath.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase)
             || installPath.Contains(@"/WindowsApps/", StringComparison.OrdinalIgnoreCase))
@@ -489,6 +510,7 @@ public partial class MainViewModel
             EngineType.REEngine     => GraphicsApiType.DirectX12,
             _                       => GraphicsApiType.Unknown,
         };
+#pragma warning restore CS0162
     }
 
     /// <summary>
@@ -528,34 +550,7 @@ public partial class MainViewModel
                 return manifestApis;
         }
 
-        // Skip WindowsApps for filesystem scanning — always access-denied
-        if (installPath.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase)
-            || installPath.Contains(@"/WindowsApps/", StringComparison.OrdinalIgnoreCase))
-            return new HashSet<GraphicsApiType>();
-
-        var result = new HashSet<GraphicsApiType>();
-
-        // ── Game-level cache: skip filesystem scanning if cached ──────────
-        if (_gameApiCache.TryGetValue(installPath, out var cached))
-            return cached.All;
-
-        // Scan all exes in the install directory
-        ScanAllExesInDir(installPath, result);
-
-        // Also scan common subdirectories (mirrors DetectGraphicsApi fallback logic)
-        string[] subDirs = ["Bin64", "Bin", "x64", "Win64", "Binaries", "Binaries\\Win64", "Binaries\\WinGDK"];
-        foreach (var sub in subDirs)
-        {
-            var subPath = Path.Combine(installPath, sub);
-            if (Directory.Exists(subPath))
-                ScanAllExesInDir(subPath, result);
-        }
-
-        // UE5+ games default to DX12 — remove DX11 unless user/manifest overrides (checked above)
-        if (gameName != null && result.Contains(GraphicsApiType.DirectX11) && IsUe5OrHigher(gameName))
-            result.Remove(GraphicsApiType.DirectX11);
-
-        return result;
+        return GraphicsEnvironmentService.Detect(installPath).SupportedApis;
     }
 
     /// <summary>

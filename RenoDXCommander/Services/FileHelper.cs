@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 
 namespace RenoDXCommander.Services;
 
@@ -7,6 +8,13 @@ namespace RenoDXCommander.Services;
 /// </summary>
 public static class FileHelper
 {
+    /// <summary>Computes an uppercase SHA-256 without buffering the whole file.</summary>
+    public static string ComputeSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
+    }
+
     /// <summary>
     /// Writes <paramref name="content"/> to <paramref name="path"/> with up to 3 attempts.
     /// On transient <see cref="IOException"/>, waits 50ms × (attempt + 1) before retrying.

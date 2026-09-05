@@ -14,6 +14,14 @@ namespace RenoDXCommander;
 
 public sealed partial class MainWindow
 {
+    internal static System.Diagnostics.ProcessStartInfo CreateDirectLaunchInfo(string executable, string? arguments)
+        => new(executable)
+        {
+            Arguments = arguments ?? "",
+            WorkingDirectory = Path.GetDirectoryName(executable) ?? "",
+            UseShellExecute = true,
+        };
+
     // ── Update All handlers ──────────────────────────────────────────────────
 
     private async void UpdateAllButton_Click(object sender, RoutedEventArgs e)
@@ -412,6 +420,129 @@ public sealed partial class MainWindow
         }
     }
 
+    // ── MFG Ada Unlock event handlers ────────────────────────────────────────
+
+    private async void InstallMfgUnlockButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: GameCardViewModel card }) return;
+        if (card.MfgUnlockIsInstalling || string.IsNullOrEmpty(card.InstallPath)) return;
+
+        card.MfgUnlockIsInstalling = true;
+        card.MfgUnlockActionMessage = "Installing MFG Ada Unlock...";
+        card.MfgUnlockProgress = 0;
+        try
+        {
+            var progress = new Progress<(string msg, double pct)>(p =>
+            {
+                card.MfgUnlockActionMessage = p.msg;
+                card.MfgUnlockProgress = p.pct;
+            });
+            var success = await _mfgUnlockService.InstallAsync(card.InstallPath, progress);
+            if (success)
+            {
+                card.MfgUnlockInstalledVersion = _mfgUnlockService.StagedVersion;
+                card.MfgUnlockStatus = Models.GameStatus.Installed;
+                card.MfgUnlockActionMessage = "✅ MFG Ada Unlock installed!";
+                card.NotifyAll();
+                card.FadeMessage(m => card.MfgUnlockActionMessage = m, card.MfgUnlockActionMessage);
+            }
+            else
+            {
+                card.MfgUnlockActionMessage = "❌ Install failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            card.MfgUnlockActionMessage = $"❌ {ex.Message}";
+        }
+        finally
+        {
+            card.MfgUnlockIsInstalling = false;
+        }
+    }
+
+    private void UninstallMfgUnlockButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: GameCardViewModel card }) return;
+        if (string.IsNullOrEmpty(card.InstallPath)) return;
+
+        var success = _mfgUnlockService.Uninstall(card.InstallPath);
+        if (success)
+        {
+            card.MfgUnlockStatus = Models.GameStatus.NotInstalled;
+            card.MfgUnlockInstalledVersion = null;
+            card.MfgUnlockActionMessage = "✖ MFG Ada Unlock removed.";
+            card.NotifyAll();
+            card.FadeMessage(m => card.MfgUnlockActionMessage = m, card.MfgUnlockActionMessage);
+        }
+        else
+        {
+            card.MfgUnlockActionMessage = "❌ Uninstall failed";
+        }
+    }
+
+    private async void MfgUnlockInfoButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: GameCardViewModel card }) return;
+
+        var notes = _mfgUnlockService.ReleaseNotes;
+        if (string.IsNullOrEmpty(notes))
+        {
+            await _mfgUnlockService.CheckForUpdateAsync();
+            notes = _mfgUnlockService.ReleaseNotes;
+        }
+
+        var panel = new StackPanel { Spacing = 10 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Unlocks DLSS Multi Frame Generation (3x/4x/6x) on GeForce RTX 40-series (Ada) GPUs, "
+                 + "which NVIDIA otherwise limits to RTX 50-series. It is a ReShade add-on that patches the "
+                 + "running game in memory only — no game or NVIDIA files are modified on disk.\n\n"
+                 + "⚠ Single-player only: patching game memory may trigger anti-cheat in online titles. "
+                 + "Requires a game using DLSS Frame Generation and a modern nvngx_dlssg.dll (310.x+).",
+            TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+            FontSize = 12,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = notes ?? "No release notes available.",
+            TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+            IsTextSelectionEnabled = true,
+            FontSize = 11,
+            Foreground = UIFactory.Brush(ResourceKeys.TextSecondaryBrush),
+        });
+
+        var dialog = new ContentDialog
+        {
+            Title = "MFG Ada Unlock",
+            Content = new ScrollViewer { Content = panel, MaxHeight = 420 },
+            CloseButtonText = "OK",
+            XamlRoot = Content.XamlRoot,
+            RequestedTheme = ElementTheme.Dark,
+        };
+        await DialogService.ShowSafeAsync(dialog);
+    }
+
+    private async void MfgUnlockCogButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: GameCardViewModel card }) return;
+        if (string.IsNullOrEmpty(card.InstallPath)) return;
+        await MfgUnlockDialog.ShowAsync(_mfgUnlockService, card.GameName, card.InstallPath, Content.XamlRoot);
+    }
+
+    private async void DetailMfgUnlockStatus_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var card = ViewModel.SelectedGame;
+        if (card == null || !card.IsMfgUnlockInstalled) return;
+
+        var version = card.MfgUnlockInstalledVersion;
+        if (!string.IsNullOrEmpty(version))
+        {
+            var url = _mfgUnlockService.GetReleaseUrl(version);
+            await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+        }
+    }
+
     private async void DetailRsStatus_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
         if (ViewModel.SelectedGame?.RsStatus == Models.GameStatus.Installed)
@@ -672,11 +803,7 @@ public sealed partial class MainWindow
                 && !string.IsNullOrEmpty(userExe) && File.Exists(userExe))
             {
                 _crashReporter.Log($"[MainWindow.LaunchGame] Launching '{gameName}' via user override: {userExe} {launchArgs}");
-                var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(userExe)
-                {
-                    Arguments = launchArgs ?? "",
-                    UseShellExecute = true,
-                });
+                var proc = System.Diagnostics.Process.Start(CreateDirectLaunchInfo(userExe, launchArgs));
                 MonitorProcessForHdr(proc, shouldToggleHdr, hdrWasAlreadyOn, gameName, card.Source, card.InstallPath, hdrTargets, shouldToggleRes, resolutionToRestore);
                 return;
             }
@@ -690,11 +817,8 @@ public sealed partial class MainWindow
                 if (File.Exists(fullPath))
                 {
                     _crashReporter.Log($"[MainWindow.LaunchGame] Launching '{gameName}' via manifest override: {fullPath} {launchArgs}");
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fullPath)
-                    {
-                        Arguments = launchArgs ?? "",
-                        UseShellExecute = true,
-                    });
+                    var proc = System.Diagnostics.Process.Start(CreateDirectLaunchInfo(fullPath, launchArgs));
+                    MonitorProcessForHdr(proc, shouldToggleHdr, hdrWasAlreadyOn, gameName, card.Source, card.InstallPath, hdrTargets, shouldToggleRes, resolutionToRestore);
                     return;
                 }
             }
@@ -758,22 +882,12 @@ public sealed partial class MainWindow
             // 6. Direct exe — find the game exe in InstallPath
             if (!string.IsNullOrEmpty(card.InstallPath) && Directory.Exists(card.InstallPath))
             {
-                var exes = Directory.GetFiles(card.InstallPath, "*.exe", SearchOption.TopDirectoryOnly);
-                var excludeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                    { "unins000", "UnityCrashHandler64", "UnityCrashHandler32", "CrashReporter", "CrashReportClient", "launcher" };
-                var gameExe = exes
-                    .Where(e => !excludeNames.Contains(Path.GetFileNameWithoutExtension(e)))
-                    .OrderByDescending(e => new FileInfo(e).Length)
-                    .FirstOrDefault();
+                var gameExe = new PeHeaderService().FindGameExe(card.InstallPath);
 
                 if (gameExe != null)
                 {
                     _crashReporter.Log($"[MainWindow.LaunchGame] Launching '{gameName}' via auto-detected exe: {gameExe} {launchArgs}");
-                    var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(gameExe)
-                    {
-                        Arguments = launchArgs ?? "",
-                        UseShellExecute = true,
-                    });
+                    var proc = System.Diagnostics.Process.Start(CreateDirectLaunchInfo(gameExe, launchArgs));
                     MonitorProcessForHdr(proc, shouldToggleHdr, hdrWasAlreadyOn, gameName, card.Source, card.InstallPath, hdrTargets, shouldToggleRes, resolutionToRestore);
                     return;
                 }
@@ -812,6 +926,23 @@ public sealed partial class MainWindow
             c.GameName.Equals(gameName, StringComparison.OrdinalIgnoreCase) &&
             (string.IsNullOrEmpty(store) || c.Source == store));
 
+        if (!string.IsNullOrWhiteSpace(installPath) && Directory.Exists(installPath))
+        {
+            _ = GraphicsEnvironmentService.ObserveLaunchAsync(installPath, detected =>
+            {
+                if (detected.Api == GraphicsApiType.Unknown || card == null) return;
+                DispatcherQueue?.TryEnqueue(() =>
+                {
+                    card.GraphicsApi = detected.Api;
+                    card.DetectedApis = detected.SupportedApis;
+                    card.Is32Bit = detected.Machine == MachineType.I386;
+                    MainViewModel.CacheGameApi(card.InstallPath, detected.Api, detected.SupportedApis);
+                    MainViewModel.SaveGameApiCache();
+                    card.NotifyAll();
+                });
+            });
+        }
+
         if (proc != null)
         {
             // Direct exe launch — monitor the process directly
@@ -820,6 +951,7 @@ public sealed partial class MainWindow
             {
                 try
                 {
+                    var monitoredProcess = proc;
                     await proc.WaitForExitAsync();
 
                     // The launched process exited — but it might be a wrapper/launcher (SKSE, MO2)
@@ -859,8 +991,12 @@ public sealed partial class MainWindow
                             // Monitor the real game process instead.
                             _crashReporter.Log($"[MainWindow.MonitorProcess] '{gameName}' wrapper exited, found surviving process '{survivingProc.ProcessName}' (PID {survivingProc.Id})");
                             await survivingProc.WaitForExitAsync();
+                            monitoredProcess = survivingProc;
                         }
                     }
+
+                    if (Dlss5LaunchRecoveryService.RecordExit(installPath, monitoredProcess.ExitCode))
+                        _crashReporter.Log($"[MainWindow.MonitorProcess] '{gameName}' will use the per-game DXVK recovery route on the next DLSS 5 Review / Repair.");
 
                     if (shouldToggle) HdrToggleService.DisableHdr(hdrTargets);
                     if (shouldToggleRes && resolutionToRestore != null) ResolutionToggleService.SetResolution(resolutionToRestore);
@@ -918,6 +1054,8 @@ public sealed partial class MainWindow
                     DispatcherQueue?.TryEnqueue(() => { if (card != null) card.IsRunning = true; });
                     _crashReporter.Log($"[MainWindow.MonitorProcess] '{gameName}' — found process '{gameProc.ProcessName}' (PID {gameProc.Id}), waiting for exit...");
                     await gameProc.WaitForExitAsync();
+                    if (Dlss5LaunchRecoveryService.RecordExit(installPath, gameProc.ExitCode))
+                        _crashReporter.Log($"[MainWindow.MonitorProcess] '{gameName}' will use the per-game DXVK recovery route on the next DLSS 5 Review / Repair.");
                     if (shouldToggle) HdrToggleService.DisableHdr(hdrTargets);
                     if (shouldToggleRes && resolutionToRestore != null) ResolutionToggleService.SetResolution(resolutionToRestore);
                     else if (shouldToggleRes) ResolutionToggleService.RestoreResolution();

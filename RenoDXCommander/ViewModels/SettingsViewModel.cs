@@ -260,6 +260,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             try { EnabledGlobalAddons = JsonSerializer.Deserialize<List<string>>(egaVal) ?? new(); }
             catch { EnabledGlobalAddons = new(); }
+            EnabledGlobalAddons.RemoveAll(AddonPackService.IsLegacyManagedDlssPackageName);
         }
 
         if (s.TryGetValue("FirstLaunchSetupDone", out var flsdVal))

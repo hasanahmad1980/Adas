@@ -2,6 +2,7 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
@@ -217,6 +218,55 @@ public partial class DetailPanelBuilder
             }
         }
 
+        // Adas DLSS 5 Suite. Compatibility scanning is intentionally deferred
+        // until the user opens the review dialog so large game directories are
+        // never traversed on the UI thread while the detail panel is rendered.
+        {
+            var components = App.Services.GetRequiredService<Dlss5ComponentService>();
+            var installedPath = !string.IsNullOrWhiteSpace(card.InstallPath)
+                ? Dlss5ComponentService.FindInstalledDeploymentPath(card.InstallPath) ?? card.InstallPath
+                : null;
+            var installedMode = installedPath != null
+                ? components.GetInstalledMode(installedPath)
+                : Dlss5DeploymentMode.None;
+            var installedRecord = installedPath == null ? null : Dlss5ComponentService.LoadRecord(installedPath);
+            var installedProfile = installedRecord?.Profile;
+            var aioInstalled = installedMode != Dlss5DeploymentMode.None && installedProfile == Dlss5InstallProfile.StandaloneAio;
+            var updateAvailable = Dlss5ComponentService.IsComponentUpdateAvailable(installedRecord);
+
+            _window.DetailDlss5Row.Visibility = Visibility.Visible;
+            var optiNrInstalled = Dlss5ComponentService.IsOptiScalerNrProfile(installedProfile);
+            _window.DetailDlss5Status.Text = updateAvailable ? "Update\nReady" : installedMode != Dlss5DeploymentMode.None
+                ? optiNrInstalled ? "OptiScaler NR\nInstalled" : aioInstalled ? "AIO\nInstalled" : installedMode switch
+                {
+                    Dlss5DeploymentMode.NativeDirectX12 => "Native\nInstalled",
+                    Dlss5DeploymentMode.NativeDirectX11 => "Native\nInstalled",
+                    Dlss5DeploymentMode.NativeVulkan => "Native Vulkan\nInstalled",
+                    Dlss5DeploymentMode.Dx11Feeder or Dlss5DeploymentMode.Dx12Feeder
+                        or Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.Dx9Feeder
+                        or Dlss5DeploymentMode.OpenGlFeeder or Dlss5DeploymentMode.Dx10ViaDxvkFeeder
+                        or Dlss5DeploymentMode.Dx10Feeder or Dlss5DeploymentMode.Dx9ViaDxvkFeeder => "Feeder\nInstalled",
+                    _ => "Installed",
+                }
+                : "Review";
+            _window.DetailDlss5Status.Foreground = installedMode != Dlss5DeploymentMode.None
+                ? UIFactory.Brush(updateAvailable ? ResourceKeys.AccentAmberBrush : ResourceKeys.AccentGreenBrush)
+                : UIFactory.Brush(ResourceKeys.AccentPurpleBrush);
+
+            _window.DetailDlss5InfoBtn.Tag = card;
+            _window.DetailDlss5ManageBtn.Tag = card;
+            _window.DetailDlss5ManageBtn.Content = installedMode != Dlss5DeploymentMode.None
+                ? updateAvailable ? "Update / Repair" : "Review / Repair"
+                : "Review & Install";
+            _window.DetailDlss5CogBtn.Tag = card;
+            _window.DetailDlss5CogBtn.IsEnabled = aioInstalled || Dlss5CompatibilityService.IsFeederMode(installedMode);
+            _window.DetailDlss5CogBtn.Opacity = _window.DetailDlss5CogBtn.IsEnabled ? 1 : 0.3;
+            _window.DetailDlss5DeleteBtn.Tag = card;
+            var isInstalled = installedMode != Dlss5DeploymentMode.None;
+            _window.DetailDlss5DeleteBtn.Opacity = isInstalled ? 1 : 0;
+            _window.DetailDlss5DeleteBtn.IsHitTestVisible = isInstalled;
+        }
+
         // ReLimiter row — hidden when in Luma mode
         _window.DetailUlRow.Visibility = card.UlRowVisibility;
         bool ulGreyed = card.UseNormalReShade || card.IsDcInstalled || (!card.IsRsInstalled && !card.ExcludeFromUpdateAllReShade);
@@ -357,6 +407,37 @@ public partial class DetailPanelBuilder
             var dofShow = card.DofFixDeleteVisibility == Visibility.Visible;
             _window.DetailDofFixDeleteBtn.Opacity = dofShow ? 1 : 0;
             _window.DetailDofFixDeleteBtn.IsHitTestVisible = dofShow;
+        }
+
+        // MFG Ada Unlock row (RTX 40-series only; requires ReShade with add-ons)
+        _window.DetailMfgUnlockRow.Visibility = card.MfgUnlockRowVisibility;
+        if (card.MfgUnlockRowVisibility == Visibility.Visible)
+        {
+            bool mfgGreyed = !card.IsRsInstalled && !card.ExcludeFromUpdateAllReShade;
+            _window.DetailMfgUnlockStatus.Text = card.MfgUnlockStatusText;
+            _window.DetailMfgUnlockStatus.Foreground = UIFactory.GetBrush(card.MfgUnlockStatusColor);
+            _window.DetailMfgUnlockStatus.TextDecorations = card.IsMfgUnlockInstalled
+                ? Windows.UI.Text.TextDecorations.Underline
+                : Windows.UI.Text.TextDecorations.None;
+            _window.DetailMfgUnlockInstallBtn.Tag = card;
+            _window.DetailMfgUnlockInstallBtn.Content = WithInfoArrow(card.MfgUnlockActionLabel, true, card.MfgUnlockStatus == GameStatus.UpdateAvailable, _window.DetailMfgUnlockInstallBtn);
+            _window.DetailMfgUnlockInstallBtn.IsEnabled = card.MfgUnlockInstallEnabled && !mfgGreyed;
+            _window.DetailMfgUnlockInstallBtn.Background = UIFactory.GetBrush(card.MfgUnlockBtnBackground);
+            _window.DetailMfgUnlockInstallBtn.Foreground = UIFactory.GetBrush(card.MfgUnlockBtnForeground);
+            _window.DetailMfgUnlockInstallBtn.BorderBrush = UIFactory.GetBrush(card.MfgUnlockBtnBorderBrush);
+            _window.DetailMfgUnlockInstallBtn.BorderThickness = new Thickness(1);
+            _window.DetailMfgUnlockInstallBtn.Opacity = mfgGreyed ? 0.35 : 1.0;
+            _window.DetailMfgUnlockInfoBtn.Tag = card;
+            _window.DetailMfgUnlockInfoBtn.Background = UIFactory.Brush(ResourceKeys.AccentBlueBgBrush);
+            _window.DetailMfgUnlockInfoBtn.Foreground = UIFactory.Brush(ResourceKeys.AccentBlueBrush);
+            _window.DetailMfgUnlockInfoBtn.BorderBrush = UIFactory.Brush(ResourceKeys.AccentBlueBorderBrush);
+            _window.DetailMfgUnlockInfoBtn.BorderThickness = new Thickness(1);
+            _window.DetailMfgUnlockCogBtn.Tag = card;
+            _window.DetailMfgUnlockCogBtn.Visibility = card.MfgUnlockCogVisibility;
+            _window.DetailMfgUnlockDeleteBtn.Tag = card;
+            var mfgShow = card.MfgUnlockDeleteVisibility == Visibility.Visible;
+            _window.DetailMfgUnlockDeleteBtn.Opacity = mfgShow ? 1 : 0;
+            _window.DetailMfgUnlockDeleteBtn.IsHitTestVisible = mfgShow;
         }
 
         bool osGreyed = card.Is32Bit;
@@ -593,6 +674,11 @@ public partial class DetailPanelBuilder
         _window.DetailDofFixMessage.Visibility = card.DofFixRowVisibility == Visibility.Visible ? card.DofFixMessageVisibility : Visibility.Collapsed;
         _window.DetailDofFixMessage.Text = card.DofFixActionMessage;
         _window.DetailDofFixMessage.Foreground = UIFactory.GetBrush(GetMessageColor(card.DofFixActionMessage));
+        _window.DetailMfgUnlockProgress.Visibility = card.MfgUnlockRowVisibility == Visibility.Visible ? card.MfgUnlockProgressVisibility : Visibility.Collapsed;
+        _window.DetailMfgUnlockProgress.Value = card.MfgUnlockProgress;
+        _window.DetailMfgUnlockMessage.Visibility = card.MfgUnlockRowVisibility == Visibility.Visible ? card.MfgUnlockMessageVisibility : Visibility.Collapsed;
+        _window.DetailMfgUnlockMessage.Text = card.MfgUnlockActionMessage;
+        _window.DetailMfgUnlockMessage.Foreground = UIFactory.GetBrush(GetMessageColor(card.MfgUnlockActionMessage));
         _window.DetailDxvkProgress.Visibility = card.DxvkRowVisibility == Visibility.Visible ? card.DxvkProgressVisibility : Visibility.Collapsed;
         _window.DetailDxvkProgress.Value = card.DxvkProgress;
         _window.DetailDxvkMessage.Visibility = card.DxvkRowVisibility == Visibility.Visible
@@ -614,33 +700,61 @@ public partial class DetailPanelBuilder
 
     public void DetailCard_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (_currentDetailCard == null) return;
-        _dispatcherQueue.TryEnqueue(() =>
+        if (sender is not GameCardViewModel card || card != _currentDetailCard) return;
+
+        lock (_detailRefreshGate)
         {
-            if (_currentDetailCard == null) return;
-            UpdateDetailComponentRows(_currentDetailCard);
+            _pendingDetailProperties.Add(e.PropertyName ?? string.Empty);
+            _pendingDetailCard = card;
+            if (_detailRefreshQueued) return;
+            _detailRefreshQueued = true;
+        }
+
+        if (!_dispatcherQueue.TryEnqueue(ProcessPendingDetailChanges))
+        {
+            lock (_detailRefreshGate)
+                _detailRefreshQueued = false;
+        }
+    }
+
+    private void ProcessPendingDetailChanges()
+    {
+        HashSet<string> changed;
+        GameCardViewModel? card;
+        lock (_detailRefreshGate)
+        {
+            changed = new HashSet<string>(_pendingDetailProperties, StringComparer.Ordinal);
+            _pendingDetailProperties.Clear();
+            card = _pendingDetailCard;
+            _detailRefreshQueued = false;
+        }
+
+        if (card == null || card != _currentDetailCard) return;
+
+        UpdateDetailComponentRows(card);
+        bool HasChanged(params string[] names) => changed.Contains(string.Empty) || names.Any(changed.Contains);
 
             // Refresh 32-bit / 64-bit badge when bitness changes
-            if (e.PropertyName is "Is32Bit" or "Is32BitBadgeVisibility")
+            if (HasChanged("Is32Bit", "Is32BitBadgeVisibility"))
             {
-                _window.Detail32BitBadge.Visibility = _currentDetailCard.Is32Bit
+                _window.Detail32BitBadge.Visibility = card.Is32Bit
                     ? Visibility.Visible : Visibility.Collapsed;
-                _window.Detail64BitBadge.Visibility = !_currentDetailCard.Is32Bit
+                _window.Detail64BitBadge.Visibility = !card.Is32Bit
                     ? Visibility.Visible : Visibility.Collapsed;
             }
 
             // Refresh Graphics API badges when API changes
-            if (e.PropertyName is "HasGraphicsApiBadge" or "GraphicsApiLabel")
+            if (HasChanged("HasGraphicsApiBadge", "GraphicsApiLabel"))
             {
-                UpdateGraphicsApiBadges(_window, _currentDetailCard);
+                UpdateGraphicsApiBadges(_window, card);
             }
 
             // Refresh addon file badge when install state changes
-            if (e.PropertyName is "InstalledAddonFileName" or "Status" or "ActionMessage")
+            if (HasChanged("InstalledAddonFileName", "Status", "ActionMessage"))
             {
-                if (!string.IsNullOrEmpty(_currentDetailCard.InstalledAddonFileName))
+                if (!string.IsNullOrEmpty(card.InstalledAddonFileName))
                 {
-                    _window.DetailInstalledFile.Text = $"{_currentDetailCard.InstalledAddonFileName}";
+                    _window.DetailInstalledFile.Text = $"{card.InstalledAddonFileName}";
                     _window.DetailInstalledFileBadge.Visibility = Visibility.Visible;
                     _window.DetailSepModPlatform.Visibility = Visibility.Visible;
                 }
@@ -652,27 +766,26 @@ public partial class DetailPanelBuilder
             }
 
             // Refresh PCGW / Nexus Mods link visibility when URLs change
-            if (e.PropertyName is "PcgwUrl" or "HasPcgwUrl")
+            if (HasChanged("PcgwUrl", "HasPcgwUrl"))
             {
-                _window.DetailPcgwBtn.Visibility = _currentDetailCard.HasPcgwUrl
+                _window.DetailPcgwBtn.Visibility = card.HasPcgwUrl
                     ? Visibility.Visible : Visibility.Collapsed;
             }
-            if (e.PropertyName is "NexusModsUrl" or "HasNexusModsUrl")
+            if (HasChanged("NexusModsUrl", "HasNexusModsUrl"))
             {
-                _window.DetailNexusModsBtn.Visibility = _currentDetailCard.HasNexusModsUrl
+                _window.DetailNexusModsBtn.Visibility = card.HasNexusModsUrl
                     ? Visibility.Visible : Visibility.Collapsed;
             }
-            if (e.PropertyName is "UwFixUrl" or "HasUwFixUrl")
+            if (HasChanged("UwFixUrl", "HasUwFixUrl"))
             {
-                _window.DetailUwFixBtn.Visibility = _currentDetailCard.HasUwFixUrl
+                _window.DetailUwFixBtn.Visibility = card.HasUwFixUrl
                     ? Visibility.Visible : Visibility.Collapsed;
             }
-            if (e.PropertyName is "UltraPlusUrl" or "HasUltraPlusUrl")
+            if (HasChanged("UltraPlusUrl", "HasUltraPlusUrl"))
             {
-                _window.DetailUltraPlusBtn.Visibility = _currentDetailCard.HasUltraPlusUrl
+                _window.DetailUltraPlusBtn.Visibility = card.HasUltraPlusUrl
                     ? Visibility.Visible : Visibility.Collapsed;
             }
-        });
     }
 
     /// <summary>Returns a color hex string based on message content: green for installs, red for removals, blue default.</summary>

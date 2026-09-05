@@ -952,6 +952,42 @@ public partial class DialogService
         }
     }
 
+    public async Task ShowGameFolderAdminRequiredDialogAsync(string gameName, string path, string? detail)
+    {
+        try
+        {
+            while (_window.Content.XamlRoot == null)
+                await Task.Delay(100);
+
+            var elevated = VulkanLayerService.IsRunningAsAdmin();
+            var dlg = new ContentDialog
+            {
+                Title = elevated ? "Game folder is not writable" : "Administrator access required",
+                Content = new TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 13,
+                    Text = elevated
+                        ? $"Adas tested write access before changing {gameName}, but Windows denied access to:\n{path}\n\nNo game files were changed. Check this folder's permissions or security software, then try again.\n\n{detail}"
+                        : $"{gameName} is installed in a Windows-protected folder. Adas tested write access before installation and Windows denied it:\n{path}\n\nRestart Adas as administrator, then reopen this game and install again. No game files were changed.",
+                },
+                PrimaryButtonText = elevated ? null : "Restart as administrator",
+                CloseButtonText = "Cancel",
+                DefaultButton = elevated ? ContentDialogButton.Close : ContentDialogButton.Primary,
+                XamlRoot = _window.Content.XamlRoot,
+                Background = Brush(ResourceKeys.SurfaceOverlayBrush),
+                RequestedTheme = ElementTheme.Dark,
+            };
+
+            if (await ShowSafeAsync(dlg) == ContentDialogResult.Primary)
+                RestartAsAdmin();
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Log($"[DialogService.ShowGameFolderAdminRequiredDialog] Failed — {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Creates the Admin Mode scheduled task (UAC prompt) and restarts RHI through it.
     /// </summary>

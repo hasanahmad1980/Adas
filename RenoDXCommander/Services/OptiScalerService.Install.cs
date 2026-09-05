@@ -31,6 +31,7 @@ public partial class OptiScalerService
         string? hotkey = null,
         string variant = "Stable")
     {
+        EnsureNotManagedNeuralRendering(card.InstallPath);
         try
         {
             // ── 1. First-time warning check ──────────────────────────────────
@@ -422,6 +423,7 @@ public partial class OptiScalerService
     /// <inheritdoc />
     public void Uninstall(GameCardViewModel card)
     {
+        EnsureNotManagedNeuralRendering(card.InstallPath);
         try
         {
             var gameDir = card.InstallPath;
@@ -740,6 +742,7 @@ public partial class OptiScalerService
         GameCardViewModel card,
         IProgress<(string message, double percent)>? progress = null)
     {
+        EnsureNotManagedNeuralRendering(card.InstallPath);
         try
         {
             progress?.Report(("Preparing OptiScaler update...", 5));
@@ -1021,6 +1024,7 @@ public partial class OptiScalerService
     public void CopyIniToGame(GameCardViewModel card, string? hotkey = null)
     {
         if (string.IsNullOrEmpty(card.InstallPath)) return;
+        EnsureNotManagedNeuralRendering(card.InstallPath);
 
         // Determine variant from tracking record
         var record = _auxInstaller.FindRecord(card.GameName, card.InstallPath, AddonType);
@@ -1134,6 +1138,13 @@ public partial class OptiScalerService
             }
         }
         return result;
+    }
+
+    internal static void EnsureNotManagedNeuralRendering(string root)
+    {
+        var deployment = Dlss5ComponentService.FindInstalledDeploymentPath(root) ?? root;
+        if (Dlss5ComponentService.IsOptiScalerNrProfile(Dlss5ComponentService.LoadRecord(deployment)?.Profile))
+            throw new InvalidOperationException("This game uses the DLSS 5 suite's OptiScaler NR fork. Manage or remove it from the DLSS 5 row; the standard OptiScaler controls cannot replace it.");
     }
 
     /// <summary>

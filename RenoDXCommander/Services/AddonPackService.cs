@@ -48,17 +48,17 @@ public class AddonPackService : IAddonPackService
         RepositoryUrl: "https://github.com/clshortfuse/renodx",
         EffectInstallPath: null);
 
-    // RenoDX DLSS5 addon — enables Neural Rendering support in RenoDX mods
+    // Unified RenoDX DLSS add-on — native DX9/DX11/DX12 neural rendering and HDR controls
     private static readonly AddonEntry Renodx5Entry = new(
-        SectionId: "renodx-dlss5",
-        PackageName: "RenoDX DLSS5",
-        PackageDescription: "Enables DLSS Neural Rendering in any DLSS-compatible game. For 50 Series GPUs only. RHI automatically deploys nvngx_dlssnr.dll to the game folder alongside this addon.",
+        SectionId: "renodx-dlss",
+        PackageName: "RenoDX DLSS",
+        PackageDescription: "Unified DX9/DX11/DX12 DLSS Neural Rendering add-on with HDR scaling and a reflowed UI. Replaces the separate DLSS5 and DX11 Bridge add-ons. The current NR runtime supports RTX 20/30/40/50 Series GPUs.",
         DownloadUrl: null,
         DownloadUrl32: null,
         DownloadUrl64: null,
         RepositoryUrl: "https://github.com/clshortfuse/renodx",
         EffectInstallPath: null,
-        DeployFileName: "renodx-dlss5");
+        DeployFileName: "renodx-dlss");
 
     // DLSS Fix addon — fixes DLSS frame generation locking to 2× in Unreal Engine games
     private static readonly AddonEntry DlssFixEntry = new(
@@ -108,8 +108,8 @@ public class AddonPackService : IAddonPackService
     /// <inheritdoc />
     public bool IsDownloaded(string packageName)
     {
-        // RenoDX DLSS5 is staged by Renodx5AddonService — check its staging dir directly
-        if (packageName.Equals("RenoDX DLSS5", StringComparison.OrdinalIgnoreCase))
+        // RenoDX DLSS is staged by Renodx5AddonService — check its staging dir directly.
+        if (IsRenoDxDlssPackageName(packageName))
         {
             var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
             return rdx5Service.IsStagingReady;
@@ -201,7 +201,7 @@ public class AddonPackService : IAddonPackService
 
         parsed ??= new List<AddonEntry>();
 
-        // Insert RenoDX DLSS5 entry at top (above Addons.ini entries including RenoDX Upgrade)
+        // Insert unified RenoDX DLSS entry at top (above Addons.ini entries including RenoDX Upgrade)
         // Download URL is null here — the file is managed by Renodx5AddonService from staging.
         // The addon picker deploys from %LocalAppData%\RHI\rdx5\ via the service, not via URL.
         if (!parsed.Any(e => e.SectionId.Equals(Renodx5Entry.SectionId, StringComparison.OrdinalIgnoreCase)))
@@ -285,8 +285,8 @@ public class AddonPackService : IAddonPackService
 
         _packs = merged;
 
-        // Always keep renodx-dlss5 at the top of the list regardless of manifest insertion order
-        var rdx5Idx = _packs.FindIndex(p => p.SectionId.Equals("renodx-dlss5", StringComparison.OrdinalIgnoreCase));
+        // Always keep the unified RenoDX DLSS add-on at the top of the list.
+        var rdx5Idx = _packs.FindIndex(p => p.SectionId.Equals("renodx-dlss", StringComparison.OrdinalIgnoreCase));
         if (rdx5Idx > 0)
         {
             var rdx5Entry = _packs[rdx5Idx];
@@ -307,17 +307,17 @@ public class AddonPackService : IAddonPackService
             Directory.CreateDirectory(StagingDir);
             var safeName = SanitizeFileName(entry.PackageName);
 
-            // RenoDX DLSS5 is managed by Renodx5AddonService — route to that service and mirror
+            // RenoDX DLSS is managed by Renodx5AddonService — route to that service and mirror
             // the staged file into the standard addon staging dir so DeployAddonsForGame finds it.
-            if (entry.SectionId.Equals("renodx-dlss5", StringComparison.OrdinalIgnoreCase))
+            if (entry.SectionId.Equals("renodx-dlss", StringComparison.OrdinalIgnoreCase))
             {
-                progress?.Report(("Downloading RenoDX DLSS5 addon...", 10));
+                progress?.Report(("Preparing unified RenoDX DLSS add-on...", 10));
                 var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
                 await rdx5Service.EnsureStagingAsync(progress).ConfigureAwait(false);
                 if (!rdx5Service.IsStagingReady)
                 {
-                    CrashReporter.Log("[AddonPackService.DownloadAddonAsync] RenoDX DLSS5 staging not ready after EnsureStaging");
-                    progress?.Report(("RenoDX DLSS5 download failed", 0));
+                    CrashReporter.Log("[AddonPackService.DownloadAddonAsync] RenoDX DLSS staging not ready after EnsureStaging");
+                    progress?.Report(("RenoDX DLSS preparation failed", 0));
                 }
                 return;
             }
@@ -506,20 +506,38 @@ public class AddonPackService : IAddonPackService
 
         foreach (var packageName in activeSelection)
         {
+            // The DLSS 5 suite owns these as a coherent, per-game install. Generic
+            // synchronization used to redeploy obsolete bridge/feeder binaries to
+            // every ReShade game and then fight the suite repair pass.
+            if (IsSuiteManagedDlssPackageName(packageName))
+            {
+                CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Skipping suite-managed '{packageName}'.");
+                continue;
+            }
+
             var safeName = SanitizeFileName(packageName);
             var stagingFile = Path.Combine(StagingDir, safeName + bitnessExt);
             var isCustom = false;
 
+            // This package is currently published only as a 64-bit add-on. An
+            // older deploy path relabelled it as .addon32, which is still an x64
+            // PE and can abort older 32-bit games during ReShade start-up.
+            if (is32Bit && IsRenoDxDlssPackageName(packageName))
+            {
+                CrashReporter.Log("[AddonPackService.DeployAddonsForGame] Skipping 'RenoDX DLSS' — no 32-bit build exists; the DLSS 5 suite uses the 64-bit host instead.");
+                continue;
+            }
+
             if (!File.Exists(stagingFile))
             {
-                // RenoDX DLSS5 is staged by Renodx5AddonService in its own directory
-                if (packageName.Equals("RenoDX DLSS5", StringComparison.OrdinalIgnoreCase))
+                // RenoDX DLSS is staged by Renodx5AddonService in its own directory.
+                if (IsRenoDxDlssPackageName(packageName))
                 {
                     var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
                     stagingFile = rdx5Service.StagedFilePath;
                     if (!File.Exists(stagingFile))
                     {
-                        CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Skipping 'RenoDX DLSS5' — rdx5 staging not ready.");
+                        CrashReporter.Log("[AddonPackService.DeployAddonsForGame] Skipping 'RenoDX DLSS' — staging not ready.");
                         continue;
                     }
                 }
@@ -542,8 +560,9 @@ public class AddonPackService : IAddonPackService
 
             // Use DeployFileName if the entry specifies one, otherwise use the original
             // filename from the zip/URL to preserve the addon's real name.
-            var entry = _packs.FirstOrDefault(e =>
-                e.PackageName.Equals(packageName, StringComparison.OrdinalIgnoreCase));
+            var entry = IsRenoDxDlssPackageName(packageName)
+                ? _packs.FirstOrDefault(e => e.SectionId.Equals("renodx-dlss", StringComparison.OrdinalIgnoreCase))
+                : _packs.FirstOrDefault(e => e.PackageName.Equals(packageName, StringComparison.OrdinalIgnoreCase));
             string deployName;
             if (!string.IsNullOrEmpty(entry?.DeployFileName))
             {
@@ -590,12 +609,22 @@ public class AddonPackService : IAddonPackService
                 deployName = packageName;
             }
 
+            if (!IsAddonArchitectureCompatible(stagingFile, is32Bit))
+            {
+                CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Skipping '{packageName}' — staged add-on architecture does not match the {(is32Bit ? "32-bit" : "64-bit")} game.");
+                continue;
+            }
+
             var destFile = Path.Combine(installPath, deployName + bitnessExt);
             try
             {
-                File.Copy(stagingFile, destFile, overwrite: true);
+                if (!FilesMatch(stagingFile, destFile))
+                    File.Copy(stagingFile, destFile, overwrite: true);
+                if (IsRenoDxDlssPackageName(packageName))
+                    App.Services.GetRequiredService<Renodx5AddonService>().RetireObsoleteAddons(installPath, installPath);
                 deployedFileNames.Add(deployName + bitnessExt);
-                CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Deployed '{deployName}{bitnessExt}' to '{installPath}'.");
+                if (CrashReporter.VerboseLogging)
+                    CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Synchronized '{deployName}{bitnessExt}' to '{installPath}'.");
             }
             catch (Exception ex)
             {
@@ -603,59 +632,124 @@ public class AddonPackService : IAddonPackService
             }
         }
 
-        // Record deployed files in the tracker
-        var deployments = LoadDeployments();
-        if (!deployments.TryGetValue(installPath, out var trackedFiles))
+        // Load/mutate/save is one transaction. Separate locks around load and save
+        // allowed concurrent game syncs to overwrite each other's tracker updates.
+        lock (_deploymentsLock)
         {
-            trackedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            deployments[installPath] = trackedFiles;
-        }
-        foreach (var f in deployedFileNames)
-            trackedFiles.Add(f);
-
-        // 5. Remove stale addon files — only remove files that RHI previously deployed to this path
-        //    and that are no longer in the active selection. User-placed files are never touched.
-        try
-        {
-            foreach (var file in Directory.EnumerateFiles(installPath))
+            var deployments = LoadDeployments();
+            if (!deployments.TryGetValue(installPath, out var trackedFiles))
             {
-                var ext = Path.GetExtension(file);
-                if (!ext.Equals(".addon32", StringComparison.OrdinalIgnoreCase) &&
-                    !ext.Equals(".addon64", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                trackedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                deployments[installPath] = trackedFiles;
+            }
+            trackedFiles.RemoveWhere(IsSuiteManagedDlssFileName);
+            foreach (var f in deployedFileNames)
+                trackedFiles.Add(f);
 
-                var fileName = Path.GetFileName(file);
-
-                // Only touch files that RHI previously deployed (in the tracker)
-                if (!trackedFiles.Contains(fileName))
-                    continue;
-
-                // Don't remove files we just deployed
-                if (deployedFileNames.Contains(fileName))
-                    continue;
-
-                try
+            // 5. Remove stale addon files — only remove files that RHI previously deployed to this path
+            //    and that are no longer in the active selection. User-placed files are never touched.
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(installPath))
                 {
-                    File.Delete(file);
-                    trackedFiles.Remove(fileName);
-                    CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Removed stale addon '{fileName}' from '{installPath}'.");
-                }
-                catch (Exception ex)
-                {
-                    CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Failed to remove stale addon '{fileName}' — {ex.Message}");
+                    var ext = Path.GetExtension(file);
+                    if (!ext.Equals(".addon32", StringComparison.OrdinalIgnoreCase) &&
+                        !ext.Equals(".addon64", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var fileName = Path.GetFileName(file);
+
+                    // Old app versions incorrectly tracked suite files as generic
+                    // add-ons. Relinquish ownership without deleting the suite's copy.
+                    if (IsSuiteManagedDlssFileName(fileName))
+                    {
+                        trackedFiles.Remove(fileName);
+                        continue;
+                    }
+
+                    // Only touch files that RHI previously deployed (in the tracker)
+                    if (!trackedFiles.Contains(fileName))
+                        continue;
+
+                    // Don't remove files we just deployed
+                    if (deployedFileNames.Contains(fileName))
+                        continue;
+
+                    try
+                    {
+                        File.Delete(file);
+                        trackedFiles.Remove(fileName);
+                        CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Removed stale addon '{fileName}' from '{installPath}'.");
+                    }
+                    catch (Exception ex)
+                    {
+                        CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Failed to remove stale addon '{fileName}' — {ex.Message}");
+                    }
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Failed to enumerate deploy directory for stale removal — {ex.Message}");
-        }
+            catch (Exception ex)
+            {
+                CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Failed to enumerate deploy directory for stale removal — {ex.Message}");
+            }
 
-        // Save updated tracker
-        SaveDeployments(deployments);
+            SaveDeployments(deployments);
+        }
 
         CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Deployment complete for '{gameName}'. Deployed {deployedFileNames.Count} addon(s).");
     }
+
+    internal static bool IsAddonArchitectureCompatible(string path, bool is32Bit)
+    {
+        if (!File.Exists(path)) return false;
+        var expected = is32Bit ? MachineType.I386 : MachineType.x64;
+        return new PeHeaderService().DetectArchitecture(path) == expected;
+    }
+
+    private static bool IsRenoDxDlssPackageName(string packageName)
+        => packageName.Equals("RenoDX DLSS", StringComparison.OrdinalIgnoreCase)
+           || packageName.Equals("RenoDX DLSS5", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSuiteManagedDlssPackageName(string packageName)
+        => IsRenoDxDlssPackageName(packageName)
+           || packageName.Equals("DLSS5 Feeder", StringComparison.OrdinalIgnoreCase)
+           || packageName.Equals("DLSS 5 Feeder", StringComparison.OrdinalIgnoreCase)
+           || packageName.Equals("DLSS5 DX11 Bridge", StringComparison.OrdinalIgnoreCase)
+           || packageName.Equals("DLSS5 Bridge", StringComparison.OrdinalIgnoreCase)
+           || IsLegacyManagedDlssPackageName(packageName);
+
+    private static bool IsSuiteManagedDlssFileName(string fileName)
+    {
+        var name = Path.GetFileName(fileName);
+        return name.StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(Dlss5ComponentService.AioAddon, StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("dlss5-feed", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("DLSS5 Feeder", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("dlss5-bridge", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("dlss5-dx11-bridge", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("DLSS5 DX11 Bridge", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool FilesMatch(string source, string destination)
+    {
+        if (!File.Exists(destination)) return false;
+        try
+        {
+            var sourceInfo = new FileInfo(source);
+            var destinationInfo = new FileInfo(destination);
+            return sourceInfo.Length == destinationInfo.Length
+                && FileHelper.ComputeSha256(source).Equals(
+                    FileHelper.ComputeSha256(destination), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsLegacyManagedDlssPackageName(string packageName)
+        => packageName.Equals("RenoDX DLSS5", StringComparison.OrdinalIgnoreCase)
+           || packageName.Equals("DLSS5 Tool", StringComparison.OrdinalIgnoreCase)
+           || packageName.Equals("DLSS Tool (ShortFuse)", StringComparison.OrdinalIgnoreCase);
 
     // ── Custom Addons ───────────────────────────────────────────────────────────
 

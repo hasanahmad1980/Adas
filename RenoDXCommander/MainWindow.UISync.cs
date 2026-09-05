@@ -24,6 +24,7 @@ public sealed partial class MainWindow
             {
                 case nameof(ViewModel.IsLoading):
                     var loading = ViewModel.IsLoading;
+                    SimpleRefreshButton.IsEnabled = !loading && !_simpleOperationRunning;
                     // After initial boot, keep the game view visible during refreshes
                     bool silent = ViewModel.HasInitialized;
                     if (!loading && !silent && ViewModel.CurrentPage == AppPage.GameView)
@@ -47,6 +48,9 @@ public sealed partial class MainWindow
                         TryRestoreSelection();
                         RefreshFilterButtonStyles();
                         RebuildCustomFilterChips();
+                        UpdateSimpleGameCount();
+                        if (SimpleGameList.SelectedItem == null && ViewModel.DisplayedGames.Count > 0)
+                            SimpleGameList.SelectedItem = ViewModel.DisplayedGames[0];
                     }
                     break;
                 case nameof(ViewModel.StatusText):
@@ -61,6 +65,7 @@ public sealed partial class MainWindow
                     break;
                 case nameof(ViewModel.TotalGames):
                     GameCountText.Text = $"{ViewModel.TotalGames} shown";
+                    UpdateSimpleGameCount();
                     if (ViewModel.CurrentViewLayout == ViewLayout.Compact
                         && ViewModel.SelectedGame is { } compactCard)
                     {

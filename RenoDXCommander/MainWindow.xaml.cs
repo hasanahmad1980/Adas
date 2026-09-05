@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
     private readonly IShaderPackService _shaderPackService;
     private readonly DlssPresetService _dlssPresetService;
     private readonly DofFixService _dofFixService;
+    private readonly MfgUnlockService _mfgUnlockService;
     private readonly DlssEnablerService _dlssEnablerService;
     private readonly IOptiScalerService _optiScalerService;
     private readonly IAddonPackService _addonPackService;
@@ -56,6 +57,7 @@ public sealed partial class MainWindow : Window
         _shaderPackService = App.Services.GetRequiredService<IShaderPackService>();
         _dlssPresetService = App.Services.GetRequiredService<DlssPresetService>();
         _dofFixService = App.Services.GetRequiredService<DofFixService>();
+        _mfgUnlockService = App.Services.GetRequiredService<MfgUnlockService>();
         _dlssEnablerService = App.Services.GetRequiredService<DlssEnablerService>();
         _optiScalerService = App.Services.GetRequiredService<IOptiScalerService>();
         _addonPackService = viewModel.AddonPackServiceInstance;
@@ -86,7 +88,7 @@ public sealed partial class MainWindow : Window
         AuxInstallService.EnsureReShadeStaging(); // create staging dir (DLLs downloaded by ReShadeUpdateService)
         App.Services.GetRequiredService<CustomReShadeHashService>().EnsureInitialized(); // seed hash file on first run
         App.Services.GetRequiredService<IOptiScalerService>().SeedUserInis(); // seed OptiScaler INIs if missing
-        Title = "RHI";
+        Title = "Adas";
         // Fire-and-forget: check/download shader packs in the background
         // When CacheAllShaders is off, skip the bulk download — packs will be fetched on demand.
         Task shaderTask;
@@ -196,14 +198,21 @@ public sealed partial class MainWindow : Window
         ViewModel.ConfirmForeignDxgiOverwrite = _dialogService.ShowForeignDxgiConfirmDialogAsync;
         ViewModel.ShowVulkanAdminRequiredDialog = _dialogService.ShowVulkanAdminRequiredDialogAsync;
         ViewModel.RequestOverridesPanelRebuild = card =>
-            DispatcherQueue.TryEnqueue(() => BuildOverridesPanel(card));
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (SimpleShellPanel.Visibility != Visibility.Visible)
+                    BuildOverridesPanel(card);
+            });
         ViewModel.RequestCardRebuild = card =>
             DispatcherQueue.TryEnqueue(() =>
             {
                 // Re-evaluate Luma injection for this card after an API override change.
                 // This updates LumaMod/LumaRenodxCompatible without a full Refresh.
                 ViewModel.ReevaluateLumaForCard(card);
-                PopulateDetailPanel(card);
+                if (SimpleShellPanel.Visibility == Visibility.Visible)
+                    _ = UpdateSimpleSelectedGameAsync(card);
+                else
+                    PopulateDetailPanel(card);
             });
         ViewModel.ShowShaderSelectionPicker = async (current) =>
             await ShaderPopupHelper.ShowAsync(Content.XamlRoot, _shaderPackService, current, ShaderPopupHelper.PopupContext.Global);
@@ -218,6 +227,7 @@ public sealed partial class MainWindow : Window
             CheckForAppUpdateAsync().SafeFireAndForget("MainWindow.PeriodicAppUpdate");
         ViewModel.PropertyChanged += OnViewModelChanged;
         GameList.ItemsSource = ViewModel.DisplayedGames;
+        InitializeSimpleShell();
         // When the filtered game list changes, preserve selection if the selected game is still visible
         ViewModel.DisplayedGames.CollectionChanged += (_, _) =>
         {
@@ -581,6 +591,13 @@ public sealed partial class MainWindow : Window
         if (GameList.SelectedItem is GameCardViewModel card)
         {
             ViewModel.SelectedGame = card;
+
+            if (SimpleShellPanel.Visibility == Visibility.Visible)
+            {
+                if (SimpleGameList.SelectedItem != card)
+                    SimpleGameList.SelectedItem = card;
+                return;
+            }
 
             switch (ViewModel.CurrentViewLayout)
             {

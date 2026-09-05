@@ -13,14 +13,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>NU1902</NoWarn>
     <WindowsPackageType>None</WindowsPackageType>
-    <SelfContained>false</SelfContained>
+    <SelfContained>true</SelfContained>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <AssemblyName>RHI</AssemblyName>
-    <AssemblyTitle>RHI</AssemblyTitle>
-    <AssemblyVersion>2.4.7.0</AssemblyVersion>
-    <FileVersion>2.4.7.0</FileVersion>
+    <AssemblyTitle>Adas</AssemblyTitle>
+    <AssemblyVersion>2.6.34.0</AssemblyVersion>
+    <FileVersion>2.6.34.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,13 +30,124 @@
   </ItemGroup>
 
   <ItemGroup>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\renodx-dlss.addon64">
+      <CanonicalName>renodx-dlss.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\renodx-dlss5-4.70.addon64">
+      <CanonicalName>renodx-dlss5-4.70.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\renodx-dlss5-4.55.addon64">
+      <CanonicalName>renodx-dlss5-4.55.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-bridge.addon64">
+      <CanonicalName>dlss5-bridge.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed.addon64">
+      <CanonicalName>dlss5-feed.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed.addon32">
+      <CanonicalName>dlss5-feed.addon32</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-host64.exe">
+      <CanonicalName>dlss5-feed-host64.exe</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\DLSS5_Feed.fx">
+      <CanonicalName>DLSS5_Feed.fx</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer.zip">
+      <CanonicalName>feed-vk-layer.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-0.14.0-beta.1.addon64">
+      <CanonicalName>dlss5-feed-0.14.0-beta.1.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-0.14.0-beta.1.addon32">
+      <CanonicalName>dlss5-feed-0.14.0-beta.1.addon32</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-host64-0.14.0-beta.1.exe">
+      <CanonicalName>dlss5-feed-host64-0.14.0-beta.1.exe</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\DLSS5_Feed-0.14.0-beta.1.fx">
+      <CanonicalName>DLSS5_Feed-0.14.0-beta.1.fx</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer-0.14.0-beta.1-x64.zip">
+      <CanonicalName>feed-vk-layer-0.14.0-beta.1-x64.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer-0.14.0-beta.1-x86.zip">
+      <CanonicalName>feed-vk-layer-0.14.0-beta.1-x86.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShade.fxh">
+      <CanonicalName>ReShade.fxh</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShadeUI.fxh">
+      <CanonicalName>ReShadeUI.fxh</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\DrawText.fxh">
+      <CanonicalName>DrawText.fxh</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\streamline.zip">
+      <CanonicalName>streamline.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\optiscaler-nr.zip">
+      <CanonicalName>optiscaler-nr.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\optiscaler-split.zip">
+      <CanonicalName>optiscaler-split.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\standalone-dlssnr.addon64">
+      <CanonicalName>standalone-dlssnr.addon64</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\nvngx.dll">
+      <CanonicalName>nvngx.dll</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\DLSS5_AIO_Feed.fx">
+      <CanonicalName>DLSS5_AIO_Feed.fx</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\vort-shaders.zip">
+      <CanonicalName>vort-shaders.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShade-6.8.0-32.dll">
+      <CanonicalName>ReShade-6.8.0-32.dll</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShade-6.8.0-64.dll">
+      <CanonicalName>ReShade-6.8.0-64.dll</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShade-6.3.3-32.dll">
+      <CanonicalName>ReShade-6.3.3-32.dll</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShade-6.3.3-64.dll">
+      <CanonicalName>ReShade-6.3.3-64.dll</CanonicalName>
+    </_RequiredDlss5Payload>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Remove="Assets\manifest.json" />
+    <Content Remove="Assets\DLSS5\**\*" />
     <!-- Exclude backup files from XAML compilation -->
     <None Remove="original\**" />
     <Page Remove="original\**" />
     <Compile Remove="original\**" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="..\docs\ADAS_DLSS5_SUITE.md" Link="docs\ADAS_DLSS5_SUITE.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="..\docs\DLSS5_COMPATIBILITY_2026-09-04.md" Link="docs\DLSS5_COMPATIBILITY_2026-09-04.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <!-- Adas is an experimental suite: ship every reviewed route locally so an
+         Advanced choice never turns into a surprise download/import step. -->
+    <None Include="Assets\DLSS5\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>Assets\DLSS5\%(Filename)%(Extension)</TargetPath>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
     <Content Include="icon.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
@@ -130,6 +241,18 @@
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
   </ItemGroup>
+
+  <Target Name="ValidateDlss5SourcePayload" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('%(_RequiredDlss5Payload.Identity)')"
+           Text="Required DLSS 5 payload is missing: %(_RequiredDlss5Payload.CanonicalName)" />
+  </Target>
+
+  <Target Name="CopyDlss5PayloadToPublish" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)Assets\DLSS5" />
+    <Copy SourceFiles="@(_RequiredDlss5Payload)" DestinationFolder="$(PublishDir)Assets\DLSS5" SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(PublishDir)Assets\DLSS5\%(_RequiredDlss5Payload.CanonicalName)')"
+           Text="Published DLSS 5 payload is missing: %(_RequiredDlss5Payload.CanonicalName)" />
+  </Target>
 
   <ItemGroup>
     <Content Include="OptiScaler.nvidia.ini">

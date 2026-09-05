@@ -31,6 +31,18 @@ public sealed partial class MainWindow
         }
     }
 
+    private async void MotdButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _dialogService.ShowMotdDialogAsync();
+        }
+        catch (Exception ex)
+        {
+            _crashReporter.Log($"[MainWindow.MotdButton_Click] MOTD dialog error — {ex.Message}");
+        }
+    }
+
     private void OpenLogsFolder_Click(object sender, RoutedEventArgs e)
         => _settingsHandler.OpenLogsFolder_Click(sender, e);
 

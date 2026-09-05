@@ -24,11 +24,25 @@ public partial class AuxInstallService
         string? store = null,
         bool mergeIni = true)
     {
+        OptiScalerService.EnsureNotManagedNeuralRendering(installPath);
+        var requestedInstallPath = Path.GetFullPath(installPath);
+        var dlssDeploymentPath = Dlss5ComponentService.FindInstalledDeploymentPath(requestedInstallPath);
+        var dlssRecord = dlssDeploymentPath == null ? null : Dlss5ComponentService.LoadRecord(dlssDeploymentPath);
+        var dlssPolicy = dlssRecord == null
+            ? null
+            : Dlss5ComponentService.ResolveReShadeInstallPolicy(dlssRecord.Mode, dlssRecord.Profile);
+        if (dlssPolicy?.BlockInstall == true)
+            throw new InvalidOperationException(dlssPolicy.Reason);
+        if (dlssDeploymentPath != null)
+            installPath = dlssDeploymentPath;
         Directory.CreateDirectory(DownloadPaths.Misc);
 
-        var destName = !string.IsNullOrWhiteSpace(filenameOverride)
+        var destName = dlssPolicy?.ProxyName ?? (!string.IsNullOrWhiteSpace(filenameOverride)
             ? filenameOverride
-            : RsNormalName;
+            : RsNormalName);
+        if (dlssPolicy != null)
+            CrashReporter.Log($"[AuxInstallService.InstallReShadeAsync] DLSS 5 pipeline policy: requestedRoot='{requestedInstallPath}', " +
+                $"deploymentRoot='{installPath}', proxy='{destName}', preserveSuiteShaders={dlssPolicy.PreserveSuiteShaders}");
 
         // ── OptiScaler coexistence: deploy as ReShade64.dll only when filenames actually conflict ──
         // Only rename when RS and OS would use the same DLL name (e.g. both want dxgi.dll).
@@ -55,8 +69,10 @@ public partial class AuxInstallService
         var addonType = useNormalReShade ? TypeReShadeNormal : TypeReShade;
         var existingRecord = FindRecord(gameName, installPath, TypeReShade)
                           ?? FindRecord(gameName, installPath, TypeReShadeNormal);
-        if (existingRecord != null &&
-            !string.Equals(existingRecord.InstalledAs, destName, StringComparison.OrdinalIgnoreCase))
+        if (existingRecord != null && ShouldRemovePreviousReShadeProxy(
+                existingRecord.InstalledAs,
+                destName,
+                dlssPolicy?.PreserveSuiteShaders == true))
         {
             var oldPath = Path.Combine(installPath, existingRecord.InstalledAs);
             if (File.Exists(oldPath))
@@ -110,12 +126,24 @@ public partial class AuxInstallService
                 $"Please restart RHI to download ReShade from reshade.me.");
         }
 
+        var expectedMachine = use32Bit ? MachineType.I386 : MachineType.x64;
+        var stagedMachine = new PeHeaderService().DetectArchitecture(rsStagedPath);
+        if (stagedMachine != expectedMachine)
+            throw new InvalidDataException(
+                $"The prepared ReShade runtime is {DescribeMachine(stagedMachine)}, but the selected game is {(use32Bit ? "32-bit" : "64-bit")}. Adas stopped before replacing any game file.");
+
         // ── Back up foreign DLL at destination ──────────────────────────────────
         BackupForeignDll(destPath);
 
         // ── Copy staged DLL to game folder ────────────────────────────────────────
         progress?.Report(("Installing ReShade...", 80));
         File.Copy(rsStagedPath, destPath, overwrite: true);
+        if (new PeHeaderService().DetectArchitecture(destPath) != expectedMachine)
+        {
+            try { File.Delete(destPath); } catch { }
+            RestoreForeignDll(destPath);
+            throw new InvalidDataException("ReShade failed its post-install architecture check; the previous game DLL was restored.");
+        }
 
         // Deploy reshade.ini alongside the DLL (skip if caller has locked ini updates for this game).
         if (mergeIni && File.Exists(RsIniPath))
@@ -130,7 +158,10 @@ public partial class AuxInstallService
         var exclAux = selectedPackIds?
             .ToDictionary(id => id, id => _shaderPackService.GetExcludedFiles(id),
                 StringComparer.OrdinalIgnoreCase);
-        _shaderPackService.SyncGameFolder(installPath, selectedPackIds, exclAux);
+        if (dlssPolicy?.PreserveSuiteShaders != true)
+            _shaderPackService.SyncGameFolder(installPath, selectedPackIds, exclAux);
+        else
+            CrashReporter.Log("[AuxInstallService.InstallReShadeAsync] Preserved DLSS 5-owned shader tree during ReShade install.");
 
         var record = new AuxInstalledRecord
         {
@@ -147,6 +178,22 @@ public partial class AuxInstallService
         SaveRecord(record);
         return record;
     }
+
+    internal static bool ShouldRemovePreviousReShadeProxy(
+        string previousName,
+        string destinationName,
+        bool dlssPipelineOwnsFiles)
+        => !dlssPipelineOwnsFiles
+            && !string.Equals(previousName, destinationName, StringComparison.OrdinalIgnoreCase);
+
+    private static string DescribeMachine(MachineType machine)
+        => machine switch
+        {
+            MachineType.I386 => "32-bit",
+            MachineType.x64 => "64-bit",
+            MachineType.Itanium => "Itanium",
+            _ => "not a valid supported PE file",
+        };
 
     // ── Update detection ──────────────────────────────────────────────────────────
 
@@ -377,6 +424,8 @@ public partial class AuxInstallService
 
     public void Uninstall(AuxInstalledRecord record)
     {
+        if (record.AddonType is TypeReShade or TypeReShadeNormal or OptiScalerService.AddonType)
+            OptiScalerService.EnsureNotManagedNeuralRendering(record.InstallPath);
         // Resolve addon search path for .addon64/.addon32 files
         var ext = Path.GetExtension(record.InstalledAs);
         var isAddon = ext.Equals(".addon64", StringComparison.OrdinalIgnoreCase)
@@ -420,6 +469,8 @@ public partial class AuxInstallService
     /// <inheritdoc />
     public void UninstallDllOnly(AuxInstalledRecord record)
     {
+        if (record.AddonType is TypeReShade or TypeReShadeNormal or OptiScalerService.AddonType)
+            OptiScalerService.EnsureNotManagedNeuralRendering(record.InstallPath);
         // Resolve addon search path for .addon64/.addon32 files
         var ext = Path.GetExtension(record.InstalledAs);
         var isAddon = ext.Equals(".addon64", StringComparison.OrdinalIgnoreCase)

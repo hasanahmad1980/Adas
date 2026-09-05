@@ -289,24 +289,7 @@ public partial class DialogService
             {
                 try
                 {
-                    var dlg = new ContentDialog
-                    {
-                        Title = "📢 Message from RHI",
-                        Content = new ScrollViewer
-                        {
-                            Content = new TextBlock
-                            {
-                                Text = motd,
-                                TextWrapping = TextWrapping.Wrap,
-                                IsTextSelectionEnabled = true,
-                            },
-                            MaxHeight = 400,
-                        },
-                        CloseButtonText = "OK",
-                        XamlRoot = _window.Content.XamlRoot,
-                        RequestedTheme = ElementTheme.Dark,
-                    };
-                    await DialogService.ShowSafeAsync(dlg);
+                    await ShowMotdContentAsync(motd);
                 }
                 catch (Exception ex) { CrashReporter.Log($"[DialogService.ShowMotdIfNewAsync] Dialog failed — {ex.Message}"); }
             });
@@ -315,5 +298,41 @@ public partial class DialogService
         {
             CrashReporter.Log($"[DialogService.ShowMotdIfNewAsync] MOTD check error — {ex.Message}");
         }
+    }
+
+    public async Task ShowMotdDialogAsync()
+    {
+        try
+        {
+            var motd = await Services.MotdService.FetchAsync(ViewModel.HttpClient);
+            if (motd != null)
+                await ShowMotdContentAsync(motd);
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Log($"[DialogService.ShowMotdDialogAsync] Failed — {ex.Message}");
+        }
+    }
+
+    private async Task ShowMotdContentAsync(string motd)
+    {
+        var dlg = new ContentDialog
+        {
+            Title = "📢 Message from RHI",
+            Content = new ScrollViewer
+            {
+                Content = new TextBlock
+                {
+                    Text = motd,
+                    TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true,
+                },
+                MaxHeight = 400,
+            },
+            CloseButtonText = "OK",
+            XamlRoot = _window.Content.XamlRoot,
+            RequestedTheme = ElementTheme.Dark,
+        };
+        await DialogService.ShowSafeAsync(dlg);
     }
 }

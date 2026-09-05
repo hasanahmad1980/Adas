@@ -235,7 +235,7 @@ public partial class DetailPanelBuilder
                     BorderThickness = new Thickness(1),
                     CornerRadius = new CornerRadius(8),
                 };
-                ToolTipService.SetToolTip(deployNrBtn, "Download and copy nvngx_dlssnr.dll to the game folder. Works with any DLSS-compatible game on 50 Series GPUs. Can also be deployed automatically via the RenoDX DLSS5 addon in the Addons picker.");
+                ToolTipService.SetToolTip(deployNrBtn, "Download and copy nvngx_dlssnr.dll plus nvngx_dlss.dll to the game folder. The current ShortFuse build extends Neural Rendering to RTX 20, 30, 40, and 50 Series GPUs.");
 
                 var deleteNrBtn = new Button
                 {
@@ -326,6 +326,26 @@ public partial class DetailPanelBuilder
                                 try { File.Delete(destPath + ".rhi_custom"); } catch { }
                                 CrashReporter.Log($"[NrDeployBtn] Deployed nvngx_dlssnr.dll (newest) to '{tc.InstallPath}'");
                             }
+                        }
+
+                        // Neural Rendering also needs the Super Resolution runtime. Keep the
+                        // game's original once, then deploy RHI's newest managed copy beside NR.
+                        try
+                        {
+                            var dlssDest = Path.Combine(tc.InstallPath, "nvngx_dlss.dll");
+                            var cachedDlss = await dlssService.EnsureNewestDlssCachedAsync().ConfigureAwait(false);
+                            if (cachedDlss != null)
+                            {
+                                var backup = dlssDest + ".original";
+                                if (File.Exists(dlssDest) && !File.Exists(backup))
+                                    File.Copy(dlssDest, backup);
+                                File.Copy(cachedDlss, dlssDest, overwrite: true);
+                                CrashReporter.Log($"[NrDeployBtn] Deployed nvngx_dlss.dll to '{tc.InstallPath}'");
+                            }
+                        }
+                        catch (Exception dlssEx)
+                        {
+                            CrashReporter.Log($"[NrDeployBtn] nvngx_dlss.dll deploy failed — {dlssEx.Message}");
                         }
 
                         var detection = dlssService.Detect(tc.InstallPath);

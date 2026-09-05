@@ -21,6 +21,10 @@ public partial class DetailPanelBuilder
     private readonly MainWindow _window;
     private readonly DispatcherQueue _dispatcherQueue;
     private GameCardViewModel? _currentDetailCard;
+    private readonly object _detailRefreshGate = new();
+    private readonly HashSet<string> _pendingDetailProperties = new(StringComparer.Ordinal);
+    private bool _detailRefreshQueued;
+    private GameCardViewModel? _pendingDetailCard;
 
     // Services injected directly — no longer accessed via ViewModel forwarding properties
     private readonly IGameNameService _gameNameService;

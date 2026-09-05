@@ -347,7 +347,10 @@ public class GameNameService : IGameNameService
             foreach (var kv in pgasDict)
             {
                 if (_perGameAddonMode.ContainsKey(kv.Key))
+                {
+                    kv.Value.RemoveAll(AddonPackService.IsLegacyManagedDlssPackageName);
                     _perGameAddonSelection[kv.Key] = kv.Value;
+                }
             }
         }
 

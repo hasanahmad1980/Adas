@@ -15,11 +15,15 @@ public static class VulkanLayerService
     public const string LayerDirectory = @"C:\ProgramData\ReShade\";
     public const string LayerDllName = "ReShade64.dll";
     public const string LayerManifestName = "ReShade64.json";
+    public const string LayerDllName32 = "ReShade32.dll";
+    public const string LayerManifestName32 = "ReShade32.json";
     public const string RegistryKeyPath = @"SOFTWARE\Khronos\Vulkan\ImplicitLayers";
     public const string LayerName = "VK_LAYER_reshade";
 
     private static string LayerDllPath => Path.Combine(LayerDirectory, LayerDllName);
     private static string LayerManifestPath => Path.Combine(LayerDirectory, LayerManifestName);
+    private static string LayerDllPath32 => Path.Combine(LayerDirectory, LayerDllName32);
+    private static string LayerManifestPath32 => Path.Combine(LayerDirectory, LayerManifestName32);
 
     // ── Admin detection ───────────────────────────────────────────────────────────
 
@@ -45,6 +49,26 @@ public static class VulkanLayerService
     public static bool IsLayerInstalled()
     {
         return IsLayerInstalled(Registry.LocalMachine, RegistryKeyPath, LayerManifestPath, LayerDllPath);
+    }
+
+    /// <summary>
+    /// Checks the registry view used by the target process. A 32-bit Vulkan
+    /// game reads the 32-bit implicit-layer registry view and cannot use the
+    /// 64-bit ReShade DLL.
+    /// </summary>
+    public static bool IsLayerInstalled(bool require32Bit)
+    {
+        if (!require32Bit) return IsLayerInstalled();
+        try
+        {
+            using var registry32 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
+            return IsLayerInstalled(registry32, RegistryKeyPath, LayerManifestPath32, LayerDllPath32);
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Log($"[VulkanLayerService.IsLayerInstalled32] Error checking layer status — {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -96,9 +120,13 @@ public static class VulkanLayerService
                 "Administrator privileges are required to install the Vulkan ReShade layer.");
 
         var stagedDll = AuxInstallService.RsStagedPath64;
+        var stagedDll32 = AuxInstallService.RsStagedPath32;
         if (!File.Exists(stagedDll))
             throw new FileNotFoundException(
                 "Staged ReShade64.dll not found. Ensure ReShade has been downloaded first.", stagedDll);
+        if (!File.Exists(stagedDll32))
+            throw new FileNotFoundException(
+                "Staged ReShade32.dll not found. Ensure ReShade has been downloaded first.", stagedDll32);
 
         try
         {
@@ -126,6 +154,14 @@ public static class VulkanLayerService
             using var key = Registry.LocalMachine.CreateSubKey(RegistryKeyPath, writable: true);
             key.SetValue(LayerManifestPath, 0, RegistryValueKind.DWord);
             CrashReporter.Log("[VulkanLayerService.InstallLayer] Registered layer in HKLM ImplicitLayers");
+
+            // 5. Install the matching x86 layer in the 32-bit registry view.
+            File.Copy(stagedDll32, LayerDllPath32, overwrite: true);
+            File.WriteAllText(LayerManifestPath32, GenerateManifestJson(LayerDllPath32));
+            using var registry32 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
+            using var key32 = registry32.CreateSubKey(RegistryKeyPath, writable: true);
+            key32.SetValue(LayerManifestPath32, 0, RegistryValueKind.DWord);
+            CrashReporter.Log("[VulkanLayerService.InstallLayer] Registered 32-bit ReShade layer");
         }
         catch (UnauthorizedAccessException) { throw; }
         catch (FileNotFoundException) { throw; }
@@ -152,6 +188,8 @@ public static class VulkanLayerService
                 "Administrator privileges are required to uninstall the Vulkan ReShade layer.");
 
         UninstallLayer(Registry.LocalMachine, RegistryKeyPath, LayerManifestPath, LayerDllPath);
+        using var registry32 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
+        UninstallLayer(registry32, RegistryKeyPath, LayerManifestPath32, LayerDllPath32);
     }
 
     /// <summary>
@@ -209,9 +247,12 @@ public static class VulkanLayerService
     /// Generates the JSON manifest content for the Vulkan layer.
     /// </summary>
     internal static string GenerateManifestJson()
+        => GenerateManifestJson(LayerDllPath);
+
+    private static string GenerateManifestJson(string dllPath)
     {
         // Use escaped backslashes for the Windows path in JSON
-        var libraryPath = LayerDllPath.Replace(@"\", @"\\");
+        var libraryPath = dllPath.Replace(@"\", @"\\");
 
         return $$"""
             {

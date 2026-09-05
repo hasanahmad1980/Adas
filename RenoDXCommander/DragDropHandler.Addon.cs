@@ -282,7 +282,7 @@ public partial class DragDropHandler
                          && !Path.GetFileName(f).StartsWith("renodx-devkit", StringComparison.OrdinalIgnoreCase)
                          && !Path.GetFileName(f).StartsWith("renodx-dlssfix", StringComparison.OrdinalIgnoreCase)
                          && !Path.GetFileName(f).StartsWith("renodx-upgrade", StringComparison.OrdinalIgnoreCase)
-                         && !Path.GetFileName(f).StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase)
+                         && !Path.GetFileName(f).StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase)
                          && !Path.GetFileName(f).StartsWith("renodx-universal_ue", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (existing.Count > 0)
@@ -332,7 +332,7 @@ public partial class DragDropHandler
                              && !Path.GetFileName(f).StartsWith("renodx-devkit", StringComparison.OrdinalIgnoreCase)
                          && !Path.GetFileName(f).StartsWith("renodx-dlssfix", StringComparison.OrdinalIgnoreCase)
                          && !Path.GetFileName(f).StartsWith("renodx-upgrade", StringComparison.OrdinalIgnoreCase)
-                         && !Path.GetFileName(f).StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase)
+                         && !Path.GetFileName(f).StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase)
                          && !Path.GetFileName(f).StartsWith("renodx-universal_ue", StringComparison.OrdinalIgnoreCase))
                     .ToList();
                 foreach (var f in toRemove)
