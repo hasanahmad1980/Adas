@@ -10,7 +10,7 @@ The combined application remains GPL-3.0 because it is based on RHI. Integrated 
 
 The existing game-library and component services remain underneath Adas for detection, installation, backup, and recovery. The older multi-component interface is no longer the main user experience.
 
-![RHI](screenshots/game_view.png)
+![Adas simplified DLSS 5 interface](screenshots/adas-simple-ui.png)
 
 > **⚠ Single-player only.** RHI installs ReShade with addon support, which may trigger anti-cheat in online games. Uninstall before playing multiplayer.
 
