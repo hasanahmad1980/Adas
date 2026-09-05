@@ -6,6 +6,40 @@ namespace RenoDXCommander.Tests;
 
 public sealed class Dlss5UpstreamRefreshTests
 {
+    [Fact]
+    public void RequestedUpstreamOptionsArePinnedAndRendererScoped()
+    {
+        Assert.Equal("0.14.0-beta.2", Dlss5ComponentService.BundledFeederBetaVersion);
+        Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
+        Assert.Equal("0.11.13", Dlss5ComponentService.OneClickVersion);
+        Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
+        Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, false));
+        Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.Dx11Feeder, true));
+
+        var plan = Dlss5ComponentService.GetCompatibilityPlan(
+            Dlss5DeploymentMode.OpenGlFeeder, true, Dlss5InstallProfile.OpenGlBridge);
+        Assert.True(plan.InstallOpenGlBridge);
+        Assert.False(plan.InstallFeeder);
+        Assert.Contains("1.0.5", plan.ProfileName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmptyDlssRuntimeIsNeverConsideredUsable()
+    {
+        var root = Directory.CreateTempSubdirectory("adas-empty-runtime-").FullName;
+        var path = Path.Combine(root, "nvngx_dlss.dll");
+        try
+        {
+            File.WriteAllBytes(path, Array.Empty<byte>());
+            Assert.False(Dlss5ComponentService.IsUsableRuntimeFile(path));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void MainlineOptiScalerBetaUsesItsSeparateNightlySettings()
+        => Assert.Contains("OptiScaler_nightly", OptiScalerService.GetUserIniPath("NVIDIA", true, "Nightly"), StringComparison.OrdinalIgnoreCase);
+
     [Theory]
     [InlineData(Dlss5DeploymentMode.Dx10Feeder, false, Dlss5InstallProfile.MaximumQuality, Dlss5InstallProfile.LatestFeederBeta)]
     [InlineData(Dlss5DeploymentMode.VulkanFeeder, false, Dlss5InstallProfile.MaximumQuality, Dlss5InstallProfile.LatestFeederBeta)]
@@ -71,7 +105,8 @@ public sealed class Dlss5UpstreamRefreshTests
     [Theory]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.12.1-beta.1", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.13.1-beta.1", true)]
-    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.1", false)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.1", true)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.2", false)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 1.7.24", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.3", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.4-experimental.1", false)]

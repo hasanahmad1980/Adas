@@ -39,6 +39,8 @@ public enum Dlss5InstallProfile
     // Alternative native-upscaler pipelines; numeric values append for record compatibility.
     OptiScalerNeuralRendering,
     OptiScalerNrBeforeSr,
+    // Native 64-bit OpenGL DLAA bridge. Appended for install-record compatibility.
+    OpenGlBridge,
 }
 
 public sealed record Dlss5Probe
@@ -124,4 +126,5 @@ internal sealed record Dlss5CompatibilityPlan(
 {
     public bool UsesExperimentalUnified => RenoDxPackage == Dlss5RenoDxPackage.ExperimentalUnified;
     public bool UsesLatestFeederBeta { get; init; }
+    public bool InstallOpenGlBridge { get; init; }
 }

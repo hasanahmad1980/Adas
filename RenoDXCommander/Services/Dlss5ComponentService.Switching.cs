@@ -73,7 +73,7 @@ public sealed partial class Dlss5ComponentService
                 var requirements = assessment.MissingRequirements.ToList();
                 var runtimeRoot = assessment.Is64Bit ? root : Path.Combine(root, "host64");
                 foreach (var name in new[] { "nvngx_dlss.dll", "nvngx_dlssnr.dll" })
-                    if (!File.Exists(Path.Combine(runtimeRoot, name))) requirements.Add(name);
+                    if (!IsUsableRuntimeFile(Path.Combine(runtimeRoot, name))) requirements.Add(name);
                 if (!File.Exists(Path.Combine(root, GetReShadeFileName(assessment.Mode, profile)))) requirements.Add("ReShade full add-on support");
                 assessment = assessment with { MissingRequirements = requirements };
                 var result = await InstallCoreAsync(gameName, assessment, progress, cancellationToken, reShadeChannel, store, profile).ConfigureAwait(false);

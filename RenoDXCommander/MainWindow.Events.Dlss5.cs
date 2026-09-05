@@ -159,6 +159,8 @@ public sealed partial class MainWindow
             : SelectAutomaticProfile(assessment);
         var selectedProfile = installedProfile switch
         {
+            Dlss5InstallProfile.OpenGlBridge when Dlss5ComponentService.SupportsOpenGlBridge(assessment.Mode, assessment.Is64Bit)
+                => Dlss5InstallProfile.OpenGlBridge,
             Dlss5InstallProfile.OptiScalerNeuralRendering => Dlss5InstallProfile.OptiScalerNeuralRendering,
             Dlss5InstallProfile.OptiScalerNrBeforeSr => Dlss5InstallProfile.OptiScalerNrBeforeSr,
             Dlss5InstallProfile.StandaloneAio when Dlss5ComponentService.SupportsAio(assessment.Mode, assessment.Is64Bit)
@@ -298,10 +300,18 @@ public sealed partial class MainWindow
             IsChecked = selectedProfile == Dlss5InstallProfile.StandaloneAio,
             IsEnabled = Dlss5ComponentService.SupportsAio(assessment.Mode, assessment.Is64Bit),
         };
+        var openGlBridgeProfile = new RadioButton
+        {
+            GroupName = "Dlss5InstallProfile",
+            Content = $"OpenGL Bridge {Dlss5ComponentService.OpenGlBridgeVersion} — native 64-bit OpenGL DLAA (experimental)",
+            IsChecked = selectedProfile == Dlss5InstallProfile.OpenGlBridge,
+            IsEnabled = Dlss5ComponentService.SupportsOpenGlBridge(assessment.Mode, assessment.Is64Bit),
+        };
         advancedProfiles.Children.Add(recommendedProfile);
         advancedProfiles.Children.Add(experimentalProfile);
         advancedProfiles.Children.Add(betaProfile);
         advancedProfiles.Children.Add(aioProfile);
+        advancedProfiles.Children.Add(openGlBridgeProfile);
         var optiNrProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile", Content = $"OptiScaler DLSS-NR {Dlss5ComponentService.OptiScalerNrVersion} (experimental; native DLSS DX11/DX12/Vulkan)",
@@ -321,7 +331,8 @@ public sealed partial class MainWindow
         content.Children.Add(profileSummary);
         void UpdateProfileSummary()
         {
-            selectedProfile = splitProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNrBeforeSr
+            selectedProfile = openGlBridgeProfile.IsChecked == true ? Dlss5InstallProfile.OpenGlBridge
+                : splitProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNrBeforeSr
                 : optiNrProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNeuralRendering
                 : aioProfile.IsChecked == true ? Dlss5InstallProfile.StandaloneAio : betaProfile.IsChecked == true
                 ? Dlss5InstallProfile.LatestFeederBeta
@@ -334,6 +345,7 @@ public sealed partial class MainWindow
                 Dlss5InstallProfile.OptiScalerNeuralRendering or Dlss5InstallProfile.OptiScalerNrBeforeSr
                     => "Selected: experimental OptiScaler neural rendering. Keep the game's own DLSS ON. Version 0.2 adds hybrid color composition, live exposure, frame hold and optional model supersampling; DX11 is configured through its D3D11-on-12 DLSS path. Press Insert for controls. Driver 616.56+ is required. Apply switches the current pipeline automatically and saves its visual settings.",
                 Dlss5InstallProfile.StandaloneAio => $"Selected: standalone AIO {Dlss5ComponentService.AioVersion}. Downloads three verified files once, then reuses the cache. NR starts on; frame generation starts off. Disable the game's own DLSS, frame generation and antialiasing. Native resolution uses DLAA; a smaller game backbuffer enables upscaling.\n\nApply switches pipelines and preserves each profile's visual settings. Ada asks before cleaning up conflicts or changing a shared Vulkan route, then does the removal itself. Vulkan needs an installed 64-bit ReShade layer. DX9/DX11 guidance and frame pacing remain experimental.",
+                Dlss5InstallProfile.OpenGlBridge => $"Selected: {plan.ProfileName}. This is the dedicated 64-bit OpenGL path: ReShade loads as opengl32.dll and the bridge supplies a DLAA presentation path without Feeder.",
                 Dlss5InstallProfile.MaximumQuality => $"Selected automatically: {plan.ProfileName}. Stable components are kept separate and only one transport route is installed.",
                 Dlss5InstallProfile.LatestFeederBeta => $"Selected: {plan.ProfileName}. This test build adds native 32-bit DirectX 10, current Smooth Motion synchronization, matched protocol-v7 x86 hosting, an in-game host panel, FSR 1 expand-back, Vulkan/DXVK fixes, crash diagnostics, and the upstream verifier. It requires one matched beta set and is not the stable default.",
                 _ => $"Selected: {plan.ProfileName}. This combined build has broader direct API support but may flicker, black-screen, or crash in games that work with the recommended profile.",
@@ -341,17 +353,79 @@ public sealed partial class MainWindow
             profileSummary.Foreground = UIFactory.Brush(selectedProfile == Dlss5InstallProfile.MaximumQuality
                 ? ResourceKeys.AccentGreenBrush
                 : ResourceKeys.AccentAmberBrush);
-            missingRequirementsPanel.Visibility = selectedProfile == Dlss5InstallProfile.StandaloneAio
+            missingRequirementsPanel.Visibility = selectedProfile is Dlss5InstallProfile.StandaloneAio or Dlss5InstallProfile.OpenGlBridge
                 || Dlss5ComponentService.IsOptiScalerNrProfile(selectedProfile) ? Visibility.Collapsed : Visibility.Visible;
         }
         recommendedProfile.Checked += (_, _) => UpdateProfileSummary();
         experimentalProfile.Checked += (_, _) => UpdateProfileSummary();
         betaProfile.Checked += (_, _) => UpdateProfileSummary();
         aioProfile.Checked += (_, _) => UpdateProfileSummary();
+        openGlBridgeProfile.Checked += (_, _) => UpdateProfileSummary();
         optiNrProfile.Checked += (_, _) => UpdateProfileSummary();
         splitProfile.Checked += (_, _) => UpdateProfileSummary();
         UpdateProfileSummary();
         advancedProfiles.Children.Add(MakeDlss5Text($"Renderer target: {assessment.DeploymentPath ?? "Not resolved"}", ResourceKeys.TextTertiaryBrush));
+
+        var alternateTools = new StackPanel { Spacing = 8 };
+        var oneClickButton = new Button
+        {
+            Content = $"Open OneClick {Dlss5ComponentService.OneClickVersion} for this game",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = assessment.Mode is Dlss5DeploymentMode.NativeDirectX11 or Dlss5DeploymentMode.NativeDirectX12
+                or Dlss5DeploymentMode.Dx11Feeder or Dlss5DeploymentMode.Dx12Feeder,
+        };
+        oneClickButton.Click += async (_, _) =>
+        {
+            oneClickButton.IsEnabled = false;
+            try
+            {
+                if (Dlss5ComponentService.LoadRecord(assessment.DeploymentPath!) != null)
+                    throw new InvalidOperationException("Remove the Adas-managed DLSS 5 suite first. OneClick is an external installer and must not be mixed with a tracked Adas pipeline.");
+                await components.LaunchOneClickAsync(assessment.DeploymentPath!);
+                await ShowDlss5MessageAsync("OneClick opened", "OneClick is a separate upstream installer. It received this game's exact renderer folder and owns any files it changes.");
+            }
+            catch (Exception ex) { await ShowDlss5MessageAsync("OneClick could not start", ex.Message); }
+            finally { oneClickButton.IsEnabled = true; }
+        };
+        alternateTools.Children.Add(oneClickButton);
+
+        var mainlineOptiButton = new Button
+        {
+            Content = "Install mainline OptiScaler beta/nightly (separate from stable)",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = assessment.Is64Bit && assessment.Mode is Dlss5DeploymentMode.NativeDirectX11
+                or Dlss5DeploymentMode.NativeDirectX12 or Dlss5DeploymentMode.NativeVulkan,
+        };
+        mainlineOptiButton.Click += async (_, _) =>
+        {
+            mainlineOptiButton.IsEnabled = false;
+            try
+            {
+                if (Dlss5ComponentService.LoadRecord(assessment.DeploymentPath!) != null)
+                    throw new InvalidOperationException("Remove the current Adas-managed DLSS 5 suite first, then install the separate mainline OptiScaler beta pipeline.");
+                var target = new GameCardViewModel
+                {
+                    GameName = card.GameName,
+                    InstallPath = assessment.DeploymentPath!,
+                    Source = card.Source,
+                    Is32Bit = false,
+                    GraphicsApi = assessment.Mode == Dlss5DeploymentMode.NativeVulkan
+                        ? GraphicsApiType.Vulkan
+                        : assessment.Mode == Dlss5DeploymentMode.NativeDirectX11
+                            ? GraphicsApiType.DirectX11
+                            : GraphicsApiType.DirectX12,
+                };
+                var result = await _optiScalerService.InstallAsync(target, variant: "Nightly");
+                await ShowDlss5MessageAsync(result == null ? "OptiScaler beta unavailable" : "OptiScaler beta installed",
+                    result == null ? "The latest mainline beta/nightly package could not be staged." : "The mainline beta/nightly was installed through its own OptiScaler route and settings, separate from stable.");
+                PopulateDetailPanel(card);
+            }
+            catch (Exception ex) { await ShowDlss5MessageAsync("OptiScaler beta installation failed", ex.Message); }
+            finally { mainlineOptiButton.IsEnabled = true; }
+        };
+        alternateTools.Children.Add(mainlineOptiButton);
+        alternateTools.Children.Add(MakeDlss5Text("These are separate upstream methods. OneClick manages its own files; mainline OptiScaler beta uses a separate nightly cache and configuration from stable.", ResourceKeys.TextTertiaryBrush));
+        advancedProfiles.Children.Add(alternateTools);
         if (!assessment.Is64Bit)
             advancedProfiles.Children.Add(MakeDlss5Text(
                 assessment.Mode is Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.Dx10ViaDxvkFeeder
@@ -696,6 +770,11 @@ public sealed partial class MainWindow
         if (installedRecord?.Profile == Dlss5InstallProfile.StandaloneAio)
         {
             await ShowAioSettingsAsync(path, mode);
+            return;
+        }
+        if (installedRecord?.Profile == Dlss5InstallProfile.OpenGlBridge)
+        {
+            await ShowRenoDxSettingsAsync(path, installedRecord.Profile);
             return;
         }
         if (!Dlss5CompatibilityService.IsFeederMode(mode))

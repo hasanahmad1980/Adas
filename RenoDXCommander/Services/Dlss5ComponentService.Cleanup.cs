@@ -70,6 +70,8 @@ public sealed partial class Dlss5ComponentService
             if (name.Equals("nvngx.dll", StringComparison.OrdinalIgnoreCase)
                 && FileHelper.ComputeSha256(source).Equals(AioAssetHashes["nvngx.dll"], StringComparison.OrdinalIgnoreCase)) return true;
         }
+        if (selected != Dlss5InstallProfile.OpenGlBridge
+            && name.Equals(OpenGlBridgeAddon, StringComparison.OrdinalIgnoreCase)) return true;
         if (IsOptiScalerNrProfile(selected) || selected == Dlss5InstallProfile.StandaloneAio)
             return (IsManagedDlssAddonReference(name) && Path.GetExtension(name).ToLowerInvariant() is ".addon64" or ".addon32")
                 || name.Equals("deep-fried-chicken.addon64", StringComparison.OrdinalIgnoreCase)

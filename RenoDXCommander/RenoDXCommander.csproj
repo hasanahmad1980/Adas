@@ -57,23 +57,26 @@
     <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer.zip">
       <CanonicalName>feed-vk-layer.zip</CanonicalName>
     </_RequiredDlss5Payload>
-    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-0.14.0-beta.1.addon64">
-      <CanonicalName>dlss5-feed-0.14.0-beta.1.addon64</CanonicalName>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-0.14.0-beta.2.addon64">
+      <CanonicalName>dlss5-feed-0.14.0-beta.2.addon64</CanonicalName>
     </_RequiredDlss5Payload>
-    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-0.14.0-beta.1.addon32">
-      <CanonicalName>dlss5-feed-0.14.0-beta.1.addon32</CanonicalName>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-0.14.0-beta.2.addon32">
+      <CanonicalName>dlss5-feed-0.14.0-beta.2.addon32</CanonicalName>
     </_RequiredDlss5Payload>
-    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-host64-0.14.0-beta.1.exe">
-      <CanonicalName>dlss5-feed-host64-0.14.0-beta.1.exe</CanonicalName>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-feed-host64-0.14.0-beta.2.exe">
+      <CanonicalName>dlss5-feed-host64-0.14.0-beta.2.exe</CanonicalName>
     </_RequiredDlss5Payload>
-    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\DLSS5_Feed-0.14.0-beta.1.fx">
-      <CanonicalName>DLSS5_Feed-0.14.0-beta.1.fx</CanonicalName>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\DLSS5_Feed-0.14.0-beta.2.fx">
+      <CanonicalName>DLSS5_Feed-0.14.0-beta.2.fx</CanonicalName>
     </_RequiredDlss5Payload>
-    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer-0.14.0-beta.1-x64.zip">
-      <CanonicalName>feed-vk-layer-0.14.0-beta.1-x64.zip</CanonicalName>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer-0.14.0-beta.2-x64.zip">
+      <CanonicalName>feed-vk-layer-0.14.0-beta.2-x64.zip</CanonicalName>
     </_RequiredDlss5Payload>
-    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer-0.14.0-beta.1-x86.zip">
-      <CanonicalName>feed-vk-layer-0.14.0-beta.1-x86.zip</CanonicalName>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\feed-vk-layer-0.14.0-beta.2-x86.zip">
+      <CanonicalName>feed-vk-layer-0.14.0-beta.2-x86.zip</CanonicalName>
+    </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\dlss5-opengl-bridge.addon64">
+      <CanonicalName>dlss5-opengl-bridge.addon64</CanonicalName>
     </_RequiredDlss5Payload>
     <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\ReShade.fxh">
       <CanonicalName>ReShade.fxh</CanonicalName>
