@@ -4,7 +4,8 @@
   "featureFlags": {
     "dlssNr": true,
     "nexusMods": false,
-    "resolutionControl": false
+    "resolutionControl": false,
+    "mfgUnlock": true
   },
   "blacklistPrefixes": [
     "Battle.net."
@@ -190,6 +191,7 @@
     "Anno 117: Pax Romana": "Bin\\Win64",
     "Borderlands\u00AE 4": "OakGame\\Binaries\\Win64",
     "Borderlands 4": "OakGame\\Binaries\\Win64",
+    "Warhammer 40,000: Space Marine 2": "client_pc\\root\\bin\\pc",
     "Tom Clancy\u0027s Splinter Cell Blacklist": "src\\SYSTEM",
     "SOULCALIBUR VI": "SoulcaliburVI\\Binaries\\Win64",
     "Gothic II: Gold Classic": "system",
@@ -583,6 +585,8 @@
     "Tomb Raider (2013)"
   ],
   "sixtyFourBitGames": [
+    "AI The Somnium Files",
+    "AI: THE SOMNIUM FILES",
     "Anno 117 - Pax Romana",
     "Ball x Pit",
     "Zero Parades",
@@ -733,7 +737,7 @@
     "Watch_Dogs\u00AE 2",
     "White Knuckle"
   ],
-  "_comment_install_behaviour": "=== INSTALL BEHAVIOUR ===\nControls what happens when the user clicks Install for a component.\ninstallWarnings shows a blocking confirm dialog before proceeding (keys: reshade, renodx, relimiter, dc, optiscaler, luma, reframework, dxvk).\nforceExternalOnly redirects the install button to an external URL instead of downloading.\nsnapshotOverrides injects or overrides the addon download URL when wiki scraping fails.\ndllNameOverrides forces specific proxy DLL filenames (e.g. winmm.dll instead of dxgi.dll).\ngacSymlinkGames routes XNA Framework games through a GAC symlink install (requires admin).\nlaunchExeOverrides sets the relative exe path used when clicking Launch and for NVIDIA profile matching.\nrenodxIniOverrides injects keys into [renodx] reshade.ini section on install/update.\nlegacyReShadeVersions auto-assigns a locked ReShade version channel to specific games.",
+  "_comment_install_behaviour": "=== INSTALL BEHAVIOUR ===\nControls what happens when the user clicks Install for a component.\ninstallWarnings shows a blocking confirm dialog before proceeding (keys: reshade, renodx, relimiter, dc, optiscaler, luma, reframework, dxvk).\nforceExternalOnly redirects the install button to an external URL instead of downloading.\nsnapshotOverrides injects or overrides the addon download URL when wiki scraping fails.\ndllNameOverrides forces specific proxy DLL filenames (e.g. winmm.dll instead of dxgi.dll).\ngacSymlinkGames routes XNA Framework games through a GAC symlink install (requires admin).\nlaunchExeOverrides sets the relative exe path used when clicking Launch and for NVIDIA profile matching.\nrenodxIniOverrides injects keys into [renodx] reshade.ini section on install/update.\nlegacyReShadeVersions lists optional compatibility channels; it does not silently override the user's stable channel.",
   "installWarnings": {
     "Borderlands 2": {
       "luma": "Requires dgVoodoo2 v2.81.3 or v2.87.3\n\nSet these in dgVoodoo.conf:\n\n[General]\nOutputAPI : d3d11_fl11_0\n\n[DirectX]\nVideoCard : geforce_9800_gt\ndgVoodooWatermark : false\nVRAM : 1024"
@@ -841,6 +845,7 @@
   },
   "launchExeOverrides": {
     "Arma Reforger": "ArmaReforgerSteam.exe",
+    "Warhammer 40,000: Space Marine 2": "Warhammer 40000 Space Marine 2 - Retail.exe",
     "Crysis Remastered": "CrysisRemastered.exe",
     "Returnal\u2122": "Returnal-Win64-Shipping.exe",
     "The Elder Scrolls V: Skyrim Special Edition": "SkyrimSE.exe",
@@ -1304,11 +1309,11 @@
       "description": "Cube 3D LUT shader with dithering to reduce banding. Requires a .cube LUT file placed in the Textures folder.",
       "category": "Extra"
     },
-    "DLSS5Feeder": {
-      "displayName": "DLSS5 Feeder by jlrouzies-fr",
+    "ReshadeMotionEstimation": {
+      "displayName": "Reshade Motion Estimation by JakobPCoder",
       "kind": "DirectUrl",
-      "url": "https://github.com/jlrouzies-fr/DLSS5-Feeder/archive/refs/heads/main.zip",
-      "description": "Companion shader for the DLSS5 Feeder addon. Requires the DLSS5 Feeder addon and iMMERSE LaunchPad.",
+      "url": "https://github.com/JakobPCoder/ReshadeMotionEstimation/archive/refs/heads/master.zip",
+      "description": "Dense real-time optical flow motion estimation via block matching and pyramids.",
       "category": "Extra"
     },
     "CrosireLegacy": {
@@ -1323,18 +1328,6 @@
     },
     "renodx-dlssfix": {
       "description": "Makes ReShade draw on native game frames instead of generated frames. Also hides DLSS upscaling from ReShade."
-    },
-    "dlss5-dx11-bridge": {
-      "packageName": "DLSS5 DX11 Bridge",
-      "description": "Enables DLSS 5 Neural Rendering in D3D11 games. Additional setup steps are required — click How To Use for details.",
-      "downloadUrl64": "https://github.com/NIGos/dlss5-dx11-bridge/releases/latest/download/dlss5-dx11-bridge.addon64",
-      "repositoryUrl": "https://github.com/NIGos/dlss5-dx11-bridge"
-    },
-    "dlss5-feed": {
-      "packageName": "DLSS5 Feeder",
-      "description": "Enables DLSS 5 Neural Rendering in D3D11 games with no native DLSS support. Additional setup steps are required — click How To Use for details.",
-      "downloadUrl64": "https://github.com/jlrouzies-fr/DLSS5-Feeder/releases/latest/download/dlss5-feed.addon64",
-      "repositoryUrl": "https://github.com/jlrouzies-fr/DLSS5-Feeder"
     },
     "renodx-upgrade": {
       "packageName": "RenoDX Upgrade",

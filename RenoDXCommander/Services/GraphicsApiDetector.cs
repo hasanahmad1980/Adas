@@ -13,6 +13,8 @@ public static class GraphicsApiDetector
 {
     private const int HeaderBufferSize = 4096; // enough for DOS + PE + section headers
     private const int ImportReadSize = 65536;  // 64KB — large enough for import tables in big UE4/UE5 executables
+    private const int DynamicScanChunkSize = 1024 * 1024;
+    private const int CacheSchemaVersion = 2;
 
     // ── API detection cache ───────────────────────────────────────────────────────
     private static readonly ConcurrentDictionary<string, HashSet<GraphicsApiType>> _apiCache = new(StringComparer.OrdinalIgnoreCase);
@@ -25,7 +27,7 @@ public static class GraphicsApiDetector
     /// are automatically invalidated when games update.
     /// </summary>
     private static string MakeCacheKey(string filePath, DateTime lastWriteUtc)
-        => $"{filePath}|{lastWriteUtc.Ticks}";
+        => $"v{CacheSchemaVersion}|{filePath}|{lastWriteUtc.Ticks}";
 
     /// <summary>
     /// Loads the API detection cache from disk into memory.
@@ -116,6 +118,29 @@ public static class GraphicsApiDetector
         [GraphicsApiType.Unknown]   = 0,
     };
 
+    private sealed record DynamicApiSignature(
+        GraphicsApiType Api,
+        byte[][] RuntimeNames,
+        byte[][] EntryPoints);
+
+    // Some games resolve their graphics runtime with LoadLibrary/GetProcAddress, so the
+    // runtime never appears in the PE import directories. Require both a runtime name and
+    // a matching device/factory entry point to keep this fallback conservative.
+    private static readonly DynamicApiSignature[] DynamicApiSignatures =
+    {
+        DynamicSignature(GraphicsApiType.DirectX8,  ["d3d8.dll"],     ["Direct3DCreate8"]),
+        DynamicSignature(GraphicsApiType.DirectX9,  ["d3d9.dll"],     ["Direct3DCreate9"]),
+        DynamicSignature(GraphicsApiType.DirectX10, ["d3d10.dll", "d3d10_1.dll"], ["D3D10CreateDevice", "D3D10CreateDevice1"]),
+        DynamicSignature(GraphicsApiType.DirectX11, ["d3d11.dll"],    ["D3D11CreateDevice"]),
+        DynamicSignature(GraphicsApiType.DirectX12, ["d3d12.dll"],    ["D3D12CreateDevice"]),
+        DynamicSignature(GraphicsApiType.Vulkan,    ["vulkan-1.dll"], ["vkCreateInstance"]),
+        DynamicSignature(GraphicsApiType.OpenGL,    ["opengl32.dll"], ["wglCreateContext"]),
+    };
+
+    private static readonly int DynamicScanOverlap = DynamicApiSignatures
+        .SelectMany(signature => signature.RuntimeNames.Concat(signature.EntryPoints))
+        .Max(marker => marker.Length) - 1;
+
     /// <summary>
     /// Reads the PE import table of the given executable and returns the
     /// highest-priority graphics API found.
@@ -183,7 +208,7 @@ public static class GraphicsApiDetector
 
             uint importRva = BitConverter.ToUInt32(header, importDirOffset);
             if (importRva == 0)
-                return GraphicsApiType.Unknown;
+                return GetHighestPriority(DetectDynamicApiHints(stream));
 
             // Delay-load import directory (optional — may be zero if no delay imports)
             uint delayImportRva = (delayImportDirOffset + 4 <= headerRead)
@@ -206,7 +231,7 @@ public static class GraphicsApiDetector
             // Phase 2: Seek to import table and read it
             long importFileOffset = RvaToFileOffset(sections, importRva);
             if (importFileOffset < 0)
-                return GraphicsApiType.Unknown;
+                return GetHighestPriority(DetectDynamicApiHints(stream));
 
             stream.Seek(importFileOffset, SeekOrigin.Begin);
             var importBuf = new byte[ImportReadSize];
@@ -301,7 +326,7 @@ public static class GraphicsApiDetector
             if (importsDxgi)
                 return GraphicsApiType.DirectX12;
 
-            return GraphicsApiType.Unknown;
+            return GetHighestPriority(DetectDynamicApiHints(stream));
         }
         catch (FileNotFoundException)
         {
@@ -382,7 +407,7 @@ public static class GraphicsApiDetector
 
             uint importRva = BitConverter.ToUInt32(header, importDirOffset);
             if (importRva == 0)
-                return result;
+                return CacheResult(exePath, DetectDynamicApiHints(stream));
 
             // Parse section table to build RVA-to-file-offset mapping
             int sectionTableOffset = optionalHeaderOffset + sizeOfOptionalHeader;
@@ -400,15 +425,13 @@ public static class GraphicsApiDetector
             // Phase 2: Seek to import table and read it
             long importFileOffset = RvaToFileOffset(sections, importRva);
             if (importFileOffset < 0)
-                return result;
+                return CacheResult(exePath, DetectDynamicApiHints(stream));
 
             stream.Seek(importFileOffset, SeekOrigin.Begin);
             var importBuf = new byte[ImportReadSize];
             int importRead = stream.Read(importBuf, 0, importBuf.Length);
 
             // Walk Import Directory Table entries (each 20 bytes)
-            bool importsDxgi = false;
-            bool hasExplicitDx = false;
 
             for (int i = 0; ; i++)
             {
@@ -426,25 +449,17 @@ public static class GraphicsApiDetector
 
                 if (dllName.Equals("dxgi.dll", StringComparison.OrdinalIgnoreCase))
                 {
-                    importsDxgi = true;
                     continue;
                 }
 
                 if (DllMap.TryGetValue(dllName, out var api))
                 {
                     result.Add(api);
-                    if (api is GraphicsApiType.DirectX8 or GraphicsApiType.DirectX9 or
-                        GraphicsApiType.DirectX10 or GraphicsApiType.DirectX11 or GraphicsApiType.DirectX12)
-                    {
-                        hasExplicitDx = true;
-                    }
                 }
             }
 
-            // If dxgi.dll was imported but no explicit DX DLL was found (or only
-            // lower-priority APIs), add DX12 — same inference as Detect().
-            if (importsDxgi && !hasExplicitDx)
-                result.Add(GraphicsApiType.DirectX12);
+            // DXGI is shared by D3D10, D3D11 and D3D12. It identifies the hook
+            // family, but cannot prove which renderer a game actually selected.
 
             // Scan delay-load import table — UE4/UE5 DX12 games delay-load d3d12.dll
             uint delayImportRvaAll = 0;
@@ -474,21 +489,135 @@ public static class GraphicsApiDetector
                 }
             }
 
-            // Store result in cache
-            try
-            {
-                var lwt = File.GetLastWriteTimeUtc(exePath);
-                _apiCache[MakeCacheKey(exePath, lwt)] = result;
-            }
-            catch { /* best-effort caching */ }
+            // Dynamic loading is common and may coexist with static imports.
+            // Keep all candidates: selection belongs to runtime evidence.
+            result.UnionWith(DetectDynamicApiHints(stream));
 
-            return result;
+            return CacheResult(exePath, result);
         }
         catch (Exception ex)
         {
             CrashReporter.Log($"[GraphicsApiDetector] Error in DetectAllApis for '{exePath}': {ex.Message}");
             return result;
         }
+    }
+
+    /// <summary>
+    /// Finds graphics runtimes that are loaded dynamically instead of listed in a PE
+    /// import directory. The scan is streamed and only reports paired runtime and
+    /// entry-point evidence.
+    /// </summary>
+    internal static HashSet<GraphicsApiType> DetectDynamicApiHints(Stream stream)
+    {
+        var result = new HashSet<GraphicsApiType>();
+        if (!stream.CanRead)
+            return result;
+
+        long savedPosition = stream.CanSeek ? stream.Position : 0;
+        var runtimeFound = new bool[DynamicApiSignatures.Length];
+        var entryPointFound = new bool[DynamicApiSignatures.Length];
+        var buffer = new byte[DynamicScanChunkSize + DynamicScanOverlap];
+        int carried = 0;
+
+        try
+        {
+            if (stream.CanSeek)
+                stream.Seek(0, SeekOrigin.Begin);
+
+            while (true)
+            {
+                int read = stream.Read(buffer, carried, DynamicScanChunkSize);
+                if (read == 0)
+                    break;
+
+                int length = carried + read;
+                LowerAsciiInPlace(buffer.AsSpan(0, length));
+                var window = buffer.AsSpan(0, length);
+
+                for (int i = 0; i < DynamicApiSignatures.Length; i++)
+                {
+                    var signature = DynamicApiSignatures[i];
+                    runtimeFound[i] |= ContainsAny(window, signature.RuntimeNames);
+                    entryPointFound[i] |= ContainsAny(window, signature.EntryPoints);
+                }
+
+                carried = Math.Min(DynamicScanOverlap, length);
+                Buffer.BlockCopy(buffer, length - carried, buffer, 0, carried);
+            }
+
+            for (int i = 0; i < DynamicApiSignatures.Length; i++)
+            {
+                if (runtimeFound[i] && entryPointFound[i])
+                    result.Add(DynamicApiSignatures[i].Api);
+            }
+
+            return result;
+        }
+        finally
+        {
+            if (stream.CanSeek)
+                stream.Seek(savedPosition, SeekOrigin.Begin);
+        }
+    }
+
+    private static DynamicApiSignature DynamicSignature(
+        GraphicsApiType api,
+        string[] runtimeNames,
+        string[] entryPoints) => new(
+            api,
+            runtimeNames.Select(ToLowerAscii).ToArray(),
+            entryPoints.Select(ToLowerAscii).ToArray());
+
+    private static byte[] ToLowerAscii(string value)
+        => Encoding.ASCII.GetBytes(value.ToLowerInvariant());
+
+    private static void LowerAsciiInPlace(Span<byte> bytes)
+    {
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            if (bytes[i] is >= (byte)'A' and <= (byte)'Z')
+                bytes[i] += (byte)('a' - 'A');
+        }
+    }
+
+    private static bool ContainsAny(ReadOnlySpan<byte> window, byte[][] markers)
+    {
+        foreach (var marker in markers)
+        {
+            if (window.IndexOf(marker) >= 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static GraphicsApiType GetHighestPriority(HashSet<GraphicsApiType> apis)
+    {
+        var bestApi = GraphicsApiType.Unknown;
+        int bestPriority = 0;
+        foreach (var api in apis)
+        {
+            int priority = Priority[api];
+            if (priority > bestPriority)
+            {
+                bestPriority = priority;
+                bestApi = api;
+            }
+        }
+
+        return bestApi;
+    }
+
+    private static HashSet<GraphicsApiType> CacheResult(string exePath, HashSet<GraphicsApiType> result)
+    {
+        try
+        {
+            var lastWrite = File.GetLastWriteTimeUtc(exePath);
+            _apiCache[MakeCacheKey(exePath, lastWrite)] = new HashSet<GraphicsApiType>(result);
+        }
+        catch { /* best-effort caching */ }
+
+        return result;
     }
 
     /// <summary>
@@ -544,8 +673,8 @@ public static class GraphicsApiDetector
 
     /// <summary>
     /// Detects the graphics API for a Unity game by reading its boot.config file.
-    /// Unity's <c>gfx-device-type</c> setting maps to a graphics API; when absent,
-    /// Unity defaults to DirectX 11 on Windows.
+    /// Unity's <c>gfx-device-type</c> setting maps to a graphics API. An absent
+    /// setting is deliberately unknown: command-line flags may select another API.
     /// </summary>
     /// <param name="installPath">The game's install directory (where the exe lives).</param>
     /// <returns>The detected API, or <see cref="GraphicsApiType.Unknown"/> if no Unity data folder is found.</returns>
@@ -562,10 +691,7 @@ public static class GraphicsApiDetector
                 var bootConfig = Path.Combine(dir, "boot.config");
                 if (!File.Exists(bootConfig))
                 {
-                    // Old Unity builds (Unity 5 and earlier) don't have boot.config
-                    // but the _Data folder is still a definitive Unity signal.
-                    // Unity defaults to DX11 on Windows.
-                    return GraphicsApiType.DirectX11;
+                    return GraphicsApiType.Unknown;
                 }
 
                 // Parse key=value lines looking for gfx-device-type
@@ -585,13 +711,12 @@ public static class GraphicsApiDetector
                             18 => GraphicsApiType.DirectX12,
                             21 => GraphicsApiType.Vulkan,
                             4  => GraphicsApiType.OpenGL,
-                            _  => GraphicsApiType.DirectX11, // unknown value → Unity default
+                            _  => GraphicsApiType.Unknown,
                         };
                     }
                 }
 
-                // boot.config exists but no gfx-device-type → Unity defaults to DX11 on Windows
-                return GraphicsApiType.DirectX11;
+                return GraphicsApiType.Unknown;
             }
         }
         catch (Exception ex)

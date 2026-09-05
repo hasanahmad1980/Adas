@@ -38,6 +38,10 @@ public static class CrashReporter
 
     private static volatile bool _verboseLogging;
     private static readonly object _verboseLogLock = new();
+    private static readonly ConcurrentQueue<string> _pendingSessionLog = new();
+    private static readonly Timer _sessionLogTimer = new(
+        static _ => FlushSessionLog(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+    private static int _sessionLogFlushActive;
 
     /// <summary>Session log file path, created fresh each time the app starts.</summary>
     private static readonly string SessionLogPath;
@@ -61,6 +65,11 @@ public static class CrashReporter
                 Encoding.UTF8);
         }
         catch { SessionLogPath = Path.Combine(LogDir, "session_fallback.txt"); }
+
+        // Logging must never stall the UI or file-deployment workers. Batch entries
+        // into a single append a few times per second instead of opening the file
+        // for every breadcrumb.
+        _sessionLogTimer.Change(TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(200));
     }
 
     /// <summary>
@@ -103,14 +112,28 @@ public static class CrashReporter
 
     private static void AppendSessionLog(string entry)
     {
+        _pendingSessionLog.Enqueue(entry);
+    }
+
+    public static void FlushSessionLog()
+    {
+        if (Interlocked.Exchange(ref _sessionLogFlushActive, 1) != 0) return;
         try
         {
-            lock (_verboseLogLock)
+            if (_pendingSessionLog.IsEmpty) return;
+
+            var buffer = new StringBuilder();
+            while (_pendingSessionLog.TryDequeue(out var entry))
+                buffer.AppendLine(entry);
+
+            if (buffer.Length > 0)
             {
-                File.AppendAllText(SessionLogPath, entry + Environment.NewLine, Encoding.UTF8);
+                lock (_verboseLogLock)
+                    File.AppendAllText(SessionLogPath, buffer.ToString(), Encoding.UTF8);
             }
         }
         catch { /* Never let logging crash the app */ }
+        finally { Volatile.Write(ref _sessionLogFlushActive, 0); }
     }
 
     /// <summary>Delete oldest session logs when count exceeds the limit.</summary>
@@ -181,6 +204,7 @@ public static class CrashReporter
     {
         try
         {
+            FlushSessionLog();
             Directory.CreateDirectory(LogDir);
             PruneOldLogs();
 

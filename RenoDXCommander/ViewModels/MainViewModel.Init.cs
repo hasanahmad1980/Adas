@@ -488,20 +488,6 @@ public partial class MainViewModel
             ApplyManifest(_manifest);
             _pcgwService.CheckManifestCacheVersion(_manifest);
 
-            // Apply manifest-driven legacy ReShade version overrides
-            // (only if user hasn't already set their own override for that game)
-            if (_manifest?.LegacyReShadeVersions != null)
-            {
-                foreach (var (gameName, version) in _manifest.LegacyReShadeVersions)
-                {
-                    // Check for any existing override — either legacy name-only or composite key
-                    bool hasOverride = _reShadeChannelOverrides.ContainsKey(gameName)
-                        || _reShadeChannelOverrides.Keys.Any(k => k.StartsWith($"{gameName}|", StringComparison.OrdinalIgnoreCase));
-                    if (!hasOverride)
-                        SetReShadeChannelOverride(gameName, version);
-                }
-            }
-
             // Merge manifest-provided author donation URLs and display names
             if (_manifest != null)
                 GameCardViewModel.MergeManifestAuthorData(_manifest.DonationUrls, _manifest.AuthorDisplayNames);
@@ -627,6 +613,10 @@ public partial class MainViewModel
                 }
                 catch (Exception ex) { _crashReporter.Log($"[MainViewModel.InitializeAsync] Deferred ReShade sync failed — {ex.Message}"); }
 
+                // Prefer a responsive first frame over immediately saturating all
+                // game drives with maintenance work.
+                await Task.Delay(750).ConfigureAwait(false);
+
                 // Wait for shader packs to be downloaded/extracted
                 if (_shaderPackReadyTask != null)
                 {
@@ -654,35 +644,35 @@ public partial class MainViewModel
                     if (allNeededPacks.Count > 0)
                         await _shaderPackService.EnsurePacksAsync(allNeededPacks);
 
-                    var syncTasks = rsCards
-                        .Select(card =>
+                    await RunBoundedGameFolderWorkAsync(rsCards, card =>
                         {
                             var effectiveSelection = ResolveShaderSelection(card.GameName, card.ShaderModeOverride, card.Source ?? "");
                             var exclusions = effectiveSelection?
                                 .ToDictionary(id => id, id => _shaderPackService.GetExcludedFiles(id),
                                     StringComparer.OrdinalIgnoreCase);
-                            return Task.Run(() => _shaderPackService.SyncGameFolder(card.InstallPath, effectiveSelection, exclusions));
+                            _shaderPackService.SyncGameFolder(card.InstallPath, effectiveSelection, exclusions);
                         });
-                    await Task.WhenAll(syncTasks);
                 }
                 catch (Exception ex) { _crashReporter.Log($"[MainViewModel.InitializeAsync] SyncShaders failed — {ex.Message}"); }
 
                 // Deploy managed addons to all installed game locations
                 try
                 {
-                    var addonTasks = _allCards
+                    var addonCards = _allCards
                         .Where(card => !string.IsNullOrEmpty(card.InstallPath))
                         .Where(card => card.RequiresVulkanInstall
                             ? VulkanFootprintService.Exists(card.InstallPath)
                             : card.RsStatus == GameStatus.Installed || card.RsStatus == GameStatus.UpdateAvailable)
-                        .Select(card =>
+                        .ToList();
+                    await RunBoundedGameFolderWorkAsync(addonCards, card =>
                         {
                             // Skip addon deployment for normal ReShade games (Req 3.1, 3.2)
                             if (card.UseNormalReShade)
                             {
-                                return Task.Run(() => _addonPackService.DeployAddonsForGame(
+                                _addonPackService.DeployAddonsForGame(
                                     card.GameName, card.InstallPath, card.Is32Bit,
-                                    useGlobalSet: true, perGameSelection: new List<string>()));
+                                    useGlobalSet: true, perGameSelection: new List<string>());
+                                return;
                             }
 
                             string addonMode = GetPerGameAddonMode(card.GameName, card.Source ?? "");
@@ -690,10 +680,9 @@ public partial class MainViewModel
                             List<string>? selection = useGlobalSet
                                 ? _settingsViewModel.EnabledGlobalAddons
                                 : (_gameNameService.PerGameAddonSelection.TryGetValue(GameKey.FromCard(card.GameName, card.Source).ToKey(), out var sel) ? sel : null);
-                            return Task.Run(() => _addonPackService.DeployAddonsForGame(
-                                card.GameName, card.InstallPath, card.Is32Bit, useGlobalSet, selection));
+                            _addonPackService.DeployAddonsForGame(
+                                card.GameName, card.InstallPath, card.Is32Bit, useGlobalSet, selection);
                         });
-                    await Task.WhenAll(addonTasks);
                 }
                 catch (Exception ex) { _crashReporter.Log($"[MainViewModel.InitializeAsync] SyncAddons failed — {ex.Message}"); }
 

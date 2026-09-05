@@ -781,7 +781,8 @@ public partial class MainViewModel
             shaderResolver: (gameName, store, shaderModeOverride) => ResolveShaderSelection(gameName, shaderModeOverride, store),
             manifestDllResolver: GetManifestDllNames,
             channelResolver: (gameName, store) => ResolveReShadeChannel(gameName, store ?? ""),
-            keepRsIniUpdatedResolver: (gameName, store) => GetKeepRsIniUpdated(gameName, store));
+            keepRsIniUpdatedResolver: (gameName, store) => GetKeepRsIniUpdated(gameName, store),
+            graphicsApiOverrideResolver: (gameName, store) => GetSingleApiOverride(gameName, store));
     }
 
     public async Task UpdateAllUlAsync()
@@ -1189,7 +1190,7 @@ public partial class MainViewModel
                 _crashReporter.Log($"[MainViewModel.CheckForUpdatesAsync] DLSS Enabler check failed — {ex.Message}");
             }
 
-            // Check RenoDX DLSS5 addon update and auto-deploy if newer version available
+            // Check the unified RenoDX DLSS add-on and auto-deploy if a newer version is available.
             try
             {
                 var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
@@ -1199,7 +1200,7 @@ public partial class MainViewModel
             }
             catch (Exception ex)
             {
-                _crashReporter.Log($"[MainViewModel.CheckForUpdatesAsync] RenoDX DLSS5 addon check failed — {ex.Message}");
+                _crashReporter.Log($"[MainViewModel.CheckForUpdatesAsync] RenoDX DLSS add-on check failed — {ex.Message}");
             }
         }
         catch (Exception ex)

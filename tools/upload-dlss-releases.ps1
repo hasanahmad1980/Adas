@@ -42,9 +42,9 @@ foreach ($file in $files) {
         $tag = "DLSS-Enabler-$version"
         $title = "DLSS-Enabler-$version"
     }
-    elseif ($name -match "^renodx-dlss5_(.+)$") {
+    elseif ($name -match "^renodx-dlss_(.+)$") {
         $version = $Matches[1]
-        $tag = "renodx-dlss5-$version"
+        $tag = "renodx-dlss-$version"
         $title = "RenoDX DLSS5 $version"
     }
     else {

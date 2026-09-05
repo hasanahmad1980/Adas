@@ -37,7 +37,8 @@ public interface IUpdateOrchestrationService
         Func<string, string, string?, IEnumerable<string>?>? shaderResolver = null,
         Func<string, ManifestDllNames?>? manifestDllResolver = null,
         Func<string, string?, string>? channelResolver = null,
-        Func<string, string, bool>? keepRsIniUpdatedResolver = null);
+        Func<string, string, bool>? keepRsIniUpdatedResolver = null,
+        Func<string, string, GraphicsApiType?>? graphicsApiOverrideResolver = null);
 
     /// <summary>
     /// Batch-updates all eligible RE Framework installations.

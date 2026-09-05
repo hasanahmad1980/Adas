@@ -37,4 +37,8 @@ public static class FeatureFlags
     /// <summary>Resolution auto-toggle feature (Settings card + per-game toggle).</summary>
     public static bool ResolutionControl
         => DevUnlockService.IsUnlocked || _manifestFlags?.ResolutionControl == true;
+
+    /// <summary>MFG Ada Unlock component row (unlocks DLSS Multi Frame Generation on RTX 40-series).</summary>
+    public static bool MfgUnlock
+        => DevUnlockService.IsUnlocked || _manifestFlags?.MfgUnlock == true;
 }

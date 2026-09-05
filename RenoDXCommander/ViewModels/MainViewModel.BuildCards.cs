@@ -70,7 +70,10 @@ public partial class MainViewModel
         var newResolvedPathCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var newBitnessCache      = new ConcurrentDictionary<string, MachineType>(StringComparer.OrdinalIgnoreCase);
 
-        var gameInfos = detectedGames.AsParallel().Select(game =>
+        var gameInfos = detectedGames
+            .AsParallel()
+            .WithDegreeOfParallelism(Math.Min(4, Math.Max(1, Environment.ProcessorCount)))
+            .Select(game =>
         {
             string installPath;
             EngineType engine;
@@ -138,7 +141,7 @@ public partial class MainViewModel
             // Detect bitness: use cached value if available, otherwise run PE detection.
             MachineType machineType;
             var resolvedKey = installPath.ToLowerInvariant();
-            if (_bitnessCache.TryGetValue(resolvedKey, out var cachedMachine))
+            if (!game.IsManuallyAdded && _bitnessCache.TryGetValue(resolvedKey, out var cachedMachine))
             {
                 machineType = cachedMachine;
             }
@@ -196,7 +199,10 @@ public partial class MainViewModel
         var slowGameThresholdMs = 500; // Log games that take longer than this
         var gameTimings = new ConcurrentBag<(string name, long ms)>();
 
-        Parallel.ForEach(gameInfos, (item) =>
+        Parallel.ForEach(
+            gameInfos,
+            new ParallelOptions { MaxDegreeOfParallelism = Math.Min(4, Math.Max(1, Environment.ProcessorCount)) },
+            item =>
         {
             var gameStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var (game, installPath, engine, mod, origFallback, detectedMachine, engineOverrideLabel) = item;
@@ -341,6 +347,11 @@ public partial class MainViewModel
                 addonOnDisk = ScanForInstalledAddon(installPath, effectiveMod);
                 safeAddonCache[cacheKey] = addonOnDisk != null;
             }
+            // Global utility and DLSS-suite add-ons are owned by their dedicated rows.
+            // Cached/legacy records can otherwise resurrect them as game-specific mods
+            // and create a bogus Discord action after the suite is removed.
+            if (addonOnDisk != null && !IsGameSpecificRenodxAddon(addonOnDisk))
+                addonOnDisk = null;
             newAddonFileCache[cacheKey] = addonOnDisk ?? "";
             LogPhase("AddonScan");
 
@@ -1131,6 +1142,15 @@ public partial class MainViewModel
                     newCard.DofFixStatus = GameStatus.Installed;
                     newCard.DofFixInstalledVersion = _dofFixService.StagedVersion;
                 }
+            }
+
+            // ── MFG Ada Unlock detection (RTX 40-series only) ─────────────────────
+            newCard.IsMfgUnlockEligible = FeatureFlags.MfgUnlock && Dlss5CompatibilityService.IsAdaGpuDetected;
+            if (newCard.IsMfgUnlockEligible && !string.IsNullOrEmpty(installPath) && Directory.Exists(installPath)
+                && _mfgUnlockService.IsInstalledIn(installPath))
+            {
+                newCard.MfgUnlockStatus = GameStatus.Installed;
+                newCard.MfgUnlockInstalledVersion = _mfgUnlockService.StagedVersion;
             }
 
             // ── DLSS / Streamline detection ──────────────────────────────────────

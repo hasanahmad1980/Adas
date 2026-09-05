@@ -29,7 +29,7 @@ public static class AddonPopupHelper
             .Where(a => !string.IsNullOrEmpty(a.DownloadUrl)
                      || !string.IsNullOrEmpty(a.DownloadUrl32)
                      || !string.IsNullOrEmpty(a.DownloadUrl64)
-                     || a.SectionId.Equals("renodx-dlss5", StringComparison.OrdinalIgnoreCase)) // managed by Renodx5AddonService
+                     || a.SectionId.Equals("renodx-dlss", StringComparison.OrdinalIgnoreCase)) // managed by Renodx5AddonService
             .ToList();
 
         // Include custom addons (local files, no download URLs)
@@ -131,6 +131,19 @@ public static class AddonPopupHelper
                     Foreground = Brush(ResourceKeys.TextPrimaryBrush),
                     TextWrapping = TextWrapping.Wrap,
                     MaxWidth = 450,
+                });
+            }
+
+            if (!string.IsNullOrEmpty(entry.RepositoryUrl)
+                && !entry.SectionId.StartsWith("custom-", StringComparison.OrdinalIgnoreCase))
+            {
+                textPanel.Children.Add(new HyperlinkButton
+                {
+                    Content = "How to use",
+                    NavigateUri = new Uri(entry.RepositoryUrl),
+                    FontSize = 11,
+                    Foreground = Brush(ResourceKeys.AccentBlueBrush),
+                    Padding = new Thickness(0),
                 });
             }
 

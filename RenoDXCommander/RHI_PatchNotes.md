@@ -1,3 +1,217 @@
+## v2.6.34 — Full game cleanup and reliable folder confirmation
+
+- Fixed **Install anyway** for games with multiple executable folders. A folder explicitly chosen by the user now clears only the folder-resolution blocker while retaining real safety blocks such as anti-cheat detection.
+- Added **Full cleanup** under Advanced. It restores Adas-tracked originals, removes managed ReShade add-ons, scans the full game tree for recognizable DLSS 5/ReShade leftovers, and moves uncertain/user settings to an external recovery folder.
+- Full cleanup never removes unrecognized game DLLs or a native `nvngx_dlss.dll`. If a tracked original backup is missing or locked, Adas keeps its recovery record and directs the user to the store's verify/repair action.
+- Added **Remove game from list**. Manually added games are removed from the saved library; detected games are persistently hidden without touching their files.
+
+## v2.6.33 — Current DLSS 5 components and simple native controls
+
+- Updated standalone AIO to **2.0.4-experimental.1**, including its buffered presentation path and improved windowed DLAA detection.
+- Updated DLSS5 Bridge to **1.4.11**, including recovery from temporary GPU stalls instead of disabling neural rendering for the rest of the session.
+- Updated the complete matched Feeder beta set to **0.14.0-beta.1**. Its new crash reports identify NVIDIA driver 616.64 failures with RenoDX v4.6/v4.7 consumers, and repair keeps the compatible v4.55 consumer.
+- Added simple persistent neural-rendering and appearance controls for the native stable and ShortFuse experimental routes. The full ReShade interface is no longer required for normal on/off configuration.
+- Preserved automatic 32-bit Vulkan layer validation and persistent OptiScaler NR enablement. Adas continues to use its own tracked installer and rollback instead of importing RHI's interface or an untracked ASI-loader chain.
+- Kept Visual Enhancer as a separate media-processing application; its very large GPU-specific runtime packs do not improve game injection or guaranteed game FPS and are not added to the installer.
+
+## v2.6.31 — Simple Adas workflow
+
+- Replaced the visible multi-component game screen with a focused Adas workflow: choose a game, install or repair the best setup, launch, or remove and restore.
+- Moved the renderer override and alternate experimental methods under Advanced.
+- Corrected automatic routing so ShortFuse's unified 64-bit add-on is never installed with DLSS5-Feeder.
+- Kept the current 32-bit D3D10 Feeder relay and matched x86/host64 deployment while isolating AIO and OptiScaler as explicit experimental alternatives.
+- Kept every reviewed experimental payload in the offline package. The interface stays simple by moving alternate routes under one Advanced entry, not by removing features.
+
+## v2.6.30 — Per-game DX9 crash recovery
+
+- Adas now recognizes the exact Windows `STATUS_STACK_OVERFLOW` failure caused by a managed 32-bit DirectX 9 dgVoodoo/ReShade chain, including a recent crash that happened before this update.
+- The next DLSS 5 Review / Repair automatically offers a game-local DXVK/Vulkan recovery route, removes the tracked DirectX ReShade proxy, and deploys matched Feeder 0.13.1 beta 32-bit/host64 components.
+- The fallback is persisted only in that game's `.adas` record. Working DX9 games retain dgVoodoo, and DirectX 10/11/12, OpenGL, native Vulkan, and unrelated games are not rerouted.
+
+## v2.6.29 — September 4 DLSS 5 ecosystem refresh
+
+- Updated the matched optional Feeder set to **0.13.1-beta.1**. Its new native 32-bit DirectX 10 relay is selected automatically and no longer installs DXVK or a machine-wide Vulkan layer; rare 64-bit D3D10 games retain the translated fallback.
+- Updated DLSS5 Bridge to **1.4.8**, including corrected HDR10 color handling and Vulkan delivery when the game swapchain cannot accept transfer copies.
+- Updated the standard OptiScaler DLSS-NR profile to **0.2.0** with hybrid color composition, live exposure, frame hold, model supersampling and native Vulkan crash fixes. Native-DLSS DX11 games are now supported and automatically select the required D3D11-on-12 DLSS backend.
+- Updated standalone AIO to **2.0.3** with its compatibility-aware compositor, automatic window virtualization, serialized safe-start recovery and lower-smearing DLSS Preset L default. Expensive VORT guidance remains off by default.
+- Game cards now show **Update Ready** when an Adas-managed DLSS profile uses a superseded Feeder, Bridge, OptiScaler NR or AIO generation.
+
+## v2.6.28 — Automatic lock, native-DLSS, and permission preflight
+
+- DLSS 5 removal and profile switching now detect a running game, ask once, close it, wait for loaded add-ons to unlock, and continue automatically.
+- Unreal Engine games now detect native DLSS runtimes under shared Engine and project plug-in folders instead of incorrectly installing the Feeder route beside the executable.
+- DLSS 5 installation now verifies real write access before changing files. Protected game folders prompt to restart Adas as administrator instead of failing after a partial install.
+
+## v2.6.27 — Reliable profile repair after missing shader folders
+
+- Profile switching now recreates a removed destination folder before restoring an original backed-up file.
+- Repair no longer fails when a previous attempt already removed `reshade-shaders\Shaders`.
+- Added regression coverage for the exact New Heights `ReShade.fxh` rollback failure.
+
+## v2.6.26 — Manual renderer fallback that installers actually obey
+
+- When reliable launch detection cannot identify the renderer, DLSS 5 Review & Install now asks you to choose DirectX 8–12, Vulkan, or OpenGL instead of leaving installation blocked.
+- The saved renderer choice now controls DLSS 5 review, installation, repair, ReShade installation, and bulk ReShade updates.
+- Manual renderer choices now select the matching ReShade hook filename and appear as explicit installation evidence.
+- Experimental unified Feeder installs now register the RenoDX DLSS add-on for early loading, fixing sessions where Feeder delivered frames but neural rendering missed the required hooks.
+
+## v2.6.25 — Automatic legacy ReShade relocation
+
+- Fixed DX8/DX9 DLSS 5 repair incorrectly rejecting an existing ReShade `d3d8.dll` or `d3d9.dll` as an unknown wrapper.
+- Adas now relocates a positively identified ReShade proxy to `dxgi.dll` automatically before installing dgVoodoo2, preserving the correct loader chain and uninstall ownership.
+- Unknown third-party graphics wrappers are still left untouched and blocked with a clear error.
+
+## v2.6.24 — DLSS 5 pipeline ownership repair
+
+- Fixed DirectX 9 Feeder installs accidentally deleting the newly installed dgVoodoo translator when an older ReShade record used `d3d9.dll`.
+- ReShade installs and updates now respect the active DLSS 5 pipeline's proxy name and preserve its shader files.
+- The ReShade component row now refreshes immediately after DLSS 5 installation instead of incorrectly offering a separate installation.
+- Independent ReShade replacement is blocked for DLSS 5 OptiScaler profiles because that pipeline owns the graphics proxy.
+
+## v2.6.23 — Consistent automatic renderer setup
+
+- Uses the same observed renderer for the game card, ReShade installation, and DLSS 5 review. Multi-renderer imports are treated as capabilities, not permission to guess DX11 or the highest DirectX version.
+- Keeps verified launch evidence when Adas or ReShade creates its own configuration files, and migrates recent renderer observations from v2.6.22.
+- Removes the automatic L.A. Noire ReShade 6.3.3 pin. Normal installation now follows the current Stable channel (6.8.0 in the bundled package); legacy versions remain an explicit user choice only.
+- Starts directly launched games in their own executable folder and observes manifest-resolved launches, fixing games that failed only when launched from Adas and ensuring successful launches update the renderer everywhere.
+
+---
+
+## v2.6.22 — Automatic renderer verification
+
+- Uses executable imports, current game-owned runtime logs, and short-lived launch observations to select DirectX 9–12, OpenGL, or Vulkan without choosing the highest version.
+- Detects mismatched 32/64-bit add-ons, incorrect ReShade hook names, duplicate ReShade runtimes, damaged ownership records, and DLSS routes that do not match the current renderer.
+- Installs ReShade beside the resolved game executable, including games whose real binary lives below the library folder.
+- Stops ambiguous installs and asks for one launch from Adas instead of relying on title or engine defaults. OpenXR is detected separately from the rendering API.
+- Removed the title-specific L.A. Noire renderer rewrite.
+
+---
+
+## v2.6.21
+
+- Fixed leftover OptiScaler NR files blocking installation when the previous suite record is gone. Review / Install now previews known conflicting components, asks once, archives them, and continues installation automatically.
+- Consent is checked against the reviewed file hashes and installation record; changed/new conflicts require a fresh review. Game-native DLSS runtimes and unrelated game-specific RenoDX mods are not cleanup targets.
+- Confirmed Vulkan profile switches now perform removal inside Ada before setting up the new route. Shared-layer changes are not falsely presented as locally reversible; a failed new setup can be continued with Repair.
+- Uninstall also archives recognized orphan OptiScaler NR/AIO components. Failed tracked removal retains its recovery record and does not run further orphan cleanup.
+
+## v2.6.20
+
+- Added Microsoft Visual C++ runtime presence/architecture checks before DLSS installation. Hosted 32-bit games require both x86 and x64; missing prerequisites link directly to Microsoft.
+- Apply now switches game-local DLSS profiles automatically, with separate saved visual settings and a disk-backed recovery journal. Failed switches restore the previous files/settings; interrupted switches recover on the next Repair request. Vulkan/shared-layer changes retain restore-first protection.
+- Added 32-bit DirectX 8 through dgVoodoo2's D3D8 wrapper, DX11 ReShade, and the matched x86 Feeder/x64 host. DX9 remains supported. Existing foreign wrappers are not overwritten.
+- Added explicit renderer setup for 19 emulator families, including executable selection when multiple builds are present. Ada remembers the chosen executable and renderer; emulator settings themselves are not changed.
+- Kept the existing stable, beta, unified, AIO and OptiScaler alternatives. No game performance or crash fix is claimed without in-game verification.
+
+## v2.6.19
+
+- Replaced the optional unified ShortFuse add-on with the supplied September 2 build, deployed as `renodx-dlss.addon64` (no download suffix). Stable RenoDX 4.55/4.70 remain separate.
+- Updated the optional matched Feeder set to **0.12.1-beta.1**: protocol-v7 x86/host pair, in-game host controls, FSR 1 expand-back and current runtime-binding/DXVK pacing fixes. Exposed expand-back filter and sharpness in advanced settings.
+- Updated the native DX11/Vulkan bridge to **1.4.7**, including the upstream NGX jump-table hook crash fix. Ordinary stale staging no longer takes priority over the packaged bridge; explicit local imports remain supported.
+- Updated standalone AIO to **1.7.24** with verified download hashes. Added optional rejection-mask controls, disabled by default because nonzero strengths can suppress NR. Upstream performance measurements remain available in its overlay.
+- Added **OptiScaler DLSS-NR 0.1.2** and the **NR-before-SR English fork** as separately selectable experimental profiles. Both packages are bundled, hash-verified, architecture-checked and tracked for reversible removal. Standard NR supports native-DLSS x64 DX12/Vulkan; the split route is native-DLSS x64 DX12 only.
+- Standard OptiScaler install/uninstall/config-copy controls cannot overwrite suite-managed NR forks. Switching exclusive pipelines requires removing the previous suite first. Use **Insert**, not ReShade Home, for the forks' complete controls.
+- No game-specific performance or black-screen fix is claimed without runtime testing.
+
+## v2.6.18
+
+- Added optional standalone AIO **1.7.17** for 64-bit DX9/DX11/DX12 and Vulkan games. Existing recommended and 32-bit routes are unchanged. Vulkan requires the registered 64-bit ReShade layer.
+- Fetches all three author-published AIO assets once, verifies their pinned SHA-256 values, and caches them for reuse; a matching local-folder import is also available. These assets are not redistributed in the installer while redistribution permission is unconfirmed.
+- Installs game-local ReShade, standard headers, VORT motion guidance and the companion shader, with hash-aware uninstall. AIO's shaders are loaded but left unchecked in the ordinary effect chain because AIO schedules them itself.
+- Prevents stacking AIO with Feeder/Bridge/RenoDX DLSS and protects existing caller/wrapper DLLs. Remove the current suite before changing to or from AIO.
+- Added plain-language AIO pipeline, NR, frame-generation, intensity, tone, detail and skin/character controls. New setups leave frame generation and early proxy initialization off.
+- Diagnostics distinguish logged processing from a verified visible picture, ignore logs older than the current install, and no longer treat an absent optional NGX C hook alone as a broken runtime.
+
+## v2.6.17
+
+- Updated the packaged native DX11/Vulkan bridge to official DLSS5 Bridge **1.4.1**, including current Vulkan display-mode recovery and delivered-frame diagnostics.
+- Updated the optional matched Feeder test route from 0.8.0-beta.4 to **0.11.0-beta.2**. Its x86 add-on and x64 host remain an inseparable protocol-v5 pair; stable Feeder 0.7 remains the default.
+- Repair now clears only Adas DLSS entries that ReShade disabled after a crash and removes stale early-load references when compatibility routes change.
+- Added final whole-suite file verification to catch incomplete copies, wrong 32/64-bit payloads, changed files, and antivirus quarantine before reporting success.
+- Added **Check current setup** with plain-language diagnosis for common ReShade, shader, motion-vector, hosted Feeder, DLSS runtime, and NGX failures.
+- Replaced the packaged DLSS-NR entry with the user-supplied RTX 20/30/40 compatibility-patched 310.8.0.0 runtime.
+
+## v2.6.16
+
+- Replaced the bundled native RenoDX DLSS5 v4.60 build with the user-supplied v4.70 release, including its HDR fix, revised sliders, compatibility adjustments, and potential flicker fixes.
+- The package is stored versioned for verification but always deploys to games as `renodx-dlss5.addon64` without the browser-added `(3)` suffix.
+- Native 64-bit DirectX 11, DirectX 12, and Vulkan profiles now select v4.70 automatically. Stable Feeder remains pinned to its required RenoDX v4.55 build.
+
+## v2.6.15
+
+- Fixed severe hangs when opening or switching games by coalescing card refresh notifications and caching DLSS deployment and executable architecture lookups.
+- Moved DLSS 5 installation work off the interface thread so progress remains responsive during large runtime copies and verification.
+- Limited background shader and add-on synchronization to two game folders at a time and delayed it briefly until the first screen is responsive.
+- Stopped the generic add-on synchronizer from redeploying suite-owned Feeder, Bridge, and RenoDX DLSS files or deleting files owned by the DLSS 5 suite.
+- Avoided rewriting unchanged add-ons and replaced per-line synchronous log writes with batched background logging.
+- Prevented normal and elevated copies of Adas from running duplicate scans at the same time.
+
+## v2.6.14
+
+- Fixed L.A. Noire repair installing a DirectX 11 ReShade proxy while leaving the game configured for DirectX 9. Adas now switches `Renderer` to DirectX 11 automatically, preserves the original setting, and restores it when the suite is removed.
+- Fixed 32-bit Feeder installs leaving x64 NVIDIA DLSS and Streamline DLLs beside the 32-bit game executable. Those runtimes are now staged only under `host64`; Repair migrates and removes older Adas-owned root copies safely.
+- Updated DLSS 5 detection and manual runtime import to recognize the hosted 64-bit runtime layout without requesting duplicate files.
+
+## v2.6.13
+
+### Current DLSS 5 upstream integration
+
+- Added the matched DLSS5-Feeder **0.8.0-beta.4** test route as a separate profile without replacing stable 0.7. It includes Smooth Motion synchronization, recoverable GPU timeouts, v4.60 safe defaults, guide probes, and protocol-v3 32-bit Vulkan support. Stable remains the recommended default except where the beta is required for 32-bit Vulkan.
+- Native 64-bit Vulkan games with their own DLSS now use RenoDX DLSS5 4.60 + final DLSS5 Bridge 1.3.0, preserving the game's real depth, motion vectors, jitter, and quality preset instead of routing through estimated-motion Feeder.
+- Updated the experimental unified ShortFuse package from 0.2 to **0.3** and kept it explicitly separate from the compatibility-tested stable routes.
+- Bundled the standard ReShade shader headers, fixed v4.60's safe neural defaults, and retired obsolete RHI 2.5.x DLSS add-on selections so the dedicated per-game suite owns one coherent deployment.
+
+## v2.6.12
+
+### 32-bit cleanup and offline core package
+
+- Fixed 64-bit RenoDX DLSS binaries renamed to `.addon32` being counted as valid suite installations. Removal now archives orphaned suite files even when an older ownership record is missing, so the status and delete button clear correctly.
+- Fixed suite-owned RenoDX files being mistaken for game-specific RenoDX mods and producing the misleading **Download from Discord** action. The separate row is now labelled **RenoDX game mod**.
+- Bundled the matched NVIDIA Streamline/DLSS runtime package, current ReShade 6.8.0 x86/x64 runtimes, and L.A. Noire's required ReShade 6.3.3 x86/x64 runtimes. The DLSS 5 suite no longer needs a Discord download or an external runtime ZIP for these files.
+- L.A. Noire repair/removal now archives the impossible x64 `renodx-dlss5.addon32` payload that caused the 32-bit game to fail during ReShade add-on loading.
+
+## v2.6.11
+
+### Maximum-quality DLSS 5 routing
+
+- Added a clear install-profile choice. **Maximum Quality** is the default; ShortFuse 0.2 remains available as an explicitly experimental unified option with its stability tradeoffs shown before installation.
+- Native 64-bit DirectX 12 now uses stable RenoDX DLSS5 4.60. Native 64-bit DirectX 11 uses 4.60 with DLSS5 Bridge 1.3.0. Feeder routes remain pinned to RenoDX DLSS5 4.55 as required by the current released Feeder build.
+- DirectX 9 Feeder installs and configures current dgVoodoo2 automatically. DirectX 10 Feeder installs stable DXVK and the correct 32- or 64-bit Vulkan ReShade layer automatically.
+- Repair removes incompatible stable, experimental, current-bridge, and obsolete-bridge combinations before deploying one coherent route. Native games also receive reliable early-load configuration when a Streamline interposer is present.
+- Vulkan layer management now installs both architectures, fixing repeated 64-bit ReShade deployment into 32-bit translation paths.
+
+## v2.6.10
+
+### Runtime safety repair
+
+- Fixed 64-bit-only RenoDX DLSS being renamed to `.addon32` and deployed into 32-bit games. Add-on and ReShade payloads now pass an executable-architecture check before and after installation.
+- DLSS 5 Review/Repair now re-detects the selected game executable instead of trusting stale bitness metadata. Existing invalid `renodx-dlss.addon32` copies are removed from 32-bit games; RenoDX remains correctly isolated in Feeder's 64-bit host.
+- Native DLSS games keep their own DLSS and Streamline versions. Automatic runtime import fills only missing files, and Repair restores game-owned runtimes that older Adas builds replaced. This addresses the 007 First Light black screen while retaining the added DLSS NR runtime.
+
+## v2.6.9
+
+### Compatibility-safe DLSS repair
+
+- Review/Repair fixes malformed ReShade `**\**` search paths and canonicalizes case-sensitive ReShade keys without deleting comments or reformatting unrelated INI content.
+- Every ReShade setting changed by the suite is journaled before modification. Uninstall restores only suite-owned values and keeps later user edits.
+- Components follow a tested compatibility matrix: stable RenoDX v4.55 for native D3D12, v4.55 + DX11 Bridge for native D3D11, and pinned v4.55 for all Feeder transports. The experimental unified build is not deployed by default, and its auto-updates no longer overwrite compatibility-pinned games.
+
+## v2.6.7
+
+### DLSS 5 Suite
+
+- Updated the matched DLSS5-Feeder payload to v0.7.0, including protocol-v2 x86/x64 hosting, OpenGL support, the 32-bit host stability fix, Vulkan color fix, work-resolution control, motion-provider diagnostics, and the optional Vulkan fallback layer.
+- Replaced DRME as the automatic provider with upstream's recommended LumeniteFX Kernel. Adas downloads it from the author's official GitHub link, sets `DLSS5_MV_PROVIDER=3`, and enables Kernel above DLSS 5 Feed in the active preset.
+- Added local OpenGL ReShade installation as `opengl32.dll` and preserved architecture-aware hosted setup for 32-bit games.
+- The unified `renodx-dlss.addon64` remains the only RenoDX neural add-on; the standalone DX11 Bridge and legacy add-on names are retired during repair.
+
+### RHI 2.4.9 Sync
+
+- Added DLSSNR 310.8.SF and SF-v2, including RTX 20/30/40/50 support, and deploys `nvngx_dlss.dll` with the NR runtime while preserving an existing copy as `.original`.
+- Added the MOTD status-bar button and per-game add-on How to Use links.
+- Added the Space Marine 2 path fix, both AI: The Somnium Files 64-bit name variants, and the ReshadeMotionEstimation library entry.
+
+---
+
 ## v2.4.7
 
 ### Manifest Updates

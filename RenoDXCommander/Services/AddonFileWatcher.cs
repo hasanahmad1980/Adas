@@ -121,7 +121,7 @@ public sealed class AddonFileWatcher : IDisposable
                 || fileName.StartsWith("renodx-devkit", StringComparison.OrdinalIgnoreCase)
                 || fileName.StartsWith("renodx-dlssfix", StringComparison.OrdinalIgnoreCase)
                 || fileName.StartsWith("renodx-upgrade", StringComparison.OrdinalIgnoreCase)
-                || fileName.StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase))
+                || fileName.StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase))
                 return;
 
             _crashReporter.Log($"[AddonFileWatcher] Detected addon file: {Path.GetFileName(path)}");

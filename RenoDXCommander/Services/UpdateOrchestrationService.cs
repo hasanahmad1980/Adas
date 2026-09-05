@@ -153,7 +153,8 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
         Func<string, string, string?, IEnumerable<string>?>? shaderResolver = null,
         Func<string, ManifestDllNames?>? manifestDllResolver = null,
         Func<string, string?, string>? channelResolver = null,
-        Func<string, string, bool>? keepRsIniUpdatedResolver = null)
+        Func<string, string, bool>? keepRsIniUpdatedResolver = null,
+        Func<string, string, GraphicsApiType?>? graphicsApiOverrideResolver = null)
     {
         // ── DX proxy games (per-game DLL) ─────────────────────────────────────
         var targets = UpdateAllEligible(allCards)
@@ -192,6 +193,15 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
             card.RsActionMessage = "Updating...";
             try
             {
+                var renderer = GraphicsEnvironmentService.ApplyUserOverride(
+                    GraphicsEnvironmentService.Detect(card.InstallPath),
+                    graphicsApiOverrideResolver?.Invoke(card.GameName, card.Source ?? ""));
+                if (renderer.Api == GraphicsApiType.Unknown && renderer.ReShadeProxy == null
+                    && !card.DllOverrideEnabled && manifestDllResolver?.Invoke(card.GameName)?.ReShade is not { Length: > 0 })
+                    throw new InvalidOperationException("Renderer not confirmed. Launch the game from Adas before updating ReShade.");
+                if (renderer.Api == GraphicsApiType.Vulkan)
+                    throw new InvalidOperationException("Use the game's ReShade row to update its Vulkan layer safely.");
+                var installTarget = renderer.Executable == null ? card.InstallPath : Path.GetDirectoryName(renderer.Executable)!;
                 var progress = new Progress<(string msg, double pct)>(p =>
                 {
                     card.RsActionMessage = p.msg;
@@ -201,12 +211,12 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
                     ? dllOverrideService.GetDllOverride(card.GameName)?.ReShadeFileName
                     : (manifestDllResolver?.Invoke(card.GameName)?.ReShade is { Length: > 0 } mRs
                         ? mRs
-                        : MainViewModel.ResolveAutoReShadeFilename(card.DetectedApis));
+                        : renderer.ReShadeProxy);
                 var effectiveChannel = card.UseNormalReShade ? null : channelResolver?.Invoke(card.GameName, card.Source) ?? AuxInstallService.ChannelStable;
                 var record = await _auxInstaller.InstallReShadeAsync(
-                    card.GameName, card.InstallPath,
+                    card.GameName, installTarget,
                     shaderModeOverride: card.ShaderModeOverride,
-                    use32Bit:       card.Is32Bit,
+                    use32Bit:       renderer.Machine == MachineType.I386 || (renderer.Machine == MachineType.Native && card.Is32Bit),
                     filenameOverride: rsOverride,
                     selectedPackIds: shaderResolver?.Invoke(card.GameName, card.Source ?? "", card.ShaderModeOverride),
                     progress:       progress,

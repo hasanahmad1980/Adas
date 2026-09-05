@@ -16,6 +16,13 @@ public partial class DragDropHandler
         var exeDir  = Path.GetDirectoryName(exePath)!;
         var exeName = Path.GetFileNameWithoutExtension(exePath);
 
+        var emulatorProfile = Dlss5EmulatorService.ForExecutable(exePath);
+        if (emulatorProfile != null && !Path.GetFileName(exePath).Equals("Ryujinx.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            ViewModel.AddManualGame(new DetectedGame { Name = emulatorProfile.Name, InstallPath = exeDir, Source = "Manual" });
+            return;
+        }
+
         // ── Ryubing emulator detection ────────────────────────────────────────
         if (Path.GetFileName(exePath).Equals("Ryujinx.exe", StringComparison.OrdinalIgnoreCase))
         {

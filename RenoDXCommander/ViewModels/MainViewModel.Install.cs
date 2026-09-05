@@ -477,6 +477,8 @@ public partial class MainViewModel
         var addonOnDisk = game.Name.Equals("Ryubing", StringComparison.OrdinalIgnoreCase)
             ? null
             : ScanForInstalledAddon(scanPath, effectiveMod);
+        if (addonOnDisk != null && !IsGameSpecificRenodxAddon(addonOnDisk))
+            addonOnDisk = null;
         if (addonOnDisk != null && record == null)
         {
             record = new InstalledModRecord

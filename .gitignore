@@ -27,3 +27,12 @@ todo.md
 nvidiaProfileInspector-master/
 
 docs/v2.3.3-test-checklist.md
+.dotnet/
+.dotnet-home/
+.nuget/
+.appdata/
+artifacts/
+.upstream/
+.claude/
+.tmp/
+RenoDXCommander.Tests/TestResults/

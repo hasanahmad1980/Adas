@@ -1,6 +1,14 @@
-# RHI — Simplified PC Gaming
+# Adas — automatic DLSS 5 setup
 
-One app to manage HDR mods across your entire PC game library. RHI auto-detects games from eight storefronts, installs and updates ReShade, RenoDX, frame limiters, DLSS/Streamline, OptiScaler, and more — all with per-game control and zero manual configuration.
+Adas now presents one small workflow: choose a game, let it detect the renderer, then **Install best setup**, **Launch**, or **Remove & restore**. It selects the compatible DLSS 5 route, removes conflicting managed routes after one confirmation, backs up originals, verifies the finished files, and rolls back a failed switch. Renderer override and folder access live under **Advanced** instead of a component table.
+
+The automatic routes integrate [DLSS5 Bridge](https://github.com/NIGos/dlss5-bridge), [DLSS5-Feeder](https://github.com/jlrouzies-fr/DLSS5-Feeder), and the current direct neural add-ons. [OptiScaler DLSSNR](https://github.com/Dagherbou/OptiScaler_DLSSNR) and [DLSS5 ReShade AIO](https://github.com/kibblerz/DLSS5-Reshade-AIO) remain isolated experimental fallbacks. See the [corrected compatibility rules](docs/DLSS5_COMPATIBILITY_2026-09-04.md) and [research ledger](docs/report-source.md).
+
+The combined application remains GPL-3.0 because it is based on RHI. Integrated third-party components retain their notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Internal game-library capabilities
+
+The existing game-library and component services remain underneath Adas for detection, installation, backup, and recovery. The older multi-component interface is no longer the main user experience.
 
 ![RHI](screenshots/game_view.png)
 
@@ -70,6 +78,7 @@ One app to manage HDR mods across your entire PC game library. RHI auto-detects 
 - DLSS presets per game — SR: Default/J/K/L/M · RR: Default/D/E · FG: Default/A/B
 - DLSS render scale override: 33–100% per game for both SR and RR
 - Multi Frame Generation (RTX 50 Series): Mode (Default/Fixed/Dynamic), Frame Count (2x–6x), Target FPS
+- **MFG Ada Unlock (RTX 40 Series)** — optional per-game ReShade add-on that unlocks DLSS Multi Frame Generation 3x/4x/6x on Ada GPUs, downloaded at runtime from its official source. In-memory only, single-player only. See [the MFG Ada Unlock guide](docs/ADAS_MFG_UNLOCK.md).
 - Quick Apply deploys your configured defaults to any game in one click
 - Batch Deploy updates versions + presets across multiple games simultaneously
 - Backup/restore per game (`.original` files)
@@ -143,7 +152,7 @@ Grab the latest release from the [GitHub Releases page](https://github.com/RankF
 
 **Requirements:**
 - Windows 10/11 (x64)
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+- No separate .NET installation is required by the Adas installer; the x64 runtime is included.
 - NVIDIA GPU recommended for DLSS/Streamline and Profile Override features (AMD/Intel supported for everything else)
 
 ---

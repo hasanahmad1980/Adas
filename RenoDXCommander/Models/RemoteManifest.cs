@@ -666,4 +666,8 @@ public class ManifestFeatureFlags
     /// <summary>Resolution auto-toggle feature (Settings card + per-game toggle).</summary>
     [JsonPropertyName("resolutionControl")]
     public bool? ResolutionControl { get; set; }
+
+    /// <summary>MFG Ada Unlock component row (RTX 40-series DLSS Multi Frame Generation unlock).</summary>
+    [JsonPropertyName("mfgUnlock")]
+    public bool? MfgUnlock { get; set; }
 }

@@ -61,6 +61,18 @@ public partial class MainViewModel
         return _apiOverrides.TryGetValue(key, out var apis) ? apis : null;
     }
 
+    /// <summary>Returns the single valid renderer selected by the user, if one is set.</summary>
+    public GraphicsApiType? GetSingleApiOverride(string gameName, string store = "")
+    {
+        var values = GetApiOverride(gameName, store);
+        if (values is not { Count: 1 }
+            || !Enum.TryParse<GraphicsApiType>(values[0], ignoreCase: true, out var api)
+            || api == GraphicsApiType.Unknown)
+            return null;
+
+        return api;
+    }
+
     /// <summary>Sets the per-game API override. Null removes the override; otherwise stores the list of enabled API names.</summary>
     public void SetApiOverride(string gameName, List<string>? apis, string store = "")
     {
@@ -79,6 +91,8 @@ public partial class MainViewModel
     {
         var key = GameKey.From(gameName, store).ToKey();
         if (_reShadeChannelOverrides.TryGetValue(key, out var value)) return value;
+        var defaultKey = GameKey.From(gameName, "").ToKey();
+        if (_reShadeChannelOverrides.TryGetValue(defaultKey, out value)) return value;
         // Fallback to name-only for legacy entries
         return _reShadeChannelOverrides.TryGetValue(gameName, out value) ? value : null;
     }
@@ -140,9 +154,20 @@ public partial class MainViewModel
     /// Returns the per-game override if set, otherwise defaults to Stable.
     /// </summary>
     public string ResolveReShadeChannel(string gameName, string store = "")
+        => ResolveReShadeChannelValue(_reShadeChannelOverrides, gameName, store);
+
+    internal static string ResolveReShadeChannelValue(
+        IReadOnlyDictionary<string, string> overrides,
+        string gameName,
+        string store = "")
     {
         var key = GameKey.From(gameName, store).ToKey();
-        if (_reShadeChannelOverrides.TryGetValue(key, out var perGame))
+        if (overrides.TryGetValue(key, out var perGame))
+            return perGame;
+        var defaultKey = GameKey.From(gameName, "").ToKey();
+        if (overrides.TryGetValue(defaultKey, out perGame))
+            return perGame;
+        if (overrides.TryGetValue(gameName, out perGame))
             return perGame;
         return "Stable";
     }
@@ -660,7 +685,12 @@ public partial class MainViewModel
 
                 if (!rsInstalled) return;
 
-                bool is32Bit = card.Is32Bit;
+                bool is32Bit = ResolveInstallIs32Bit(card);
+                if (is32Bit != card.Is32Bit)
+                {
+                    _crashReporter.Log($"[MainViewModel.DeployAddonsForCard] Corrected stale bitness for {gameName}: card said {(card.Is32Bit ? "32" : "64")}-bit, executable is {(is32Bit ? "32" : "64")}-bit");
+                    card.Is32Bit = is32Bit;
+                }
 
                 // Skip addon deployment for normal ReShade games (Req 3.1, 3.2)
                 if (card.UseNormalReShade)
@@ -700,9 +730,9 @@ public partial class MainViewModel
                 _addonPackService.DeployAddonsForGame(gameName, card.InstallPath, is32Bit,
                     useGlobalSet, selection);
 
-                // If renodx-dlss5 is in the active selection, ensure nvngx_dlssnr.dll is also present
+                // If the unified RenoDX DLSS add-on is active, ensure nvngx_dlssnr.dll is also present.
                 var effectiveSelection = useGlobalSet ? selection : selection;
-                bool rdx5Active = effectiveSelection?.Contains("RenoDX DLSS5", StringComparer.OrdinalIgnoreCase) == true;
+                bool rdx5Active = effectiveSelection?.Contains("RenoDX DLSS", StringComparer.OrdinalIgnoreCase) == true;
                 if (rdx5Active && !File.Exists(Path.Combine(card.InstallPath, "nvngx_dlssnr.dll")))
                 {
                     _ = Task.Run(async () =>
@@ -840,7 +870,7 @@ public partial class MainViewModel
 
                     if (!rsInstalled) continue;
 
-                    bool is32Bit = card.Is32Bit;
+                    bool is32Bit = ResolveInstallIs32Bit(card);
 
                     // Skip addon deployment for normal ReShade games (Req 3.1, 3.2)
                     if (card.UseNormalReShade)

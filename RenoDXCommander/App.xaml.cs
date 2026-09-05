@@ -75,6 +75,7 @@ public partial class App : Application
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<ILumaService, LumaService>();
         services.AddSingleton<IShaderPackService, ShaderPackService>();
+        services.AddSingleton<IAddonPackService, AddonPackService>();
         services.AddSingleton<ILiliumShaderService, LiliumShaderService>();
         services.AddSingleton<IGameDetectionService, GameDetectionService>();
         services.AddSingleton<IPeHeaderService, PeHeaderService>();
@@ -108,9 +109,14 @@ public partial class App : Application
         services.AddSingleton<IDlssStreamlineService, DlssStreamlineService>();
         services.AddSingleton<DlssPresetService>();
         services.AddSingleton<DofFixService>();
+        services.AddSingleton<MfgUnlockService>();
         services.AddSingleton<AutoUpdateService>();
         services.AddSingleton<DlssEnablerService>();
         services.AddSingleton<Renodx5AddonService>();
+        services.AddSingleton<Dlss5CompatibilityService>();
+        services.AddSingleton<Dlss5ComponentService>();
+        services.AddSingleton<GameCleanupService>();
+        services.AddSingleton<DlssNrRepairService>();
         services.AddSingleton<CustomReShadeHashService>();
         services.AddSingleton<SeenWikiModsService>();
         services.AddSingleton<SeenUltraPlusModsService>();
@@ -143,7 +149,8 @@ public partial class App : Application
             var fileName = Path.GetFileName(cmdArgs[1]);
             if ((string.Equals(ext, ".addon64", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(ext, ".addon32", StringComparison.OrdinalIgnoreCase))
-                && fileName.StartsWith("renodx-", StringComparison.OrdinalIgnoreCase))
+                && fileName.StartsWith("renodx-", StringComparison.OrdinalIgnoreCase)
+                && !Renodx5AddonService.IsManagedAddonFileName(fileName))
                 addonArg = cmdArgs[1];
         }
 
@@ -222,6 +229,9 @@ public partial class App : Application
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
+                // The elevated copy must be able to acquire the cross-elevation
+                // mutex. Release it before launching the scheduled task.
+                SingleInstanceService.Stop();
                 System.Diagnostics.Process.Start(psi);
                 try { File.Delete(CrashReporter.CurrentSessionLogPath); } catch { }
                 Environment.Exit(0);
@@ -230,6 +240,12 @@ public partial class App : Application
             catch (Exception ex)
             {
                 CrashReporter.Log($"[App.OnLaunched] Admin Mode relaunch failed — continuing non-elevated: {ex.Message}");
+                if (!SingleInstanceService.TryAcquire())
+                {
+                    SingleInstanceService.SendToRunningInstance("--activate");
+                    Environment.Exit(0);
+                    return;
+                }
             }
         }
 

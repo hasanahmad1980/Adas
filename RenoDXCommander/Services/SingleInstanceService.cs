@@ -11,8 +11,10 @@ namespace RenoDXCommander.Services;
 /// </summary>
 public static class SingleInstanceService
 {
-    private const string MutexName = "RenoDXCommander_SingleInstance";
-    private const string PipeName = "RenoDXCommander_AddonPipe";
+    // Global prevents the normal and elevated scheduled-task copies from running
+    // separate scan/deployment pipelines at the same time.
+    private const string MutexName = @"Global\Adas_RenoDXCommander_SingleInstance_v2";
+    private const string PipeName = "Adas_RenoDXCommander_AddonPipe_v2";
     private static Mutex? _mutex;
     private static CancellationTokenSource? _cts;
 
@@ -83,7 +85,9 @@ public static class SingleInstanceService
     {
         _cts?.Cancel();
         _cts?.Dispose();
-        _mutex?.ReleaseMutex();
+        _cts = null;
+        try { _mutex?.ReleaseMutex(); } catch (ApplicationException) { }
         _mutex?.Dispose();
+        _mutex = null;
     }
 }

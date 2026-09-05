@@ -134,8 +134,8 @@ public static class AddonManagerDialog
             !string.IsNullOrEmpty(entry.DownloadUrl64))
             return "download";
 
-        // renodx-dlss5 is managed by Renodx5AddonService — treat as downloadable
-        if (entry.SectionId.Equals("renodx-dlss5", StringComparison.OrdinalIgnoreCase))
+        // renodx-dlss is managed by Renodx5AddonService — treat as downloadable
+        if (entry.SectionId.Equals("renodx-dlss", StringComparison.OrdinalIgnoreCase))
             return "download";
 
         if (!string.IsNullOrEmpty(entry.RepositoryUrl))

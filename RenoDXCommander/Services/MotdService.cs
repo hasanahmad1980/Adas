@@ -47,4 +47,21 @@ public static class MotdService
             return null;
         }
     }
+
+    /// <summary>Fetches the current MOTD even if it has already been displayed.</summary>
+    public static async Task<string?> FetchAsync(HttpClient http)
+    {
+        try
+        {
+            var response = await http.GetAsync(MotdUrl).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+            var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return string.IsNullOrWhiteSpace(content) ? null : content.Trim();
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Log($"[MotdService.FetchAsync] Failed — {ex.Message}");
+            return null;
+        }
+    }
 }

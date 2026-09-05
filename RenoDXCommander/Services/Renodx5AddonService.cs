@@ -4,15 +4,31 @@ using RenoDXCommander.Models;
 namespace RenoDXCommander.Services;
 
 /// <summary>
-/// Manages the RenoDX DLSS5 addon — download, staging, install, and auto-update.
-/// Hosted on RankFTW/rhi-repo GitHub releases under the renodx-dlss5- tag prefix.
+/// Manages the unified RenoDX DLSS add-on — staging, install, and auto-update.
+/// The unified build replaces both renodx-dlss5 and the standalone DX11 bridge.
 /// Auto-redeploys to any game folder where the addon is already present.
 /// </summary>
 public class Renodx5AddonService
 {
-    private const string StagedFileName   = "renodx-dlss5.addon64";
-    private const string DeployFileName   = "renodx-dlss5.addon64";
-    private const string TagPrefix        = "renodx-dlss5-";
+    public const string AddonFileName = "renodx-dlss.addon64";
+    public static readonly string[] ObsoleteAddonFileNames =
+    {
+        "renodx-dlss5.addon64",
+        "renodx-dlss5(2).addon64",
+        "dlss5-bridge.addon64",
+        "dlss5-dx11-bridge.addon64",
+        // No x86 builds exist for these names. They are listed so releases that
+        // incorrectly relabelled the x64 payload as .addon32 can be retired.
+        "renodx-dlss.addon32",
+        "renodx-dlss5.addon32",
+        "dlss5-dx11-bridge.addon32",
+    };
+
+    public static bool IsManagedAddonFileName(string? fileName)
+        => !string.IsNullOrWhiteSpace(fileName)
+           && (fileName.Equals(AddonFileName, StringComparison.OrdinalIgnoreCase)
+               || ObsoleteAddonFileNames.Any(name => fileName.Equals(name, StringComparison.OrdinalIgnoreCase)));
+    private const string TagPrefix = "renodx-dlss-";
     private static readonly string GitHubApiUrl =
         "https://api.github.com/repos/RankFTW/rhi-repo/releases?per_page=100";
 
@@ -43,11 +59,11 @@ public class Renodx5AddonService
 
     // ── Properties ────────────────────────────────────────────────────────────
 
-    /// <summary>Whether renodx-dlss5.addon64 is ready in staging.</summary>
-    public bool IsStagingReady => File.Exists(Path.Combine(_stagingDir, StagedFileName));
+    /// <summary>Whether the unified RenoDX DLSS add-on is ready in staging.</summary>
+    public bool IsStagingReady => File.Exists(Path.Combine(_stagingDir, AddonFileName));
 
-    /// <summary>Full path to the staged renodx-dlss5.addon64 file.</summary>
-    public string StagedFilePath => Path.Combine(_stagingDir, StagedFileName);
+    /// <summary>Full path to the staged unified RenoDX DLSS add-on.</summary>
+    public string StagedFilePath => Path.Combine(_stagingDir, AddonFileName);
 
     /// <summary>The currently staged version string (tag suffix), or null if not staged.</summary>
     public string? StagedVersion
@@ -59,11 +75,48 @@ public class Renodx5AddonService
     /// <summary>The latest remote version string (set after CheckForUpdateAsync).</summary>
     public string? LatestVersion { get; private set; }
 
+    /// <summary>Stages a user-supplied or installer-bundled add-on under its canonical filename.</summary>
+    public void StageLocalAddon(string sourcePath, string version)
+    {
+        if (!File.Exists(sourcePath))
+            throw new FileNotFoundException("The RenoDX DLSS 5 add-on was not found.", sourcePath);
+        if (!AddonPackService.IsAddonArchitectureCompatible(sourcePath, is32Bit: false))
+            throw new InvalidDataException("The unified RenoDX DLSS add-on is not a valid 64-bit ReShade add-on.");
+        Directory.CreateDirectory(_stagingDir);
+        var temporary = StagedFilePath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.Copy(sourcePath, temporary, overwrite: false);
+            File.Move(temporary, StagedFilePath, overwrite: true);
+            File.WriteAllText(_versionFile, version);
+            HasUpdate = false;
+            LatestVersion = version;
+            _crashReporter.Log($"[Renodx5AddonService.StageLocalAddon] Staged v{version} as '{AddonFileName}'");
+        }
+        finally
+        {
+            try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
+        }
+    }
+
     // ── Public API ────────────────────────────────────────────────────────────
+
+    // A supplied build date cannot be ordered against the mirror's unrelated semantic versions.
+    // Keep it pinned until another explicit import or packaged update replaces it.
+    internal static bool IsPinnedLocalBuild(string? version)
+        => version != null && version.StartsWith("SF-", StringComparison.OrdinalIgnoreCase)
+            && DateTime.TryParseExact(version[3..], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _);
 
     /// <summary>Checks GitHub for a newer version than what's currently staged.</summary>
     public async Task<bool> CheckForUpdateAsync()
     {
+        if (IsStagingReady && IsPinnedLocalBuild(StagedVersion))
+        {
+            LatestVersion = StagedVersion;
+            HasUpdate = false;
+            return false;
+        }
         var (version, _) = await FetchLatestReleaseInfoAsync().ConfigureAwait(false);
         if (string.IsNullOrEmpty(version))
         {
@@ -79,19 +132,21 @@ public class Renodx5AddonService
     }
 
     /// <summary>
-    /// Ensures renodx-dlss5.addon64 is staged. Downloads if not present or if an update is available.
+    /// Ensures renodx-dlss.addon64 is staged. Downloads if not present or if an update is available.
     /// After a successful download, auto-redeploys to all game folders that already have the addon.
     /// </summary>
-    public async Task EnsureStagingAsync(IProgress<(string message, double percent)>? progress = null)
+    public async Task EnsureStagingAsync(
+        IProgress<(string message, double percent)>? progress = null,
+        bool autoRedeploy = true)
     {
-        if (IsStagingReady && !HasUpdate)
+        if (IsStagingReady && (!HasUpdate || IsPinnedLocalBuild(StagedVersion)))
         {
             _crashReporter.Log("[Renodx5AddonService.EnsureStagingAsync] Staging already valid — skipping download");
             return;
         }
 
         Directory.CreateDirectory(_stagingDir);
-        progress?.Report(("Downloading RenoDX DLSS5 addon...", 10));
+        progress?.Report(("Preparing unified RenoDX DLSS add-on...", 10));
 
         var (version, downloadUrl) = await FetchLatestReleaseInfoAsync().ConfigureAwait(false);
         if (string.IsNullOrEmpty(version) || string.IsNullOrEmpty(downloadUrl))
@@ -100,11 +155,11 @@ public class Renodx5AddonService
             return;
         }
 
-        progress?.Report(("Downloading RenoDX DLSS5 addon...", 30));
+        progress?.Report(("Downloading unified RenoDX DLSS add-on...", 30));
 
         try
         {
-            var destPath = Path.Combine(_stagingDir, StagedFileName);
+            var destPath = Path.Combine(_stagingDir, AddonFileName);
             var bytes    = await _http.GetByteArrayAsync(downloadUrl).ConfigureAwait(false);
 
             // If the download is a zip, extract the addon64 from it
@@ -115,10 +170,10 @@ public class Renodx5AddonService
                 using (var zip = System.IO.Compression.ZipFile.OpenRead(tempZip))
                 {
                     var entry = zip.Entries.FirstOrDefault(e =>
-                        string.Equals(e.Name, StagedFileName, StringComparison.OrdinalIgnoreCase));
+                        string.Equals(e.Name, AddonFileName, StringComparison.OrdinalIgnoreCase));
                     if (entry == null)
                     {
-                        _crashReporter.Log($"[Renodx5AddonService.EnsureStagingAsync] '{StagedFileName}' not found in zip");
+                        _crashReporter.Log($"[Renodx5AddonService.EnsureStagingAsync] '{AddonFileName}' not found in zip");
                         File.Delete(tempZip);
                         return;
                     }
@@ -140,16 +195,17 @@ public class Renodx5AddonService
         catch (Exception ex)
         {
             _crashReporter.Log($"[Renodx5AddonService.EnsureStagingAsync] Download failed ({downloadUrl}) — {ex.Message}");
-            progress?.Report(($"RenoDX DLSS5 addon download failed: {ex.Message}", 0));
+            progress?.Report(($"RenoDX DLSS add-on download failed: {ex.Message}", 0));
             return;
         }
 
-        progress?.Report(("RenoDX DLSS5 addon ready", 90));
+        progress?.Report(("RenoDX DLSS add-on ready", 90));
 
         // ── Auto-redeploy to all games where the addon is already present ─────
-        await AutoRedeployAsync().ConfigureAwait(false);
+        if (autoRedeploy)
+            await AutoRedeployAsync().ConfigureAwait(false);
 
-        progress?.Report(("RenoDX DLSS5 addon ready", 100));
+        progress?.Report(("RenoDX DLSS add-on ready", 100));
     }
 
     /// <summary>
@@ -192,6 +248,10 @@ public class Renodx5AddonService
     {
         if (string.IsNullOrEmpty(installPath)) return;
 
+        if (new PeHeaderService().DetectGameArchitecture(installPath) == MachineType.I386)
+            throw new InvalidOperationException(
+                "RenoDX DLSS has no 32-bit add-on build. Use the DLSS 5 Feeder suite, which runs RenoDX inside its 64-bit host.");
+
         await EnsureStagingAsync().ConfigureAwait(false);
         if (!IsStagingReady)
         {
@@ -203,9 +263,10 @@ public class Renodx5AddonService
         {
             var deployDir = ModInstallService.GetAddonDeployPath(installPath);
             Directory.CreateDirectory(deployDir);
-            var src  = Path.Combine(_stagingDir, StagedFileName);
-            var dest = Path.Combine(deployDir, DeployFileName);
+            var src  = Path.Combine(_stagingDir, AddonFileName);
+            var dest = Path.Combine(deployDir, AddonFileName);
             File.Copy(src, dest, overwrite: true);
+            RetireObsoleteAddons(installPath, deployDir);
             _crashReporter.Log($"[Renodx5AddonService.InstallAsync] Deployed addon to '{deployDir}'");
         }
         catch (Exception ex)
@@ -218,13 +279,13 @@ public class Renodx5AddonService
     }
 
     /// <summary>
-    /// Deletes renodx-dlss5.addon64 from the given game install path.
+    /// Deletes the unified add-on from the given game install path.
     /// </summary>
     public void Uninstall(string installPath)
     {
         if (string.IsNullOrEmpty(installPath)) return;
         var deployDir = ModInstallService.GetAddonDeployPath(installPath);
-        var filePath  = Path.Combine(deployDir, DeployFileName);
+        var filePath  = Path.Combine(deployDir, AddonFileName);
         try
         {
             if (File.Exists(filePath))
@@ -239,12 +300,12 @@ public class Renodx5AddonService
         }
     }
 
-    /// <summary>Returns true if renodx-dlss5.addon64 exists at the game's deploy path.</summary>
+    /// <summary>Returns true if the unified add-on exists at the game's deploy path.</summary>
     public bool IsInstalledIn(string installPath)
     {
         if (string.IsNullOrEmpty(installPath)) return false;
         var deployDir = ModInstallService.GetAddonDeployPath(installPath);
-        return File.Exists(Path.Combine(deployDir, DeployFileName));
+        return File.Exists(Path.Combine(deployDir, AddonFileName));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -257,7 +318,7 @@ public class Renodx5AddonService
     {
         try
         {
-            var staged = Path.Combine(_stagingDir, StagedFileName);
+            var staged = Path.Combine(_stagingDir, AddonFileName);
             if (!File.Exists(staged)) return;
 
             var lib = _gameLibraryService.Load();
@@ -272,25 +333,49 @@ public class Renodx5AddonService
             {
                 try
                 {
+                    if (new PeHeaderService().DetectGameArchitecture(game.InstallPath!) == MachineType.I386)
+                    {
+                        _crashReporter.Log($"[Renodx5AddonService.AutoRedeployAsync] Skipped 32-bit game '{game.Name}' — the unified add-on is 64-bit only");
+                        continue;
+                    }
                     var deployDir = ModInstallService.GetAddonDeployPath(game.InstallPath!);
-                    var dest      = Path.Combine(deployDir, DeployFileName);
+                    var suiteRecord = Dlss5ComponentService.LoadRecord(deployDir)
+                        ?? (!deployDir.Equals(game.InstallPath, StringComparison.OrdinalIgnoreCase)
+                            ? Dlss5ComponentService.LoadRecord(game.InstallPath!)
+                            : null);
+                    if (suiteRecord != null
+                        && !Dlss5ComponentService.GetCompatibilityPlan(
+                                suiteRecord.Mode,
+                                is64Bit: true,
+                                suiteRecord.Profile)
+                            .UsesExperimentalUnified)
+                    {
+                        _crashReporter.Log($"[Renodx5AddonService.AutoRedeployAsync] Kept compatibility-pinned RenoDX build for '{game.Name}'");
+                        continue;
+                    }
+                    var dest      = Path.Combine(deployDir, AddonFileName);
 
                     // Also check the install path root in case addon was deployed there directly
-                    var destRoot = Path.Combine(game.InstallPath!, DeployFileName);
-                    bool existsInDeployDir = File.Exists(dest);
-                    bool existsInRoot = !dest.Equals(destRoot, StringComparison.OrdinalIgnoreCase) && File.Exists(destRoot);
+                    var destRoot = Path.Combine(game.InstallPath!, AddonFileName);
+                    bool existsInDeployDir = File.Exists(dest)
+                        || ObsoleteAddonFileNames.Any(name => File.Exists(Path.Combine(deployDir, name)));
+                    bool existsInRoot = !dest.Equals(destRoot, StringComparison.OrdinalIgnoreCase)
+                        && (File.Exists(destRoot)
+                            || ObsoleteAddonFileNames.Any(name => File.Exists(Path.Combine(game.InstallPath!, name))));
 
                     if (!existsInDeployDir && !existsInRoot) continue; // only update if already present
 
-                    var src = Path.Combine(_stagingDir, StagedFileName);
+                    var src = Path.Combine(_stagingDir, AddonFileName);
                     if (existsInDeployDir)
                     {
                         File.Copy(src, dest, overwrite: true);
+                        RetireObsoleteAddons(game.InstallPath!, deployDir);
                         _crashReporter.Log($"[Renodx5AddonService.AutoRedeployAsync] Updated '{game.Name}' at '{deployDir}'");
                     }
                     if (existsInRoot)
                     {
                         File.Copy(src, destRoot, overwrite: true);
+                        RetireObsoleteAddons(game.InstallPath!, deployDir);
                         _crashReporter.Log($"[Renodx5AddonService.AutoRedeployAsync] Updated '{game.Name}' at root '{game.InstallPath}'");
                     }
                 }
@@ -306,6 +391,34 @@ public class Renodx5AddonService
         }
 
         await Task.CompletedTask;
+    }
+
+    public void RetireObsoleteAddons(string installPath, string deployDir)
+    {
+        var backupDirectory = Path.Combine(installPath, ".adas", "backups", "obsolete-addons");
+        foreach (var obsoleteName in ObsoleteAddonFileNames)
+        {
+            foreach (var obsoletePath in new[]
+                     {
+                         Path.Combine(deployDir, obsoleteName),
+                         Path.Combine(installPath, obsoleteName),
+                     }.Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists))
+            {
+                try
+                {
+                    Directory.CreateDirectory(backupDirectory);
+                    var backup = Path.Combine(
+                        backupDirectory,
+                        $"{Path.GetFileName(obsoletePath)}.{DateTime.UtcNow:yyyyMMddHHmmssfff}.{Guid.NewGuid():N}.bak");
+                    File.Move(obsoletePath, backup);
+                    _crashReporter.Log($"[Renodx5AddonService] Retired obsolete add-on '{obsoletePath}' to '{backup}'");
+                }
+                catch (Exception ex)
+                {
+                    _crashReporter.Log($"[Renodx5AddonService] Could not retire obsolete add-on '{obsoletePath}' — {ex.Message}");
+                }
+            }
+        }
     }
 
     private async Task<(string? version, string? downloadUrl)> FetchLatestReleaseInfoAsync()
@@ -326,7 +439,7 @@ public class Renodx5AddonService
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
 
-            var candidates = new List<(string version, string downloadUrl, Version parsed)>();
+            var candidates = new List<(string version, string downloadUrl, Version parsed, bool shortFuse, DateTime published)>();
 
             foreach (var release in doc.RootElement.EnumerateArray())
             {
@@ -335,6 +448,12 @@ public class Renodx5AddonService
                 if (tag == null || !tag.StartsWith(TagPrefix, StringComparison.OrdinalIgnoreCase)) continue;
 
                 var version = tag.Substring(TagPrefix.Length);
+                var shortFuse = version.StartsWith("SF-", StringComparison.OrdinalIgnoreCase);
+                var numericVersion = shortFuse ? version[3..] : version;
+                var published = release.TryGetProperty("published_at", out var publishedElement)
+                                && DateTime.TryParse(publishedElement.GetString(), out var parsedPublished)
+                    ? parsedPublished
+                    : DateTime.MinValue;
 
                 string? downloadUrl = null;
                 if (release.TryGetProperty("assets", out var assets))
@@ -345,9 +464,9 @@ public class Renodx5AddonService
                         if (assetName == null) continue;
 
                         // Accept the .addon64 directly, or a zip named with the tag prefix
-                        bool isAddon = string.Equals(assetName, StagedFileName, StringComparison.OrdinalIgnoreCase);
+                        bool isAddon = string.Equals(assetName, AddonFileName, StringComparison.OrdinalIgnoreCase);
                         bool isZip   = assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
-                                    && assetName.StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase);
+                                    && assetName.StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase);
 
                         if ((isAddon || isZip) && asset.TryGetProperty("browser_download_url", out var urlEl))
                         {
@@ -359,18 +478,26 @@ public class Renodx5AddonService
 
                 if (string.IsNullOrEmpty(downloadUrl)) continue;
 
-                candidates.Add(Version.TryParse(version, out var parsed)
-                    ? (version, downloadUrl!, parsed)
-                    : (version, downloadUrl!, new Version(0, 0)));
+                candidates.Add(Version.TryParse(numericVersion, out var parsed)
+                    ? (version, downloadUrl!, parsed, shortFuse, published)
+                    : (version, downloadUrl!, new Version(0, 0), shortFuse, published));
             }
 
             if (candidates.Count == 0)
             {
-                _crashReporter.Log("[Renodx5AddonService] No release found with renodx-dlss5- tag");
+                _crashReporter.Log("[Renodx5AddonService] No release found with renodx-dlss- tag");
                 return (null, null);
             }
 
-            var best = candidates.OrderByDescending(c => c.parsed).First();
+            // The unified package in RHI is the explicitly labelled ShortFuse
+            // line. Its tags are "renodx-dlss-SF-x.y", which Version.TryParse
+            // cannot read directly; without this normalization an older generic
+            // snapshot could incorrectly win over the current SF release.
+            var best = candidates
+                .OrderByDescending(candidate => candidate.shortFuse)
+                .ThenByDescending(candidate => candidate.parsed)
+                .ThenByDescending(candidate => candidate.published)
+                .First();
             return (best.version, best.downloadUrl);
         }
         catch (Exception ex)

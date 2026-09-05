@@ -311,7 +311,8 @@ public class WindowStateManager
                     }
 
                     if (ext is ".addon64" or ".addon32"
-                        && Path.GetFileName(path).StartsWith("renodx-", StringComparison.OrdinalIgnoreCase))
+                        && Path.GetFileName(path).StartsWith("renodx-", StringComparison.OrdinalIgnoreCase)
+                        && !Renodx5AddonService.IsManagedAddonFileName(Path.GetFileName(path)))
                     {
                         try { await _dragDropHandler.ProcessDroppedAddon(path); }
                         catch (Exception ex) { _crashReporter.Log($"[WindowStateManager.HandleWin32Drop] Addon error — {ex.Message}"); }
@@ -597,7 +598,8 @@ public class WindowStateManager
                                 var ext = Path.GetExtension(path)?.ToLowerInvariant() ?? "";
 
                                 if (ext is ".addon64" or ".addon32"
-                                    && Path.GetFileName(path).StartsWith("renodx-", StringComparison.OrdinalIgnoreCase))
+                                    && Path.GetFileName(path).StartsWith("renodx-", StringComparison.OrdinalIgnoreCase)
+                                    && !Renodx5AddonService.IsManagedAddonFileName(Path.GetFileName(path)))
                                 {
                                     try { await _owner._dragDropHandler.ProcessDroppedAddon(path); }
                                     catch (Exception ex) { _owner._crashReporter.Log($"[OleDropTarget.Drop] Addon error — {ex.Message}"); }

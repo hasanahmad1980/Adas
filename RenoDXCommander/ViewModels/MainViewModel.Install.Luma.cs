@@ -30,6 +30,18 @@ public partial class MainViewModel
         return null; // fall through to default dxgi.dll
     }
 
+    internal static void ApplyInstalledReShadeRecord(
+        GameCardViewModel card,
+        AuxInstalledRecord record,
+        string? installedVersion)
+    {
+        card.RsRecord = record;
+        card.RsInstalledFile = record.InstalledAs;
+        card.RsInstalledVersion = installedVersion;
+        card.RsStatus = GameStatus.Installed;
+        card.NotifyAll();
+    }
+
     [RelayCommand]
     public async Task InstallReShadeAsync(GameCardViewModel? card)
     {
@@ -54,8 +66,21 @@ public partial class MainViewModel
         // Check for manifest-driven install warning
         if (!await CheckInstallWarningAsync(card.GameName, "reshade")) return;
 
+        // Use the exact executable and current runtime evidence. Card badges and
+        // manifests describe support; they are not installation authority.
+        var renderer = await Task.Run(() => GraphicsEnvironmentService.ApplyUserOverride(
+            GraphicsEnvironmentService.Detect(card.InstallPath),
+            GetSingleApiOverride(card.GameName, card.Source ?? "")));
+        var installTarget = renderer.Executable == null ? card.InstallPath : Path.GetDirectoryName(renderer.Executable)!;
+        if (renderer.Api == GraphicsApiType.Unknown && renderer.ReShadeProxy == null
+            && !card.DllOverrideEnabled && GetManifestDllNames(card.GameName)?.ReShade is not { Length: > 0 })
+        {
+            card.RsActionMessage = "Renderer not confirmed — use DLSS 5 Review & Install to choose DirectX, Vulkan, or OpenGL manually.";
+            return;
+        }
+
         // ── Vulkan ReShade install flow ───────────────────────────────────────────
-        if (card.RequiresVulkanInstall)
+        if (renderer.Api == GraphicsApiType.Vulkan)
         {
             await InstallReShadeVulkanAsync(card);
             return;
@@ -71,12 +96,12 @@ public partial class MainViewModel
 
         // Check for foreign dxgi.dll before overwriting
         {
-            var dxgiPath = Path.Combine(card.InstallPath, "dxgi.dll");
+            var dxgiPath = Path.Combine(installTarget, "dxgi.dll");
             if (File.Exists(dxgiPath))
             {
                 // Skip the warning entirely if OptiScaler is installed for this game —
                 // the dxgi.dll is OptiScaler's and ReShade will be deployed as ReShade64.dll
-                var osRecord = _auxInstaller.FindRecord(card.GameName, card.InstallPath, OptiScalerService.AddonType);
+                var osRecord = _auxInstaller.FindRecord(card.GameName, installTarget, OptiScalerService.AddonType);
                 if (osRecord == null)
                 {
                     var fileType = AuxInstallService.IdentifyDxgiFile(dxgiPath);
@@ -106,6 +131,13 @@ public partial class MainViewModel
         card.RsActionMessage = "Starting ReShade download...";
         try
         {
+            var installIs32Bit = renderer.Machine == MachineType.I386
+                || (renderer.Machine == MachineType.Native && ResolveInstallIs32Bit(card));
+            if (installIs32Bit != card.Is32Bit)
+            {
+                _crashReporter.Log($"[InstallReShadeAsync] Corrected stale bitness for {card.GameName}: card said {(card.Is32Bit ? "32" : "64")}-bit, executable is {(installIs32Bit ? "32" : "64")}-bit");
+                card.Is32Bit = installIs32Bit;
+            }
             var progress = new Progress<(string msg, double pct)>(p =>
             {
                 card.RsActionMessage = p.msg;
@@ -120,7 +152,7 @@ public partial class MainViewModel
                     ? (GetDllOverride(card.GameName)?.ReShadeFileName)
                     : (GetManifestDllNames(card.GameName)?.ReShade is { Length: > 0 } mRs
                         ? mRs
-                        : ResolveAutoReShadeFilename(card.DetectedApis));
+                        : renderer.ReShadeProxy);
             var effectiveChannel = card.UseNormalReShade ? "(Normal/NoAddons)" : ResolveReShadeChannel(card.GameName, card.Source ?? "");
             var filenameSource = card.DllOverrideEnabled ? "UserDllOverride"
                 : (GetManifestDllNames(card.GameName)?.ReShade is { Length: > 0 } ? "ManifestDllOverride" : "AutoDetect");
@@ -128,11 +160,11 @@ public partial class MainViewModel
                 $"channel={effectiveChannel}, useNormalReShade={card.UseNormalReShade}, " +
                 $"DllOverrideEnabled={card.DllOverrideEnabled}, filenameSource={filenameSource}, " +
                 $"filenameOverride={rsFilenameOverride ?? "dxgi.dll"}, " +
-                $"DetectedApis=[{string.Join(",", card.DetectedApis)}], is32Bit={card.Is32Bit}");
+                $"DetectedApis=[{string.Join(",", card.DetectedApis)}], is32Bit={installIs32Bit}");
 
-            var record = await _auxInstaller.InstallReShadeAsync(card.GameName, card.InstallPath,
+            var record = await _auxInstaller.InstallReShadeAsync(card.GameName, installTarget,
                 shaderModeOverride: card.ShaderModeOverride,
-                use32Bit:       card.Is32Bit,
+                use32Bit:       installIs32Bit,
                 filenameOverride: rsFilenameOverride,
                 selectedPackIds: selectedPacks,
                 progress:       progress,
@@ -146,12 +178,11 @@ public partial class MainViewModel
 
             DispatcherQueue?.TryEnqueue(() =>
             {
-                card.RsRecord           = record;
-                card.RsInstalledFile    = record.InstalledAs;
-                card.RsInstalledVersion = AuxInstallService.ReadInstalledVersion(record.InstallPath, record.InstalledAs);
-                card.RsStatus           = GameStatus.Installed;
-                card.RsActionMessage    = "✅ ReShade installed!";
-                card.NotifyAll();
+                ApplyInstalledReShadeRecord(
+                    card,
+                    record,
+                    AuxInstallService.ReadInstalledVersion(record.InstallPath, record.InstalledAs));
+                card.RsActionMessage    = "✅ ReShade installed and architecture checked!";
                 card.FadeMessage(m => card.RsActionMessage = m, card.RsActionMessage);
 
                 // Deploy managed addons now that ReShade is present
@@ -762,7 +793,7 @@ public partial class MainViewModel
                                 && !fn.StartsWith("renodx-devkit", StringComparison.OrdinalIgnoreCase)
                                 && !fn.StartsWith("renodx-dlssfix", StringComparison.OrdinalIgnoreCase)
                                 && !fn.StartsWith("renodx-upgrade", StringComparison.OrdinalIgnoreCase)
-                                && !fn.StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase)
+                                && !fn.StartsWith("renodx-dlss", StringComparison.OrdinalIgnoreCase)
                                 && !fn.StartsWith("renodx-universal_ue", StringComparison.OrdinalIgnoreCase))
                             {
                                 try { File.Delete(f); } catch (Exception ex) { _crashReporter.Log($"[MainViewModel.ToggleLumaMode] Failed to delete '{f}' — {ex.Message}"); }
