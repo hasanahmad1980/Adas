@@ -5,7 +5,7 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    public const string AioVersion = "2.0.4-experimental.1";
+    public const string AioVersion = "2.0.7-experimental.1";
     public const string AioAddon = "standalone-dlssnr.addon64";
     public const string AioShader = "DLSS5_AIO_Feed.fx";
     public const string AioVortBundle = "vort-shaders.zip";
@@ -16,8 +16,9 @@ public sealed partial class Dlss5ComponentService
     // Pin the author-published release rather than a mutable latest URL.
     internal static readonly IReadOnlyDictionary<string, string> AioAssetHashes = new Dictionary<string, string>
     {
-        [AioAddon] = "7254642B51239B1DDBFBA1458DC29167F7CD9022863565BBB0587916D10A28B0",
-        ["nvngx.dll"] = "60EABC0182C1DDA00FF0FFC634BBAEC9186C48890019A88F4638D40011D424CD",
+        // v2.0.7-experimental.1 — adds the adaptive GPU-pressure governor (on by default).
+        [AioAddon] = "A1BB1A6056D9849E08D7C91B8B996DF34803CC2B1B89305885890224632F5CC7",
+        ["nvngx.dll"] = "21BC631F72614D34387CCF07EEB4DD60EC848FBF67A042A4D8C05C66E0CD5250",
         [AioShader] = "B0EF9EE8F9C7675C0224B87A614905D4283363438BD7E104B132E7200AD84748",
     };
     internal static readonly IReadOnlyDictionary<string, string> AioDefaults = new Dictionary<string, string>

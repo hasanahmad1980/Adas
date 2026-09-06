@@ -110,7 +110,7 @@ public sealed record Dlss5PathResolution(
     string? Path,
     IReadOnlyList<string> Candidates);
 
-internal enum Dlss5RenoDxPackage
+public enum Dlss5RenoDxPackage
 {
     ExperimentalUnified,
     Native470,
@@ -128,3 +128,13 @@ internal sealed record Dlss5CompatibilityPlan(
     public bool UsesLatestFeederBeta { get; init; }
     public bool InstallOpenGlBridge { get; init; }
 }
+
+/// <summary>
+/// Per-install à-la-carte overrides chosen in manual mode. Each null field keeps the selected
+/// profile's recommended default; a non-null field forces that specific component. This is the
+/// extension point for exposing every "combined" DLSS 5 choice (consumer version first; feeder
+/// version, bridge, MV provider, ReShade version to follow) without re-pinning the curated profiles.
+/// </summary>
+public sealed record Dlss5ManualOverrides(
+    Dlss5RenoDxPackage? RenoDxPackage = null,
+    bool DeepFriedChicken = false);

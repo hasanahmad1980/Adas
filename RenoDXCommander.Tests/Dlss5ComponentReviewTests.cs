@@ -343,6 +343,159 @@ public sealed class Dlss5ComponentReviewTests
         }
     }
 
+    [Theory]
+    [InlineData(Dlss5DeploymentMode.Dx9Feeder, false)]      // 32-bit Feeder host route (e.g. F.E.A.R.)
+    [InlineData(Dlss5DeploymentMode.Dx12Feeder, true)]      // 64-bit Feeder route
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12, true)] // 64-bit native / non-Feeder route
+    public void VerifyInstallation_WhenDeepFriedChickenFilesPresent_DoesNotDemandRenoDxConsumer(
+        Dlss5DeploymentMode mode, bool is64Bit)
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-verify-present");
+        try
+        {
+            // Deep Fried Chicken replaces the RenoDX consumer: its files sit where the consumer goes,
+            // and renodx-dlss5.addon64 was deliberately retired by the installer.
+            var consumerFolder = is64Bit
+                ? ModInstallService.GetAddonDeployPath(root)
+                : Path.Combine(root, "host64");
+            Directory.CreateDirectory(consumerFolder);
+            foreach (var name in new[]
+            {
+                DeepFriedChickenService.AddonFileName,
+                DeepFriedChickenService.NvngxShim,
+                DeepFriedChickenService.ConfigFileName,
+            })
+                WriteSource(consumerFolder, name, "dfc");
+
+            // Record from an existing install predating the DeepFriedChicken flag (defaults to false).
+            Dlss5ComponentService.SaveRecord(root, new Dlss5InstallRecord
+            {
+                Mode = mode,
+                Profile = Dlss5InstallProfile.MaximumQuality,
+                ComponentVersion = "Maximum Quality — Feeder-pinned RenoDX v4.55; Feeder local-user-import",
+                InstalledAtUtc = DateTime.UtcNow,
+            });
+
+            var problems = Dlss5DiagnosticService.VerifyInstallation(root, mode, is64Bit);
+
+            Assert.DoesNotContain(problems, p => p.Contains("renodx-dlss5.addon64", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(problems, p => p.Contains(DeepFriedChickenService.AddonFileName, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(Dlss5DeploymentMode.Dx9Feeder, false)]      // 32-bit Feeder host route (e.g. F.E.A.R.)
+    [InlineData(Dlss5DeploymentMode.Dx12Feeder, true)]      // 64-bit Feeder route
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12, true)] // 64-bit native / non-Feeder route
+    public void VerifyInstallation_WhenDeepFriedChickenRecordedButFilesMissing_FlagsDfcNotRenoDx(
+        Dlss5DeploymentMode mode, bool is64Bit)
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-verify-missing");
+        try
+        {
+            Dlss5ComponentService.SaveRecord(root, new Dlss5InstallRecord
+            {
+                Mode = mode,
+                Profile = Dlss5InstallProfile.MaximumQuality,
+                DeepFriedChicken = true,
+                ComponentVersion = "Maximum Quality — Feeder-pinned RenoDX v4.55; Feeder local-user-import",
+                InstalledAtUtc = DateTime.UtcNow,
+            });
+
+            var problems = Dlss5DiagnosticService.VerifyInstallation(root, mode, is64Bit);
+
+            // A quarantined DFC consumer must be reported as the missing DFC file, never as RenoDX.
+            Assert.Contains(problems, p => p.Contains(DeepFriedChickenService.AddonFileName, StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(problems, p => p.Contains("renodx-dlss5.addon64", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void HostedFeederFiles_SwitchingToRenoDx_RetiresLingeringDeepFriedChickenFiles()
+    {
+        var root = CreateTemporaryDirectory("adas-hosted-feeder-dfc-switch");
+        var sources = Path.Combine(root, "sources");
+        Directory.CreateDirectory(sources);
+        var host = WriteSource(sources, Dlss5ComponentService.FeederHost64, "host renodx-dlss5.addon64\0 executable");
+        var reshade = WriteSource(sources, "ReShade64.dll", "x64 reshade");
+        var renodx = WriteSource(sources, Renodx5AddonService.AddonFileName, "renodx addon");
+        WriteSource(root, "nvngx_dlssnr.dll", "nr runtime");
+        WriteSource(root, "nvngx_dlss.dll", "sr runtime");
+
+        // A prior Deep Fried Chicken install left its files inside the Feeder host folder.
+        var hostDir = Path.Combine(root, "host64");
+        Directory.CreateDirectory(hostDir);
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(hostDir, name, "stale dfc");
+
+        var record = new Dlss5InstallRecord();
+        var installed = new List<string>();
+        var warnings = new List<string>();
+        try
+        {
+            Dlss5ComponentService.InstallHostedFeederFiles(
+                root,
+                new Dictionary<string, string> { [Dlss5ComponentService.FeederHost64] = host },
+                reshade,
+                renodx,
+                record,
+                installed,
+                warnings);
+
+            // Switching back to the RenoDX consumer must not leave DFC stacked beside it.
+            foreach (var name in DeepFriedChickenService.RequiredFiles)
+                Assert.False(File.Exists(Path.Combine(hostDir, name)), $"{name} should have been retired");
+            Assert.True(File.Exists(Path.Combine(hostDir, Renodx5AddonService.AddonFileName)));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]   // installing DFC as the consumer must keep the DFC files
+    [InlineData(false)]  // switching to RenoDX must retire lingering DFC files
+    public void RemoveIncompatibleDlssAddons_RetiresDeepFriedChickenOnlyWhenRenoDxIsTheConsumer(bool useDeepFriedChicken)
+    {
+        var root = CreateTemporaryDirectory("adas-remove-incompatible-dfc");
+        var addonPath = root;
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(addonPath, name, "dfc");
+        var record = new Dlss5InstallRecord();
+        var plan = new Dlss5CompatibilityPlan(
+            Dlss5RenoDxPackage.Feeder455,
+            InstallFeeder: false,
+            InstallDx11Bridge: false,
+            PatchFeederForUnifiedName: false,
+            ProfileName: "test");
+        try
+        {
+            Dlss5ComponentService.RemoveIncompatibleDlssAddons(root, addonPath, plan, record, useDeepFriedChicken);
+
+            foreach (var name in DeepFriedChickenService.RequiredFiles)
+            {
+                var path = Path.Combine(addonPath, name);
+                if (useDeepFriedChicken)
+                    Assert.True(File.Exists(path), $"{name} is the consumer and must be kept");
+                else
+                    Assert.False(File.Exists(path), $"{name} must be retired when RenoDX is the consumer");
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void FindAutomaticRuntimePackage_PrefersPackagedArchiveOverDownloadsFallback()
     {

@@ -12,6 +12,44 @@ namespace RenoDXCommander;
 
 public sealed partial class MainWindow
 {
+    /// <summary>
+    /// Prompts the user for the author's official Deep Fried Chicken zip and imports it (unmodified)
+    /// into Adas's cache. Returns true on success. DFC is never bundled — its licence forbids it.
+    /// </summary>
+    private async Task<bool> ImportDeepFriedChickenAsync(DeepFriedChickenService dfc)
+    {
+        try
+        {
+            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
+            picker.FileTypeFilter.Add(".zip");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            var file = await picker.PickSingleFileAsync();
+            if (file == null) return false;
+            var error = await dfc.ImportAsync(file.Path);
+            if (error != null)
+            {
+                await ShowDlss5MessageAsync("Deep Fried Chicken import failed", error);
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await ShowDlss5MessageAsync("Deep Fried Chicken import failed", ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>True when the NVIDIA driver string (e.g. "616.64") is at least major.minor.</summary>
+    private static bool DriverAtLeast(string? version, int major, int minor)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return false;
+        var parts = version.Split('.');
+        if (parts.Length < 2 || !int.TryParse(parts[0], out var maj) || !int.TryParse(parts[1], out var min))
+            return false;
+        return maj > major || (maj == major && min >= minor);
+    }
+
     private Dlss5Probe ProbeDlss5(
         Dlss5CompatibilityService compatibility,
         GameCardViewModel card)
@@ -329,6 +367,86 @@ public sealed partial class MainWindow
         advancedProfiles.Children.Add(MakeDlss5Text("Disabled options do not match this game's renderer or architecture. Standard OptiScaler NR requires native DLSS and a 64-bit DX11, DX12 or Vulkan game; the split fork remains DX12 only."));
         var profileSummary = MakeDlss5Text("");
         content.Children.Add(profileSummary);
+
+        // ── À-la-carte slot #1: Neural consumer (RenoDX) ──────────────────────
+        // Manual mode exposes each combined choice. The profile seeds a Recommended default;
+        // any value can be forced, and the label states compatibility (never blocked).
+        content.Children.Add(MakeDlss5Heading("Neural consumer"));
+        var dfc = App.Services.GetRequiredService<DeepFriedChickenService>();
+        var consumerCombo = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Items =
+            {
+                "Recommended",
+                "RenoDX v4.55 — feeder-pinned, classic engine",
+                "RenoDX v4.70 — native / latest engine",
+                "Deep Fried Chicken — import your own (alpha)",
+            },
+            SelectedIndex = 0,
+        };
+        var consumerLabel = MakeDlss5Text("");
+        content.Children.Add(consumerCombo);
+        content.Children.Add(consumerLabel);
+        void UpdateConsumerLabel()
+        {
+            if (consumerCombo.SelectedIndex == 3)
+            {
+                if (dfc.IsImported)
+                {
+                    consumerLabel.Text = $"✓ Deep Fried Chicken {dfc.ImportedVersion} imported — replaces the RenoDX consumer wherever it deploys. Keep Frame Generation OFF (this alpha still black-screens with FG in some games). Licence: personal / non-commercial; Adas deploys your unmodified copy and never redistributes it.";
+                    consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentGreenBrush);
+                }
+                else
+                {
+                    var requiredFiles = string.Join(", ", DeepFriedChickenService.RequiredFiles);
+                    consumerLabel.Text = $"Deep Fried Chicken can't be bundled — its licence forbids anyone, Adas included, from hosting, mirroring or redistributing it, so you supply the author's own official release. Pick that zip (or its extracted folder) once and Adas caches your unmodified copy and deploys it as the neural consumer for any game. A valid release contains {requiredFiles}; get it only from the author's official distribution and verify its integrity (the release ships SHA256SUMS.txt) before importing.";
+                    consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentAmberBrush);
+                }
+                return;
+            }
+            var recommended = Dlss5ComponentService.GetCompatibilityPlan(assessment.Mode, assessment.Is64Bit, selectedProfile).RenoDxPackage;
+            var chosen = consumerCombo.SelectedIndex switch
+            {
+                1 => Dlss5RenoDxPackage.Feeder455,
+                2 => Dlss5RenoDxPackage.Native470,
+                _ => recommended,
+            };
+            var badDriver = DriverAtLeast(_dlssPresetService.DriverVersionString, 616, 64);
+            var isFeederRoute = Dlss5CompatibilityService.IsFeederMode(assessment.Mode);
+            string label; string brushKey;
+            if (chosen == Dlss5RenoDxPackage.Native470 && badDriver)
+            {
+                brushKey = ResourceKeys.AccentAmberBrush;
+                label = $"⚠ Known issue: RenoDX v4.70 on driver {_dlssPresetService.DriverVersionString} faults in D3D12Core (black screen — NR runs but shows nothing). Not blocked, but v4.55 is the measured-good build here.";
+            }
+            else if (chosen == Dlss5RenoDxPackage.Native470 && isFeederRoute)
+            {
+                brushKey = ResourceKeys.AccentAmberBrush;
+                label = "⚠ v4.70 is the native-route consumer; feeder routes are validated against the pinned v4.55. Usually fine on older drivers, but v4.55 is the safe pairing.";
+            }
+            else
+            {
+                brushKey = ResourceKeys.AccentGreenBrush;
+                var chosenName = chosen == Dlss5RenoDxPackage.Feeder455 ? "v4.55" : chosen == Dlss5RenoDxPackage.Native470 ? "v4.70" : "the profile's built-in consumer";
+                var recName = recommended == Dlss5RenoDxPackage.Feeder455 ? "v4.55" : recommended == Dlss5RenoDxPackage.Native470 ? "v4.70" : "profile consumer";
+                label = consumerCombo.SelectedIndex == 0
+                    ? $"✓ Compatible — Recommended for this route resolves to {recName}."
+                    : $"✓ Compatible — forcing {chosenName}.";
+            }
+            consumerLabel.Text = label;
+            consumerLabel.Foreground = UIFactory.Brush(brushKey);
+        }
+        consumerCombo.SelectionChanged += async (_, _) =>
+        {
+            if (consumerCombo.SelectedIndex == 3 && !dfc.IsImported)
+            {
+                if (!await ImportDeepFriedChickenAsync(dfc))
+                    consumerCombo.SelectedIndex = 0;
+            }
+            UpdateConsumerLabel();
+        };
+
         void UpdateProfileSummary()
         {
             selectedProfile = openGlBridgeProfile.IsChecked == true ? Dlss5InstallProfile.OpenGlBridge
@@ -355,6 +473,7 @@ public sealed partial class MainWindow
                 : ResourceKeys.AccentAmberBrush);
             missingRequirementsPanel.Visibility = selectedProfile is Dlss5InstallProfile.StandaloneAio or Dlss5InstallProfile.OpenGlBridge
                 || Dlss5ComponentService.IsOptiScalerNrProfile(selectedProfile) ? Visibility.Collapsed : Visibility.Visible;
+            UpdateConsumerLabel();
         }
         recommendedProfile.Checked += (_, _) => UpdateProfileSummary();
         experimentalProfile.Checked += (_, _) => UpdateProfileSummary();
@@ -713,6 +832,13 @@ public sealed partial class MainWindow
                     string.Join("\n", relocationErrors));
 
             var reShadeChannel = ViewModel.ResolveReShadeChannel(card.GameName, card.Source ?? "");
+            var overrides = consumerCombo.SelectedIndex switch
+            {
+                1 => new Dlss5ManualOverrides(Dlss5RenoDxPackage.Feeder455),
+                2 => new Dlss5ManualOverrides(Dlss5RenoDxPackage.Native470),
+                3 when dfc.IsImported => new Dlss5ManualOverrides(DeepFriedChicken: true),
+                _ => (Dlss5ManualOverrides?)null,
+            };
             var installResult = await Task.Run(() => components.InstallAsync(
                 card.GameName,
                 assessment,
@@ -720,7 +846,8 @@ public sealed partial class MainWindow
                 reShadeChannel: reShadeChannel,
                 store: card.Source,
                 profile: selectedProfile,
-                cleanupApproval: cleanup));
+                cleanupApproval: cleanup,
+                overrides: overrides));
             progressDialog.Hide();
             var auxInstaller = App.Services.GetRequiredService<IAuxInstallService>();
             var reShadeRecord = auxInstaller.FindRecord(card.GameName, assessment.DeploymentPath!, AuxInstallService.TypeReShade)

@@ -48,6 +48,12 @@ Source and official download: <https://github.com/dege-diosg/dgVoodoo2>
 
 Adas does not redistribute dgVoodoo2. For a DirectX 9 Feeder route it downloads the current release from the author's official GitHub release, installs only the matching D3D9 wrapper and control panel, and records those files for exact uninstall and restoration.
 
+## Deep Fried Chicken
+
+Copyright (c) 2026 Alexander. "Deep Fried Chicken Binary Use Licence" — a limited, personal, non-commercial licence to run unmodified official binary releases; it **forbids copying, rehosting, mirroring, redistributing, or bundling** the software.
+
+Adas therefore never bundles Deep Fried Chicken. The neural-consumer option imports the author's official archive that the user supplies, caches the **unmodified** binaries locally, and deploys them (in place of the RenoDX consumer) into the folder Adas already resolved for the game — beside the game executable, or inside the Feeder host folder for 32-bit games. No NVIDIA runtime files are included; the user supplies a trusted `nvngx_dlssnr.dll`. RenoDX-derived colour/tone portions within Deep Fried Chicken are MIT (see the release's `LICENSE-RenoDX.md`).
+
 ## DLSSNR Standby Repair
 
 Source: <https://github.com/kayle2203/dlssnr-signature-repair>

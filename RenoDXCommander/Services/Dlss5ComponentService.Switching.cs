@@ -19,7 +19,7 @@ public sealed partial class Dlss5ComponentService
     public async Task<Dlss5InstallResult> InstallAsync(string gameName, Dlss5Assessment assessment,
         IProgress<(string message, double percent)>? progress = null, CancellationToken cancellationToken = default,
         string? reShadeChannel = null, string? store = null, Dlss5InstallProfile profile = Dlss5InstallProfile.MaximumQuality,
-        Dlss5CleanupPlan? cleanupApproval = null)
+        Dlss5CleanupPlan? cleanupApproval = null, Dlss5ManualOverrides? overrides = null)
     {
         if (!assessment.CanInstall || string.IsNullOrWhiteSpace(assessment.DeploymentPath))
             throw new InvalidOperationException(string.Join(Environment.NewLine, assessment.BlockingReasons));
@@ -36,7 +36,7 @@ public sealed partial class Dlss5ComponentService
             var switching = cleanup.RemoveRecordedInstall || cleanup.Files.Count > 0;
             if (!switching)
             {
-                var result = await InstallCoreAsync(gameName, assessment, progress, cancellationToken, reShadeChannel, store, profile).ConfigureAwait(false);
+                var result = await InstallCoreAsync(gameName, assessment, progress, cancellationToken, reShadeChannel, store, profile, overrides).ConfigureAwait(false);
                 if (previous == null) RestoreProfileSettings(root);
                 return result;
             }
@@ -76,7 +76,7 @@ public sealed partial class Dlss5ComponentService
                     if (!IsUsableRuntimeFile(Path.Combine(runtimeRoot, name))) requirements.Add(name);
                 if (!File.Exists(Path.Combine(root, GetReShadeFileName(assessment.Mode, profile)))) requirements.Add("ReShade full add-on support");
                 assessment = assessment with { MissingRequirements = requirements };
-                var result = await InstallCoreAsync(gameName, assessment, progress, cancellationToken, reShadeChannel, store, profile).ConfigureAwait(false);
+                var result = await InstallCoreAsync(gameName, assessment, progress, cancellationToken, reShadeChannel, store, profile, overrides).ConfigureAwait(false);
                 RestoreProfileSettings(root);
                 var issues = Dlss5DiagnosticService.VerifyInstallation(root, assessment.Mode, assessment.Is64Bit);
                 if (issues.Count > 0) throw new IOException(string.Join("; ", issues));

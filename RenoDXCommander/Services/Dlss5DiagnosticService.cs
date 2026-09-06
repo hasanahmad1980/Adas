@@ -119,6 +119,32 @@ internal static partial class Dlss5DiagnosticService
             required.Add(Path.Combine(root, "dgVoodoo.conf"));
         }
         var addonPath = ModInstallService.GetAddonDeployPath(root);
+
+        // The neural consumer is RenoDX by default, or the imported Deep Fried Chicken files that
+        // replace it wherever the consumer is deployed. The install record is the source of truth;
+        // for installs that predate that flag, fall back to the DFC add-on being present in the
+        // consumer folder with no RenoDX consumer beside it (its installer always retires RenoDX).
+        bool DeployedWithoutRenoDx(string folder)
+            => File.Exists(Path.Combine(folder, DeepFriedChickenService.AddonFileName))
+               && !File.Exists(Path.Combine(folder, "renodx-dlss5.addon64"))
+               && !File.Exists(Path.Combine(folder, Renodx5AddonService.AddonFileName));
+
+        void RequireConsumer(string consumerFolder)
+        {
+            var usesDeepFriedChicken = record.DeepFriedChicken || DeployedWithoutRenoDx(consumerFolder);
+            if (usesDeepFriedChicken)
+            {
+                foreach (var name in DeepFriedChickenService.RequiredFiles)
+                    required.Add(Path.Combine(consumerFolder, name));
+            }
+            else
+            {
+                required.Add(Path.Combine(consumerFolder, record.Profile == Dlss5InstallProfile.ExperimentalUnified
+                    ? Renodx5AddonService.AddonFileName
+                    : "renodx-dlss5.addon64"));
+            }
+        }
+
         if (mode is not (Dlss5DeploymentMode.Dx10ViaDxvkFeeder or Dlss5DeploymentMode.Dx9ViaDxvkFeeder))
             required.Add(Path.Combine(root, Dlss5ComponentService.GetReShadeFileName(mode, record.Profile)));
 
@@ -143,25 +169,20 @@ internal static partial class Dlss5DiagnosticService
                 var host = Path.Combine(root, "host64");
                 required.Add(Path.Combine(host, Dlss5ComponentService.FeederHost64));
                 required.Add(Path.Combine(host, "dxgi.dll"));
-                required.Add(Path.Combine(host, "renodx-dlss5.addon64"));
+                RequireConsumer(host);
                 required.Add(Path.Combine(host, "nvngx_dlss.dll"));
                 required.Add(Path.Combine(host, "nvngx_dlssnr.dll"));
             }
             else
             {
-                required.Add(Path.Combine(addonPath, record.Profile == Dlss5InstallProfile.ExperimentalUnified
-                    ? Renodx5AddonService.AddonFileName
-                    : "renodx-dlss5.addon64"));
+                RequireConsumer(addonPath);
                 required.Add(Path.Combine(root, "nvngx_dlss.dll"));
                 required.Add(Path.Combine(root, "nvngx_dlssnr.dll"));
             }
         }
         else
         {
-            var renoDxName = record.Profile == Dlss5InstallProfile.ExperimentalUnified
-                ? Renodx5AddonService.AddonFileName
-                : "renodx-dlss5.addon64";
-            required.Add(Path.Combine(addonPath, renoDxName));
+            RequireConsumer(addonPath);
             if (mode is Dlss5DeploymentMode.NativeDirectX11 or Dlss5DeploymentMode.NativeVulkan)
                 required.Add(Path.Combine(addonPath, Dlss5ComponentService.BridgeAddon));
             if (plan.InstallOpenGlBridge)
