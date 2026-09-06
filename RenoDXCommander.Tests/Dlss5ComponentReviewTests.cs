@@ -497,6 +497,73 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public void DeepFriedChicken_RealDeployThenVerify_AgreeOnConsumerForFeederHostRoute()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-e2e");
+        var cache = CreateTemporaryDirectory("adas-dfc-cache");
+        var sources = Path.Combine(root, "sources");
+        Directory.CreateDirectory(sources);
+
+        // A real imported Deep Fried Chicken release in the service's cache.
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(cache, name, "dfc " + name);
+        var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+        Assert.True(dfc.IsImported);
+
+        var host = WriteSource(sources, Dlss5ComponentService.FeederHost64, "host executable");
+        var reshade = WriteSource(sources, "ReShade64.dll", "x64 reshade");
+        var renodx = WriteSource(sources, Renodx5AddonService.AddonFileName, "renodx addon");
+        WriteSource(root, "nvngx_dlssnr.dll", "nr runtime");
+        WriteSource(root, "nvngx_dlss.dll", "sr runtime");
+        var plan = new Dlss5CompatibilityPlan(
+            Dlss5RenoDxPackage.Feeder455,
+            InstallFeeder: true,
+            InstallDx11Bridge: false,
+            PatchFeederForUnifiedName: false,
+            ProfileName: "Maximum Quality — Feeder-pinned RenoDX v4.55");
+        var record = new Dlss5InstallRecord
+        {
+            Mode = Dlss5DeploymentMode.Dx11Feeder,
+            Profile = Dlss5InstallProfile.MaximumQuality,
+            DeepFriedChicken = true,
+            ComponentVersion = "Maximum Quality — Feeder-pinned RenoDX v4.55; Feeder local-user-import",
+            InstalledAtUtc = DateTime.UtcNow,
+        };
+        try
+        {
+            // Deploy with the real installer helper and the real DFC service.
+            Dlss5ComponentService.InstallHostedFeederFiles(
+                root,
+                new Dictionary<string, string> { [Dlss5ComponentService.FeederHost64] = host },
+                reshade,
+                renodx,
+                plan,
+                record,
+                new List<string>(),
+                new List<string>(),
+                dfc);
+            Dlss5ComponentService.SaveRecord(root, record);
+
+            // The deploy landed DFC into the host folder, and RenoDX was not installed beside it.
+            var hostDir = Path.Combine(root, "host64");
+            foreach (var name in DeepFriedChickenService.RequiredFiles)
+                Assert.True(File.Exists(Path.Combine(hostDir, name)), $"deploy should place {name}");
+            Assert.False(File.Exists(Path.Combine(hostDir, Renodx5AddonService.AddonFileName)));
+
+            // The real verifier agrees: it never demands RenoDX and never reports a DFC file missing.
+            var problems = Dlss5DiagnosticService.VerifyInstallation(root, Dlss5DeploymentMode.Dx11Feeder, is64Bit: false);
+            Assert.DoesNotContain(problems, p => p.Contains("renodx-dlss5.addon64", StringComparison.OrdinalIgnoreCase));
+            foreach (var name in DeepFriedChickenService.RequiredFiles)
+                Assert.DoesNotContain(problems, p => p.Contains(name, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(cache, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FindAutomaticRuntimePackage_PrefersPackagedArchiveOverDownloadsFallback()
     {
         var profile = CreateTemporaryDirectory("adas-runtime-discovery");

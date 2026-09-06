@@ -33,10 +33,10 @@ public sealed class DeepFriedChickenService
     private readonly string _cacheDir;
     private readonly string _versionFile;
 
-    public DeepFriedChickenService(ICrashReporter crashReporter)
+    public DeepFriedChickenService(ICrashReporter crashReporter, string? cacheDirectory = null)
     {
         _crashReporter = crashReporter;
-        _cacheDir = Path.Combine(
+        _cacheDir = cacheDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RHI", "deep-fried-chicken");
         _versionFile = Path.Combine(_cacheDir, "imported-version.txt");
     }
