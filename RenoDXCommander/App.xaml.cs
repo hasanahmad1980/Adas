@@ -113,6 +113,7 @@ public partial class App : Application
         services.AddSingleton<AutoUpdateService>();
         services.AddSingleton<DlssEnablerService>();
         services.AddSingleton<Renodx5AddonService>();
+        services.AddSingleton<DeepFriedChickenService>();
         services.AddSingleton<Dlss5CompatibilityService>();
         services.AddSingleton<Dlss5ComponentService>();
         services.AddSingleton<GameCleanupService>();
