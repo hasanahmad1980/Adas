@@ -49,7 +49,7 @@ public sealed partial class Dlss5ComponentService
     private const string BundledFeederVersion = "0.7.0";
     internal const string BundledFeederBetaVersion = "0.14.0-beta.2";
     internal const string OpenGlBridgeVersion = "1.0.5";
-    internal const string OneClickVersion = "0.11.13";
+    internal const string OneClickVersion = "0.11.15";
     private const string BundledStableReShadeVersion = "6.8.0";
     private const string BundledLegacyReShadeVersion = "6.3.3";
     private const string DgVoodooRepo = "dege-diosg/dgVoodoo2";
@@ -95,12 +95,16 @@ public sealed partial class Dlss5ComponentService
         if ((profile == Dlss5InstallProfile.LatestFeederBeta || mode == Dlss5DeploymentMode.Dx10Feeder)
             && IsFeederMode(mode))
         {
+            // Feeder routes run the RenoDX consumer in the 64-bit host and must use the feeder-pinned
+            // v4.55 build. The native v4.70 consumer faults inside the driver's NGX runtime
+            // (access violation in D3D12Core.dll via nvngx_dlssnr.dll) on driver 616.64, producing a
+            // black screen while everything else works; v4.55 is the measured-good build.
             return new(
-                Dlss5RenoDxPackage.Native470,
+                Dlss5RenoDxPackage.Feeder455,
                 InstallFeeder: true,
                 InstallDx11Bridge: false,
                 PatchFeederForUnifiedName: false,
-                ProfileName: $"Latest Feeder beta {BundledFeederBetaVersion} + RenoDX v4.70")
+                ProfileName: $"Latest Feeder beta {BundledFeederBetaVersion} + RenoDX v4.55")
             {
                 UsesLatestFeederBeta = true,
             };
@@ -162,6 +166,7 @@ public sealed partial class Dlss5ComponentService
     private readonly ISevenZipExtractor _sevenZipExtractor;
     private readonly IDxvkService? _dxvkService;
     private readonly IReShadeUpdateService? _reShadeUpdateService;
+    private readonly DeepFriedChickenService? _deepFriedChicken;
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -173,7 +178,8 @@ public sealed partial class Dlss5ComponentService
         Renodx5AddonService renodx5AddonService,
         ISevenZipExtractor sevenZipExtractor,
         IDxvkService? dxvkService = null,
-        IReShadeUpdateService? reShadeUpdateService = null)
+        IReShadeUpdateService? reShadeUpdateService = null,
+        DeepFriedChickenService? deepFriedChicken = null)
     {
         _http = http;
         _crashReporter = crashReporter;
@@ -183,6 +189,7 @@ public sealed partial class Dlss5ComponentService
         _sevenZipExtractor = sevenZipExtractor;
         _dxvkService = dxvkService;
         _reShadeUpdateService = reShadeUpdateService;
+        _deepFriedChicken = deepFriedChicken;
     }
 
     public static string? FindInstalledDeploymentPath(string gameRoot)
@@ -307,7 +314,8 @@ public sealed partial class Dlss5ComponentService
         CancellationToken cancellationToken = default,
         string? reShadeChannel = null,
         string? store = null,
-        Dlss5InstallProfile profile = Dlss5InstallProfile.MaximumQuality)
+        Dlss5InstallProfile profile = Dlss5InstallProfile.MaximumQuality,
+        Dlss5ManualOverrides? overrides = null)
     {
         if (!assessment.CanInstall || string.IsNullOrWhiteSpace(assessment.DeploymentPath))
             throw new InvalidOperationException(string.Join(Environment.NewLine, assessment.BlockingReasons));
@@ -370,6 +378,13 @@ public sealed partial class Dlss5ComponentService
 
         progress?.Report(("Preparing author-published components...", 5));
         var compatibilityPlan = GetCompatibilityPlan(assessment.Mode, assessment.Is64Bit, profile);
+        // Manual mode can override the profile's recommended neural consumer (e.g. force the
+        // feeder-pinned v4.55 or the native/latest v4.70) without changing the curated profile.
+        if (overrides?.RenoDxPackage is { } renoDxOverride)
+            compatibilityPlan = compatibilityPlan with { RenoDxPackage = renoDxOverride };
+        // Deep Fried Chicken is an alternative neural consumer, imported locally (never bundled).
+        // When chosen it is deployed wherever the RenoDX consumer would go, replacing it.
+        var useDfc = overrides?.DeepFriedChicken == true && _deepFriedChicken?.IsImported == true;
         StagedComponent? staged = null;
         if (compatibilityPlan.InstallFeeder)
             staged = await EnsureStagedAsync(assessment.Mode, assessment.Is64Bit, profile, cancellationToken).ConfigureAwait(false);
@@ -420,6 +435,9 @@ public sealed partial class Dlss5ComponentService
 
         record.Mode = assessment.Mode;
         record.Profile = profile;
+        // Record which neural consumer was deployed so verification requires the right files.
+        // Deep Fried Chicken replaces the RenoDX consumer; anything else installs RenoDX.
+        record.DeepFriedChicken = useDfc;
         if (assessment.Mode == Dlss5DeploymentMode.Dx9ViaDxvkFeeder)
             record.PreferDxvkForDirectX9 = true;
         record.ComponentVersion = $"{compatibilityPlan.ProfileName}; Feeder {staged?.Version ?? "not used"}";
@@ -488,7 +506,18 @@ public sealed partial class Dlss5ComponentService
         Directory.CreateDirectory(addonDeployPath);
         if (!assessment.Is64Bit)
             DisableObsolete32BitRenoDx(path, addonDeployPath, record);
-        if (assessment.Is64Bit)
+        if (assessment.Is64Bit && useDfc)
+        {
+            // Deploy the imported Deep Fried Chicken consumer into the same add-on folder Adas
+            // resolved for this game; RenoDX is dropped below by RemoveIncompatibleDlssAddons.
+            foreach (var name in _deepFriedChicken!.DeployFiles(includeDx11Bridge: false))
+            {
+                var dfcDestination = Path.Combine(addonDeployPath, name);
+                InstallTrackedFile(_deepFriedChicken.CachedFile(name), dfcDestination, path, record);
+                installed.Add(dfcDestination);
+            }
+        }
+        else if (assessment.Is64Bit)
         {
             var renoName = compatibilityPlan.UsesExperimentalUnified
                 ? Renodx5AddonService.AddonFileName
@@ -512,7 +541,7 @@ public sealed partial class Dlss5ComponentService
             InstallTrackedFile(bundledOpenGlBridge, bridgeDestination, path, record);
             installed.Add(bridgeDestination);
         }
-        RemoveIncompatibleDlssAddons(path, addonDeployPath, compatibilityPlan, record);
+        RemoveIncompatibleDlssAddons(path, addonDeployPath, compatibilityPlan, record, useDfc);
         RepairReShadeAddonState(path);
         if (assessment.Is64Bit && compatibilityPlan.UsesExperimentalUnified)
             EnsureUnifiedRenoDxSettings(path, record);
@@ -603,7 +632,8 @@ public sealed partial class Dlss5ComponentService
                         compatibilityPlan,
                         record,
                         installed,
-                        warnings);
+                        warnings,
+                        useDfc ? _deepFriedChicken : null);
             }
             catch (Exception installError)
             {
@@ -2088,7 +2118,8 @@ public sealed partial class Dlss5ComponentService
         Dlss5CompatibilityPlan compatibilityPlan,
         Dlss5InstallRecord record,
         ICollection<string> installed,
-        ICollection<string> warnings)
+        ICollection<string> warnings,
+        DeepFriedChickenService? deepFriedChicken = null)
     {
         var hostDirectory = Path.Combine(root, "host64");
         var requiredRuntimeNames = new[] { "nvngx_dlssnr.dll", "nvngx_dlss.dll" };
@@ -2130,11 +2161,32 @@ public sealed partial class Dlss5ComponentService
                 "The 64-bit ReShade runtime needed by the 32-bit Feeder host is not staged. Import the full ReShade add-on installer and retry.",
                 reshadeRuntimePath);
         InstallHostFile(reshadeRuntimePath, "dxgi.dll");
-        InstallHostFile(
-            renoDxPath,
-            compatibilityPlan.UsesExperimentalUnified
-                ? Renodx5AddonService.AddonFileName
-                : RenoDxDeploymentName);
+        if (deepFriedChicken is { IsImported: true })
+        {
+            // Deep Fried Chicken replaces the RenoDX consumer inside the Feeder host folder.
+            foreach (var name in deepFriedChicken.DeployFiles(includeDx11Bridge: false))
+                InstallHostFile(deepFriedChicken.CachedFile(name), name);
+            foreach (var stale in new[] { RenoDxDeploymentName, Renodx5AddonService.AddonFileName })
+            {
+                var stalePath = Path.Combine(hostDirectory, stale);
+                if (File.Exists(stalePath)) RetireComponentFiles(root, new[] { stalePath }, record);
+            }
+        }
+        else
+        {
+            InstallHostFile(
+                renoDxPath,
+                compatibilityPlan.UsesExperimentalUnified
+                    ? Renodx5AddonService.AddonFileName
+                    : RenoDxDeploymentName);
+            // RenoDX is the consumer: retire any Deep Fried Chicken files a prior DFC install
+            // left in the host folder so the two never stack.
+            foreach (var stale in DeepFriedChickenService.RequiredFiles)
+            {
+                var stalePath = Path.Combine(hostDirectory, stale);
+                if (File.Exists(stalePath)) RetireComponentFiles(root, new[] { stalePath }, record);
+            }
+        }
 
         foreach (var runtimeName in HostedRuntimeNames)
         {
@@ -2344,18 +2396,21 @@ public sealed partial class Dlss5ComponentService
         return bytes;
     }
 
-    private static void RemoveIncompatibleDlssAddons(
+    internal static void RemoveIncompatibleDlssAddons(
         string root,
         string addonDeployPath,
         Dlss5CompatibilityPlan compatibilityPlan,
-        Dlss5InstallRecord record)
+        Dlss5InstallRecord record,
+        bool useDeepFriedChicken = false)
     {
-        var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            compatibilityPlan.UsesExperimentalUnified
+        var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // With Deep Fried Chicken as the consumer, RenoDX must be removed (DFC replaces it), and
+        // DFC's own files are deployed separately and kept. With RenoDX as the consumer the reverse
+        // holds: RenoDX is kept and any Deep Fried Chicken files from a prior install are retired.
+        if (!useDeepFriedChicken)
+            keep.Add(compatibilityPlan.UsesExperimentalUnified
                 ? Renodx5AddonService.AddonFileName
-                : RenoDxDeploymentName,
-        };
+                : RenoDxDeploymentName);
         if (compatibilityPlan.InstallDx11Bridge)
             keep.Add(BridgeAddon);
         if (compatibilityPlan.InstallOpenGlBridge)
@@ -2370,7 +2425,11 @@ public sealed partial class Dlss5ComponentService
             OpenGlBridgeAddon,
             ObsoleteBridgeAddon,
         };
-        var paths = managedNames
+        // Deep Fried Chicken files are managed only when RenoDX is taking over as the consumer.
+        var deepFriedChickenNames = useDeepFriedChicken
+            ? Array.Empty<string>()
+            : DeepFriedChickenService.RequiredFiles;
+        var paths = managedNames.Concat(deepFriedChickenNames)
             .Where(name => !keep.Contains(name))
             .SelectMany(name => new[] { Path.Combine(addonDeployPath, name), Path.Combine(root, name) })
             .Concat(new[]

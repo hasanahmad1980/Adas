@@ -393,7 +393,9 @@ public sealed class Dlss5SuiteTests
             Dlss5DeploymentMode.Dx11Feeder,
             is64Bit: true,
             Dlss5InstallProfile.LatestFeederBeta);
-        Assert.Equal(Dlss5RenoDxPackage.Native470, beta.RenoDxPackage);
+        // Feeder routes run the RenoDX consumer in the 64-bit host and must use the feeder-pinned
+        // v4.55 build. The native v4.70 consumer faults in D3D12Core on driver 616.64 (black screen).
+        Assert.Equal(Dlss5RenoDxPackage.Feeder455, beta.RenoDxPackage);
         Assert.True(beta.InstallFeeder);
         Assert.True(beta.UsesLatestFeederBeta);
         Assert.Contains("0.14.0-beta.2", beta.ProfileName);
