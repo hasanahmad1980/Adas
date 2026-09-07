@@ -5,7 +5,7 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    public const string AioVersion = "2.0.9";
+    public const string AioVersion = "2.1.1";
     public const string AioAddon = "standalone-dlssnr.addon64";
     public const string AioShader = "DLSS5_AIO_Feed.fx";
     public const string AioVortBundle = "vort-shaders.zip";
@@ -16,12 +16,13 @@ public sealed partial class Dlss5ComponentService
     // Pin the author-published release rather than a mutable latest URL.
     internal static readonly IReadOnlyDictionary<string, string> AioAssetHashes = new Dictionary<string, string>
     {
-        // v2.0.9 — stable release folding in the adaptive GPU-pressure governor plus a
-        // source-resolution override, DPI virtualization correction, live color-profile
-        // switching and selectable neural-rendering pass counts. The AIO feed shader is
-        // unchanged from 2.0.7-experimental.1; only the add-on and proxy nvngx.dll moved.
-        [AioAddon] = "61E87931845CC72C00CCF2B7B05383C22BDA0FE3BBCCAF29A16FFBFB23EE5927",
-        ["nvngx.dll"] = "2EE50F6F4C878A052F34F29FC43E8F14BF7EFBD0C8F0CB8C4A414EEA56C4DEAF",
+        // v2.1.1 — upstream adds native 32-bit D3D9 support and a Vulkan effects-boundary
+        // fallback shader. Adas keeps its reviewed 64-bit route, where only the add-on and
+        // the AIO caller-bridge nvngx.dll changed; the boundary shader is a no-op fallback
+        // for shader-less Vulkan setups and is redundant because Adas always deploys the
+        // feed shader technique. The AIO feed shader is byte-identical to 2.0.9.
+        [AioAddon] = "684223CADB54BEDF13751A6540D62AD0D27DDBD6C0A0E456F5788B26B98B8A27",
+        ["nvngx.dll"] = "C61AE2B5ECA6D7E8EBA60DBAAA75CE01155F1D5BC3425B21DEC0334D2B8CB67F",
         [AioShader] = "B0EF9EE8F9C7675C0224B87A614905D4283363438BD7E104B132E7200AD84748",
     };
     internal static readonly IReadOnlyDictionary<string, string> AioDefaults = new Dictionary<string, string>

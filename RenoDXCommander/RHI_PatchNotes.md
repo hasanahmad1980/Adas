@@ -1,3 +1,8 @@
+## Unreleased — DLSS 5 upstream refresh (follow-up)
+
+- Updated **Standalone AIO** to **2.1.1**. Upstream 2.1.1 adds native 32-bit D3D9 support and a Vulkan effects-boundary fallback shader; Adas keeps its reviewed 64-bit route, where only the add-on and the AIO caller-bridge `nvngx.dll` changed (the feed shader is byte-identical to 2.0.9). The new 32-bit/D3D9 route and the redundant Vulkan boundary shader are intentionally not pulled in.
+- Updated the verified **OneClick** helper launch to **0.11.24** (dgVoodoo2 games with `d3d9.dll`/`dgVoodoo.conf` present are correctly classified as D3D11 instead of being refused).
+
 ## v2.6.35 — DLSS 5 upstream refresh and consumer routing (2026-09-07)
 
 ### Upstream component refresh
