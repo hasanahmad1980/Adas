@@ -41,6 +41,8 @@ public enum Dlss5InstallProfile
     OptiScalerNrBeforeSr,
     // Native 64-bit OpenGL DLAA bridge. Appended for install-record compatibility.
     OpenGlBridge,
+    // Neural Upstream runs DLSS-NR before the game's own DLSS Super Resolution.
+    NeuralUpstream,
 }
 
 public sealed record Dlss5Probe

@@ -202,13 +202,14 @@ public sealed partial class MainWindow
 
     private async Task RunSimpleAutomaticInstallAsync(GameCardViewModel card)
     {
+        var game = Dlss5GameOperation.Capture(card);
         var compatibility = App.Services.GetRequiredService<Dlss5CompatibilityService>();
         var components = App.Services.GetRequiredService<Dlss5ComponentService>();
-        var probe = await Task.Run(() => ProbeDlss5(compatibility, card));
+        var probe = await Task.Run(() => ProbeDlss5(compatibility, game));
         if (probe.GraphicsApi == GraphicsApiType.Unknown)
         {
-            if (await ChooseDlss5RendererOverrideAsync(card) == null) return;
-            probe = await Task.Run(() => ProbeDlss5(compatibility, card));
+            if (await ChooseDlss5RendererOverrideAsync(card, game) == null) return;
+            probe = await Task.Run(() => ProbeDlss5(compatibility, game));
         }
 
         var assessment = Dlss5CompatibilityService.Assess(probe, singlePlayerConfirmed: true);
@@ -234,9 +235,9 @@ public sealed partial class MainWindow
             // exact executable folder and install anyway, instead of hard-blocking.
             var suggested = !string.IsNullOrWhiteSpace(assessment.DeploymentPath)
                 ? assessment.DeploymentPath
-                : Dlss5CompatibilityService.ResolveDeploymentPath(card.InstallPath).Candidates.FirstOrDefault()
-                  ?? card.InstallPath;
-            var chosen = await ConfirmGameFolderAndPickAsync(card, assessment, suggested);
+                : Dlss5CompatibilityService.ResolveDeploymentPath(game.InstallPath).Candidates.FirstOrDefault()
+                  ?? game.InstallPath;
+            var chosen = await ConfirmGameFolderAndPickAsync(game.GameName, game.InstallPath, assessment, suggested);
             if (string.IsNullOrWhiteSpace(chosen))
             {
                 await UpdateSimpleSelectedGameAsync(card);
@@ -248,7 +249,21 @@ public sealed partial class MainWindow
 
         var deploymentPath = assessment.DeploymentPath
             ?? throw new InvalidOperationException("The confirmed game executable folder is missing.");
-        var profile = SelectAutomaticProfile(assessment);
+        Dlss5InstallRecord? existingRecord;
+        try { existingRecord = Dlss5ComponentService.LoadRecord(deploymentPath); }
+        catch (Exception ex)
+        {
+            await ShowDlss5MessageAsync("Could not read the current DLSS 5 setup", ex.Message);
+            return;
+        }
+        var profile = existingRecord?.Profile == Dlss5InstallProfile.NeuralUpstream
+            && Dlss5ComponentService.SupportsNeuralUpstream(assessment.Mode, assessment.Is64Bit)
+            ? Dlss5InstallProfile.NeuralUpstream
+            : SelectAutomaticProfile(assessment);
+        var consumerOverrides = existingRecord?.DeepFriedChicken == true
+            && profile != Dlss5InstallProfile.NeuralUpstream
+            ? new Dlss5ManualOverrides(DeepFriedChicken: true)
+            : null;
         Dlss5CleanupPlan cleanup;
         try
         {
@@ -261,8 +276,8 @@ public sealed partial class MainWindow
             return;
         }
 
-        var running = await Task.Run(() => GameProcessService.FindRunningProcesses(card.InstallPath));
-        var currentPath = Dlss5ComponentService.FindInstalledDeploymentPath(card.InstallPath);
+        var running = await Task.Run(() => GameProcessService.FindRunningProcesses(game.InstallPath));
+        var currentPath = Dlss5ComponentService.FindInstalledDeploymentPath(game.InstallPath);
         var isRepair = currentPath != null && components.GetInstalledMode(currentPath) != Dlss5DeploymentMode.None;
         var details = DescribeAutomaticRoute(assessment, profile)
             + "\n\nAdas will back up replaced files, remove conflicting managed pipelines, and restore the previous setup if the switch fails."
@@ -273,7 +288,7 @@ public sealed partial class MainWindow
         {
             var confirm = await DialogService.ShowSafeAsync(new ContentDialog
             {
-                Title = isRepair ? $"Repair {card.GameName}?" : $"Install for {card.GameName}?",
+                Title = isRepair ? $"Repair {game.GameName}?" : $"Install for {game.GameName}?",
                 Content = MakeDlss5Text(details),
                 PrimaryButtonText = isRepair ? "Repair automatically" : "Install automatically",
                 CloseButtonText = "Cancel",
@@ -290,7 +305,7 @@ public sealed partial class MainWindow
         if (!canWrite.Allowed)
         {
             await _dialogService.ShowGameFolderAdminRequiredDialogAsync(
-                card.GameName, deploymentPath, canWrite.Error);
+                game.GameName, deploymentPath, canWrite.Error);
             return;
         }
 
@@ -311,7 +326,7 @@ public sealed partial class MainWindow
         try
         {
             var relocationErrors = await Task.Run(() =>
-                components.RemoveOtherManagedDeployments(card.InstallPath, deploymentPath));
+                components.RemoveOtherManagedDeployments(game.InstallPath, deploymentPath));
             if (relocationErrors.Count > 0)
                 throw new IOException(string.Join("\n", relocationErrors));
 
@@ -320,7 +335,7 @@ public sealed partial class MainWindow
             Dlss5Assessment installAssessment = assessment;
             if (!forced)
             {
-                var freshProbe = await Task.Run(() => ProbeDlss5(compatibility, card));
+                var freshProbe = await Task.Run(() => ProbeDlss5(compatibility, game));
                 var fresh = Dlss5CompatibilityService.Assess(freshProbe, singlePlayerConfirmed: true);
                 if (!fresh.CanInstall || fresh.Mode != assessment.Mode
                     || !string.Equals(fresh.DeploymentPath, assessment.DeploymentPath, StringComparison.OrdinalIgnoreCase))
@@ -329,13 +344,14 @@ public sealed partial class MainWindow
             }
 
             var result = await Task.Run(() => components.InstallAsync(
-                card.GameName,
+                game.GameName,
                 installAssessment,
                 progress,
-                reShadeChannel: ViewModel.ResolveReShadeChannel(card.GameName, card.Source ?? ""),
-                store: card.Source,
+                reShadeChannel: ViewModel.ResolveReShadeChannel(game.GameName, game.Source),
+                store: game.Source,
                 profile: profile,
-                cleanupApproval: cleanup));
+                cleanupApproval: cleanup,
+                overrides: consumerOverrides));
             SimpleActionStatus.Text = result.Warnings.Count == 0
                 ? "Required files installed and checked. Launch the game to confirm neural rendering."
                 : "Required files installed and checked. " + string.Join(" ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase));
@@ -617,14 +633,18 @@ public sealed partial class MainWindow
     /// Explains the flag, lets the user pick the exact executable folder, and returns it so the
     /// install can proceed anyway. Returns null if the user cancels.
     /// </summary>
-    private async Task<string?> ConfirmGameFolderAndPickAsync(GameCardViewModel card, Dlss5Assessment assessment, string? suggested)
+    private async Task<string?> ConfirmGameFolderAndPickAsync(
+        string gameName,
+        string gameRoot,
+        Dlss5Assessment assessment,
+        string? suggested)
     {
         var reasons = assessment.BlockingReasons.Count > 0
             ? "Adas flagged this game:\n\n• " + string.Join("\n• ", assessment.BlockingReasons) + "\n\n"
             : "";
         var confirm = await DialogService.ShowSafeAsync(new ContentDialog
         {
-            Title = $"Install {card.GameName} anyway?",
+            Title = $"Install {gameName} anyway?",
             Content = MakeDlss5Text(reasons
                 + "Choose the exact folder that holds the game's executable (the .exe). "
                 + "Adas will install there and skip the automatic check.\n\n"
@@ -635,7 +655,22 @@ public sealed partial class MainWindow
             XamlRoot = Content.XamlRoot,
         });
         if (confirm != ContentDialogResult.Primary) return null;
-        return await PickGameFolderAsync(suggested);
+        var selected = await PickGameFolderAsync(suggested);
+        if (selected == null) return null;
+
+        var root = Path.GetFullPath(gameRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var candidate = Path.GetFullPath(selected).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var relative = Path.GetRelativePath(root, candidate);
+        if (Path.IsPathRooted(relative)
+            || relative.Equals("..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            await ShowDlss5MessageAsync(
+                "Folder is outside this game",
+                "Choose the executable folder inside the selected game's installation directory. Adas did not change any files.");
+            return null;
+        }
+        return candidate;
     }
 
     private async Task<string?> PickGameFolderAsync(string? suggested)

@@ -57,8 +57,18 @@ public sealed partial class MainWindow
             card,
             ViewModel.GetSingleApiOverride(card.GameName, card.Source ?? ""));
 
-    private async Task<GraphicsApiType?> ChooseDlss5RendererOverrideAsync(GameCardViewModel card)
+    private Dlss5Probe ProbeDlss5(
+        Dlss5CompatibilityService compatibility,
+        Dlss5GameOperation game)
+        => compatibility.Probe(
+            game,
+            ViewModel.GetSingleApiOverride(game.GameName, game.Source));
+
+    private async Task<GraphicsApiType?> ChooseDlss5RendererOverrideAsync(
+        GameCardViewModel card,
+        Dlss5GameOperation? operation = null)
     {
+        var game = operation ?? Dlss5GameOperation.Capture(card);
         var choices = new Dictionary<string, GraphicsApiType>
         {
             ["DirectX 8"] = GraphicsApiType.DirectX8,
@@ -86,7 +96,7 @@ public sealed partial class MainWindow
 
         var dialog = new ContentDialog
         {
-            Title = $"Choose renderer for {card.GameName}",
+            Title = $"Choose renderer for {game.GameName}",
             Content = panel,
             PrimaryButtonText = "Use selected renderer",
             CloseButtonText = "Cancel",
@@ -107,7 +117,7 @@ public sealed partial class MainWindow
             || !choices.TryGetValue(label, out var selectedApi))
             return null;
 
-        ViewModel.SetApiOverride(card.GameName, new List<string> { selectedApi.ToString() }, card.Source ?? "");
+        ViewModel.SetApiOverride(game.GameName, new List<string> { selectedApi.ToString() }, game.Source);
         card.GraphicsApi = selectedApi;
         card.DetectedApis = new HashSet<GraphicsApiType> { selectedApi };
         card.IsDualApiGame = false;
@@ -150,7 +160,7 @@ public sealed partial class MainWindow
             $"Every overwritten suite file is backed up for hash-aware uninstall. The ReShade suite and OptiScaler routes remain mutually exclusive. Smooth Motion must stay off on stable Feeder 0.7; Feeder {Dlss5ComponentService.BundledFeederBetaVersion} adds the newer synchronized Present fixes and native 32-bit D3D10 relay."));
         body.Children.Add(MakeDlss5Heading("Included upstream features"));
         body.Children.Add(MakeDlss5Text(
-            $"RenoDX DLSS 4.70; DLSS5 Bridge {Dlss5ComponentService.BridgeVersion}; stable Feeder 0.7 plus optional {Dlss5ComponentService.BundledFeederBetaVersion}; ShortFuse (2026-09-02); automatic dgVoodoo2 and DXVK legacy translation; native 32-bit D3D10 relay; x86 hosted deployment; Vulkan and OpenGL transport; " +
+            $"RenoDX DLSS 4.70; DLSS5 Bridge {Dlss5ComponentService.BridgeVersion}; Neural Upstream {Dlss5ComponentService.NeuralUpstreamVersion} for native 64-bit D3D12; stable Feeder 0.7 plus optional {Dlss5ComponentService.BundledFeederBetaVersion}; ShortFuse (2026-09-02); automatic dgVoodoo2 and DXVK legacy translation; native 32-bit D3D10 relay; x86 hosted deployment; Vulkan and OpenGL transport; " +
             "bundled standard ReShade headers; LumeniteFX Kernel setup; hot-reloaded configuration; local Streamline/runtime import; and the exact " +
             "DLSSNR signature-repair preview/backup/atomic-replace/rollback workflow."));
         body.Children.Add(MakeDlss5Text(
@@ -168,15 +178,16 @@ public sealed partial class MainWindow
     private async void Dlss5ManageButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: GameCardViewModel card }) return;
-        var emulator = await Task.Run(() => Dlss5EmulatorService.FindInstallation(card.InstallPath));
-        if (emulator != null && !await ChooseDlss5EmulatorRendererAsync(emulator, card.InstallPath)) return;
+        var game = Dlss5GameOperation.Capture(card);
+        var emulator = await Task.Run(() => Dlss5EmulatorService.FindInstallation(game.InstallPath));
+        if (emulator != null && !await ChooseDlss5EmulatorRendererAsync(emulator, game.InstallPath)) return;
         var compatibility = App.Services.GetRequiredService<Dlss5CompatibilityService>();
         var components = App.Services.GetRequiredService<Dlss5ComponentService>();
-        var probe = await Task.Run(() => ProbeDlss5(compatibility, card));
+        var probe = await Task.Run(() => ProbeDlss5(compatibility, game));
         if (emulator == null && probe.GraphicsApi == GraphicsApiType.Unknown)
         {
-            if (await ChooseDlss5RendererOverrideAsync(card) == null) return;
-            probe = await Task.Run(() => ProbeDlss5(compatibility, card));
+            if (await ChooseDlss5RendererOverrideAsync(card, game) == null) return;
+            probe = await Task.Run(() => ProbeDlss5(compatibility, game));
         }
         var assessment = Dlss5CompatibilityService.Assess(probe, singlePlayerConfirmed: true);
         var installedMode = assessment.DeploymentPath == null
@@ -184,7 +195,7 @@ public sealed partial class MainWindow
             : components.GetInstalledMode(assessment.DeploymentPath);
         if (installedMode == Dlss5DeploymentMode.None)
         {
-            var previousDeploymentPath = Dlss5ComponentService.FindInstalledDeploymentPath(card.InstallPath);
+            var previousDeploymentPath = Dlss5ComponentService.FindInstalledDeploymentPath(game.InstallPath);
             if (previousDeploymentPath != null)
                 installedMode = components.GetInstalledMode(previousDeploymentPath);
         }
@@ -199,6 +210,8 @@ public sealed partial class MainWindow
         {
             Dlss5InstallProfile.OpenGlBridge when Dlss5ComponentService.SupportsOpenGlBridge(assessment.Mode, assessment.Is64Bit)
                 => Dlss5InstallProfile.OpenGlBridge,
+            Dlss5InstallProfile.NeuralUpstream when Dlss5ComponentService.SupportsNeuralUpstream(assessment.Mode, assessment.Is64Bit)
+                => Dlss5InstallProfile.NeuralUpstream,
             Dlss5InstallProfile.OptiScalerNeuralRendering => Dlss5InstallProfile.OptiScalerNeuralRendering,
             Dlss5InstallProfile.OptiScalerNrBeforeSr => Dlss5InstallProfile.OptiScalerNrBeforeSr,
             Dlss5InstallProfile.StandaloneAio when Dlss5ComponentService.SupportsAio(assessment.Mode, assessment.Is64Bit)
@@ -222,7 +235,7 @@ public sealed partial class MainWindow
                 ? isInstalled ? "Automatic repair is ready" : "Recommended setup is ready"
                 : "Adas cannot install this game yet",
             assessment.CanInstall
-                ? $"The renderer folder and architecture are resolved for {card.GameName}. Review the selected setup below; advanced alternatives are optional."
+                ? $"The renderer folder and architecture are resolved for {game.GameName}. Review the selected setup below; advanced alternatives are optional."
                 : "Review the problem below. Adas will not change game files while installation is blocked.",
             assessment.CanInstall));
 
@@ -276,9 +289,9 @@ public sealed partial class MainWindow
             };
             checkSetup.Click += async (_, _) =>
             {
-                var installedPath = Dlss5ComponentService.FindInstalledDeploymentPath(card.InstallPath)
+                var installedPath = Dlss5ComponentService.FindInstalledDeploymentPath(game.InstallPath)
                     ?? assessment.DeploymentPath
-                    ?? card.InstallPath;
+                    ?? game.InstallPath;
                 var report = await Task.Run(() => Dlss5DiagnosticService.Diagnose(
                     installedPath,
                     installedMode,
@@ -312,59 +325,165 @@ public sealed partial class MainWindow
             GroupName = "Dlss5InstallProfile",
             Content = "Recommended (stable)",
             IsChecked = selectedProfile == Dlss5InstallProfile.MaximumQuality,
-            IsEnabled = assessment.Mode != Dlss5DeploymentMode.Dx10Feeder
-                        && !(assessment.Mode is Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.Dx10ViaDxvkFeeder
-                                or Dlss5DeploymentMode.Dx9ViaDxvkFeeder
-                             && !assessment.Is64Bit),
+            IsEnabled = true,
         };
         var experimentalProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile",
             Content = "ShortFuse unified — September 2 build (experimental)",
             IsChecked = selectedProfile == Dlss5InstallProfile.ExperimentalUnified,
-            IsEnabled = assessment.Is64Bit && assessment.Mode != Dlss5DeploymentMode.NativeVulkan,
+            IsEnabled = true,
         };
         var betaProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile",
             Content = $"Feeder {Dlss5ComponentService.BundledFeederBetaVersion} (beta)",
             IsChecked = selectedProfile == Dlss5InstallProfile.LatestFeederBeta,
-            IsEnabled = Dlss5CompatibilityService.IsFeederMode(assessment.Mode),
+            IsEnabled = true,
         };
         var aioProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile",
             Content = $"Standalone AIO {Dlss5ComponentService.AioVersion} — NR + DLAA/upscaling + optional frame generation (experimental)",
             IsChecked = selectedProfile == Dlss5InstallProfile.StandaloneAio,
-            IsEnabled = Dlss5ComponentService.SupportsAio(assessment.Mode, assessment.Is64Bit),
+            IsEnabled = true,
         };
         var openGlBridgeProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile",
             Content = $"OpenGL Bridge {Dlss5ComponentService.OpenGlBridgeVersion} — native 64-bit OpenGL DLAA (experimental)",
             IsChecked = selectedProfile == Dlss5InstallProfile.OpenGlBridge,
-            IsEnabled = Dlss5ComponentService.SupportsOpenGlBridge(assessment.Mode, assessment.Is64Bit),
+            IsEnabled = true,
         };
-        advancedProfiles.Children.Add(recommendedProfile);
-        advancedProfiles.Children.Add(experimentalProfile);
-        advancedProfiles.Children.Add(betaProfile);
-        advancedProfiles.Children.Add(aioProfile);
-        advancedProfiles.Children.Add(openGlBridgeProfile);
+        var neuralUpstreamProfile = new RadioButton
+        {
+            GroupName = "Dlss5InstallProfile",
+            Content = $"Neural Upstream {Dlss5ComponentService.NeuralUpstreamVersion} — before the game's DLSS (beta)",
+            IsChecked = selectedProfile == Dlss5InstallProfile.NeuralUpstream,
+            IsEnabled = true,
+        };
         var optiNrProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile", Content = $"OptiScaler DLSS-NR {Dlss5ComponentService.OptiScalerNrVersion} (experimental; native DLSS DX11/DX12/Vulkan)",
             IsChecked = selectedProfile == Dlss5InstallProfile.OptiScalerNeuralRendering,
-            IsEnabled = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, false),
+            IsEnabled = true,
         };
         var splitProfile = new RadioButton
         {
             GroupName = "Dlss5InstallProfile", Content = "NR before upscaling (experimental OptiScaler fork; native DLSS DX12)",
             IsChecked = selectedProfile == Dlss5InstallProfile.OptiScalerNrBeforeSr,
-            IsEnabled = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, true),
+            IsEnabled = true,
         };
-        advancedProfiles.Children.Add(optiNrProfile);
-        advancedProfiles.Children.Add(splitProfile);
-        advancedProfiles.Children.Add(MakeDlss5Text("Disabled options do not match this game's renderer or architecture. Standard OptiScaler NR requires native DLSS and a 64-bit DX11, DX12 or Vulkan game; the split fork remains DX12 only."));
+        string UnsupportedReason(string reason)
+            => $"Not recommended — {reason}";
+
+        void AddProfileOption(
+            RadioButton option,
+            string gameShape,
+            bool supported,
+            bool recommended,
+            string unsupportedReason)
+        {
+            advancedProfiles.Children.Add(option);
+            var detail = MakeDlss5Text($"  {gameShape}", ResourceKeys.TextTertiaryBrush);
+            detail.Margin = new Thickness(28, -5, 0, 0);
+            advancedProfiles.Children.Add(detail);
+            var statusText = supported
+                ? recommended ? "✓ Recommended for this game's detected renderer and architecture."
+                    : "Available — experimental; use only when you specifically need this route."
+                : $"✕ {UnsupportedReason(unsupportedReason)}";
+            var status = MakeDlss5Text(statusText,
+                supported ? recommended ? ResourceKeys.AccentGreenBrush : ResourceKeys.AccentAmberBrush
+                    : ResourceKeys.AccentRedBrush);
+            status.Margin = new Thickness(28, -5, 0, 0);
+            advancedProfiles.Children.Add(status);
+        }
+
+        var stableSupported = assessment.Mode != Dlss5DeploymentMode.Dx10Feeder
+                              && !(assessment.Mode is Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.Dx10ViaDxvkFeeder
+                                      or Dlss5DeploymentMode.Dx9ViaDxvkFeeder
+                                   && !assessment.Is64Bit);
+        var unifiedSupported = assessment.Is64Bit && assessment.Mode != Dlss5DeploymentMode.NativeVulkan;
+        var feederSupported = Dlss5CompatibilityService.IsFeederMode(assessment.Mode);
+        var aioSupported = Dlss5ComponentService.SupportsAio(assessment.Mode, assessment.Is64Bit);
+        var openGlSupported = Dlss5ComponentService.SupportsOpenGlBridge(assessment.Mode, assessment.Is64Bit);
+        var upstreamSupported = Dlss5ComponentService.SupportsNeuralUpstream(assessment.Mode, assessment.Is64Bit);
+        var optiSupported = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, false);
+        var splitSupported = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, true);
+
+        bool ProfileSupported(Dlss5InstallProfile profile) => profile switch
+        {
+            Dlss5InstallProfile.MaximumQuality => stableSupported,
+            Dlss5InstallProfile.ExperimentalUnified => unifiedSupported,
+            Dlss5InstallProfile.LatestFeederBeta => feederSupported,
+            Dlss5InstallProfile.StandaloneAio => aioSupported,
+            Dlss5InstallProfile.OpenGlBridge => openGlSupported,
+            Dlss5InstallProfile.NeuralUpstream => upstreamSupported,
+            Dlss5InstallProfile.OptiScalerNeuralRendering => optiSupported,
+            Dlss5InstallProfile.OptiScalerNrBeforeSr => splitSupported,
+            _ => false,
+        };
+
+        AddProfileOption(
+            recommendedProfile,
+            "For most games. Adas chooses the renderer-specific stable RenoDX or Feeder pairing and keeps the installation reversible.",
+            stableSupported,
+            stableSupported && selectedProfile == Dlss5InstallProfile.MaximumQuality,
+            assessment.Is64Bit ? "this route needs the matched Feeder beta for the detected 32-bit/translated path"
+                : "this game needs the matched Feeder beta host route");
+        AddProfileOption(
+            experimentalProfile,
+            "For 64-bit DirectX games when you want ShortFuse's combined RenoDX controls; experimental and not the native Vulkan mirror route.",
+            unifiedSupported,
+            false,
+            !assessment.Is64Bit ? "ShortFuse requires a 64-bit game"
+                : "ShortFuse is not compatible with the native Vulkan mirror route");
+        AddProfileOption(
+            betaProfile,
+            $"For Feeder games without a native DLSS path, legacy/translated renderers, and matched 32-bit hosting. Uses the packaged {Dlss5ComponentService.BundledFeederBetaVersion} test set.",
+            feederSupported,
+            feederSupported && selectedProfile == Dlss5InstallProfile.LatestFeederBeta,
+            "this game is on a native route; Feeder is a transport for games that need it");
+        AddProfileOption(
+            aioProfile,
+            $"For supported 64-bit native DLSS games when you want standalone DLSS-NR plus DLAA/upscaling and optional frame generation. Turn the game's own DLSS/FG off.",
+            aioSupported,
+            false,
+            !assessment.Is64Bit ? "Standalone AIO requires a 64-bit game"
+                : "Standalone AIO does not support this translated or legacy renderer");
+        AddProfileOption(
+            openGlBridgeProfile,
+            "For 64-bit OpenGL games. Provides native OpenGL DLAA through the bridge; it is not a DirectX/Vulkan Feeder route.",
+            openGlSupported,
+            false,
+            !assessment.Is64Bit ? "the OpenGL bridge requires a 64-bit game"
+                : "the detected renderer is not OpenGL");
+        AddProfileOption(
+            neuralUpstreamProfile,
+            $"For 64-bit native DirectX 12 games that already use DLSS. Runs Neural Rendering before the game's own DLSS Super Resolution; never combine with another NGX consumer.",
+            upstreamSupported,
+            false,
+            !assessment.Is64Bit ? "Neural Upstream requires a 64-bit game"
+                : assessment.Mode != Dlss5DeploymentMode.NativeDirectX12
+                    ? "Neural Upstream requires native DirectX 12"
+                    : "the game does not expose the native DLSS contract it needs");
+        AddProfileOption(
+            optiNrProfile,
+            $"For 64-bit native-DLSS DX11, DX12, or Vulkan games when you want OptiScaler's Insert controls and DLSS-NR pipeline.",
+            optiSupported,
+            false,
+            !assessment.Is64Bit ? "OptiScaler DLSS-NR requires a 64-bit game"
+                : "OptiScaler DLSS-NR requires a native DLSS DX11, DX12, or Vulkan route");
+        AddProfileOption(
+            splitProfile,
+            "For 64-bit native DirectX 12 games that specifically need Neural Rendering before Super Resolution. This is the highest-risk experimental fork.",
+            splitSupported,
+            false,
+            !assessment.Is64Bit ? "the NR-before-upscaling fork requires a 64-bit game"
+                : "the NR-before-upscaling fork requires native DirectX 12");
+        advancedProfiles.Children.Add(MakeDlss5Text(
+            "Red means Adas does not recommend that route for this detected game shape, but it remains selectable so you can override detection. Amber means the route is selectable but experimental. Green means it is the recommended fit; the profile summary below explains the exact files and game settings.",
+            ResourceKeys.TextTertiaryBrush));
         var profileSummary = MakeDlss5Text("");
         content.Children.Add(profileSummary);
 
@@ -373,6 +492,10 @@ public sealed partial class MainWindow
         // any value can be forced, and the label states compatibility (never blocked).
         content.Children.Add(MakeDlss5Heading("Neural consumer"));
         var dfc = App.Services.GetRequiredService<DeepFriedChickenService>();
+        await dfc.EnsureImportedFromDefaultLocationsAsync();
+        var installedUsesDfc = installedRecord?.DeepFriedChicken == true
+            || (assessment.DeploymentPath != null
+                && DeepFriedChickenService.IsSelectedConsumer(assessment.DeploymentPath, assessment.Is64Bit));
         var consumerCombo = new ComboBox
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -383,24 +506,32 @@ public sealed partial class MainWindow
                 "RenoDX v4.70 — native / latest engine",
                 "Deep Fried Chicken — import your own (alpha)",
             },
-            SelectedIndex = 0,
+            SelectedIndex = installedUsesDfc ? 3 : 0,
         };
         var consumerLabel = MakeDlss5Text("");
         content.Children.Add(consumerCombo);
         content.Children.Add(consumerLabel);
         void UpdateConsumerLabel()
         {
+            if (selectedProfile == Dlss5InstallProfile.NeuralUpstream)
+            {
+                consumerCombo.IsEnabled = false;
+                consumerLabel.Text = $"✓ Neural Upstream {Dlss5ComponentService.NeuralUpstreamVersion} is selected. It runs DLSS-NR before the game's own DLSS Super Resolution and is kept separate from RenoDX and Deep Fried Chicken.";
+                consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentAmberBrush);
+                return;
+            }
+            consumerCombo.IsEnabled = true;
             if (consumerCombo.SelectedIndex == 3)
             {
                 if (dfc.IsImported)
                 {
-                    consumerLabel.Text = $"✓ Deep Fried Chicken {dfc.ImportedVersion} imported — replaces the RenoDX consumer wherever it deploys. Keep Frame Generation OFF (this alpha still black-screens with FG in some games). Licence: personal / non-commercial; Adas deploys your unmodified copy and never redistributes it.";
+                    consumerLabel.Text = $"✓ Deep Fried Chicken {dfc.ImportedVersion} imported and SHA-256 verified — replaces the RenoDX consumer wherever it deploys. Adas uses its newer reviewed DLSS 5 bridge on native routes instead of stacking the older bridge from the DFC archive. Frame Generation is available but remains experimental; disable it if a title black-screens or becomes unstable. Licence: personal / non-commercial; Adas never redistributes DFC.";
                     consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentGreenBrush);
                 }
                 else
                 {
                     var requiredFiles = string.Join(", ", DeepFriedChickenService.RequiredFiles);
-                    consumerLabel.Text = $"Deep Fried Chicken can't be bundled — its licence forbids anyone, Adas included, from hosting, mirroring or redistributing it, so you supply the author's own official release. Pick that zip (or its extracted folder) once and Adas caches your unmodified copy and deploys it as the neural consumer for any game. A valid release contains {requiredFiles}; get it only from the author's official distribution and verify its integrity (the release ships SHA256SUMS.txt) before importing.";
+                    consumerLabel.Text = $"No verified Deep Fried Chicken release is cached yet. Adas automatically checks Downloads on first use, then keeps the verified core in local app data for every game and future launch. If it is not there, choose the author's official ZIP once. Its licence forbids Adas from bundling or redistributing the binaries; Adas verifies SHA256SUMS.txt before caching. A valid release contains {requiredFiles}.";
                     consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentAmberBrush);
                 }
                 return;
@@ -450,6 +581,7 @@ public sealed partial class MainWindow
         void UpdateProfileSummary()
         {
             selectedProfile = openGlBridgeProfile.IsChecked == true ? Dlss5InstallProfile.OpenGlBridge
+                : neuralUpstreamProfile.IsChecked == true ? Dlss5InstallProfile.NeuralUpstream
                 : splitProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNrBeforeSr
                 : optiNrProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNeuralRendering
                 : aioProfile.IsChecked == true ? Dlss5InstallProfile.StandaloneAio : betaProfile.IsChecked == true
@@ -458,8 +590,9 @@ public sealed partial class MainWindow
                     ? Dlss5InstallProfile.ExperimentalUnified
                     : Dlss5InstallProfile.MaximumQuality;
             var plan = Dlss5ComponentService.GetCompatibilityPlan(assessment.Mode, assessment.Is64Bit, selectedProfile);
-            profileSummary.Text = selectedProfile switch
+            var summary = selectedProfile switch
             {
+                Dlss5InstallProfile.NeuralUpstream => $"Selected: Neural Upstream {Dlss5ComponentService.NeuralUpstreamVersion} (beta). Adas installs the verified upstream add-on as nvngx.dll.addon64 for 64-bit native DirectX 12 games, leaves the game's own DLSS runtime in place, and removes competing NGX consumers. Leave the game's DLSS Super Resolution enabled. Configure Neural Upstream from its ReShade panel; use Quality cadence if Frame Generation is enabled. Tested upstream support is limited, so expect game-specific issues.",
                 Dlss5InstallProfile.OptiScalerNeuralRendering or Dlss5InstallProfile.OptiScalerNrBeforeSr
                     => "Selected: experimental OptiScaler neural rendering. Keep the game's own DLSS ON. Version 0.2 adds hybrid color composition, live exposure, frame hold and optional model supersampling; DX11 is configured through its D3D11-on-12 DLSS path. Press Insert for controls. Driver 616.56+ is required. Apply switches the current pipeline automatically and saves its visual settings.",
                 Dlss5InstallProfile.StandaloneAio => $"Selected: standalone AIO {Dlss5ComponentService.AioVersion}. Downloads three verified files once, then reuses the cache. NR starts on; frame generation starts off. Disable the game's own DLSS, frame generation and antialiasing. Native resolution uses DLAA; a smaller game backbuffer enables upscaling.\n\nApply switches pipelines and preserves each profile's visual settings. Ada asks before cleaning up conflicts or changing a shared Vulkan route, then does the removal itself. Vulkan needs an installed 64-bit ReShade layer. DX9/DX11 guidance and frame pacing remain experimental.",
@@ -468,10 +601,15 @@ public sealed partial class MainWindow
                 Dlss5InstallProfile.LatestFeederBeta => $"Selected: {plan.ProfileName}. This test build adds native 32-bit DirectX 10, current Smooth Motion synchronization, matched protocol-v7 x86 hosting, an in-game host panel, FSR 1 expand-back, Vulkan/DXVK fixes, crash diagnostics, and the upstream verifier. It requires one matched beta set and is not the stable default.",
                 _ => $"Selected: {plan.ProfileName}. This combined build has broader direct API support but may flicker, black-screen, or crash in games that work with the recommended profile.",
             };
-            profileSummary.Foreground = UIFactory.Brush(selectedProfile == Dlss5InstallProfile.MaximumQuality
-                ? ResourceKeys.AccentGreenBrush
-                : ResourceKeys.AccentAmberBrush);
-            missingRequirementsPanel.Visibility = selectedProfile is Dlss5InstallProfile.StandaloneAio or Dlss5InstallProfile.OpenGlBridge
+            profileSummary.Text = ProfileSupported(selectedProfile)
+                ? summary
+                : $"⚠ Not recommended for the detected {assessment.ModeLabel} / {(assessment.Is64Bit ? "64-bit" : "32-bit")} route. Adas is leaving this option selectable so you can override an imperfect detection, but verify the renderer and game DLSS contract before applying it.\n\n{summary}";
+            profileSummary.Foreground = UIFactory.Brush(!ProfileSupported(selectedProfile)
+                ? ResourceKeys.AccentRedBrush
+                : selectedProfile == Dlss5InstallProfile.MaximumQuality
+                    ? ResourceKeys.AccentGreenBrush
+                    : ResourceKeys.AccentAmberBrush);
+            missingRequirementsPanel.Visibility = selectedProfile is Dlss5InstallProfile.StandaloneAio or Dlss5InstallProfile.OpenGlBridge or Dlss5InstallProfile.NeuralUpstream
                 || Dlss5ComponentService.IsOptiScalerNrProfile(selectedProfile) ? Visibility.Collapsed : Visibility.Visible;
             UpdateConsumerLabel();
         }
@@ -480,6 +618,7 @@ public sealed partial class MainWindow
         betaProfile.Checked += (_, _) => UpdateProfileSummary();
         aioProfile.Checked += (_, _) => UpdateProfileSummary();
         openGlBridgeProfile.Checked += (_, _) => UpdateProfileSummary();
+        neuralUpstreamProfile.Checked += (_, _) => UpdateProfileSummary();
         optiNrProfile.Checked += (_, _) => UpdateProfileSummary();
         splitProfile.Checked += (_, _) => UpdateProfileSummary();
         UpdateProfileSummary();
@@ -524,9 +663,9 @@ public sealed partial class MainWindow
                     throw new InvalidOperationException("Remove the current Adas-managed DLSS 5 suite first, then install the separate mainline OptiScaler beta pipeline.");
                 var target = new GameCardViewModel
                 {
-                    GameName = card.GameName,
+                    GameName = game.GameName,
                     InstallPath = assessment.DeploymentPath!,
-                    Source = card.Source,
+                    Source = game.Source,
                     Is32Bit = false,
                     GraphicsApi = assessment.Mode == Dlss5DeploymentMode.NativeVulkan
                         ? GraphicsApiType.Vulkan
@@ -718,9 +857,9 @@ public sealed partial class MainWindow
             }
             var suggested = !string.IsNullOrWhiteSpace(assessment.DeploymentPath)
                 ? assessment.DeploymentPath
-                : Dlss5CompatibilityService.ResolveDeploymentPath(card.InstallPath).Candidates.FirstOrDefault()
-                  ?? card.InstallPath;
-            var chosen = await ConfirmGameFolderAndPickAsync(card, assessment, suggested);
+                : Dlss5CompatibilityService.ResolveDeploymentPath(game.InstallPath).Candidates.FirstOrDefault()
+                  ?? game.InstallPath;
+            var chosen = await ConfirmGameFolderAndPickAsync(game.GameName, game.InstallPath, assessment, suggested);
             if (string.IsNullOrWhiteSpace(chosen)) return;
             assessment = Dlss5CompatibilityService.ConfirmDeploymentPath(assessment, chosen);
             manualForced = true;
@@ -728,7 +867,7 @@ public sealed partial class MainWindow
 
         if (!manualForced)
         {
-            var freshProbe = await Task.Run(() => ProbeDlss5(compatibility, card));
+            var freshProbe = await Task.Run(() => ProbeDlss5(compatibility, game));
             var freshAssessment = Dlss5CompatibilityService.Assess(freshProbe, singlePlayerConfirmed: true);
             if (!freshAssessment.CanInstall
                 || freshAssessment.Mode != assessment.Mode
@@ -750,7 +889,7 @@ public sealed partial class MainWindow
         if (!canWrite.Allowed)
         {
             await _dialogService.ShowGameFolderAdminRequiredDialogAsync(
-                card.GameName,
+                game.GameName,
                 assessment.DeploymentPath!,
                 canWrite.Error);
             return;
@@ -776,12 +915,12 @@ public sealed partial class MainWindow
             if (await DialogService.ShowSafeAsync(confirmCleanup) != ContentDialogResult.Primary) return;
         }
 
-        var runningProcesses = await Task.Run(() => GameProcessService.FindRunningProcesses(card.InstallPath));
+        var runningProcesses = await Task.Run(() => GameProcessService.FindRunningProcesses(game.InstallPath));
         if (runningProcesses.Count > 0)
         {
             var closeGame = new ContentDialog
             {
-                Title = $"Close {card.GameName} and continue?",
+                Title = $"Close {game.GameName} and continue?",
                 Content = MakeDlss5Text(
                     "Windows keeps active ReShade and DLSS add-ons locked while the game is running. Adas will close the game, wait for those files to be released, then continue the selected installation automatically."),
                 PrimaryButtonText = "Close game and continue",
@@ -795,7 +934,7 @@ public sealed partial class MainWindow
             if (stopErrors.Count > 0)
             {
                 await ShowDlss5MessageAsync(
-                    $"Could not close {card.GameName}",
+                    $"Could not close {game.GameName}",
                     "Adas did not change the installation:\n\n• " + string.Join("\n• ", stopErrors));
                 return;
             }
@@ -825,33 +964,35 @@ public sealed partial class MainWindow
             progressText.Text = "Moving the suite to the game renderer folder...";
             progressBar.Value = 2;
             var relocationErrors = await Task.Run(() =>
-                components.RemoveOtherManagedDeployments(card.InstallPath, assessment.DeploymentPath!));
+                components.RemoveOtherManagedDeployments(game.InstallPath, assessment.DeploymentPath!));
             if (relocationErrors.Count > 0)
                 throw new IOException(
                     "Adas could not remove the previous launcher-folder deployment:\n" +
                     string.Join("\n", relocationErrors));
 
-            var reShadeChannel = ViewModel.ResolveReShadeChannel(card.GameName, card.Source ?? "");
-            var overrides = consumerCombo.SelectedIndex switch
-            {
-                1 => new Dlss5ManualOverrides(Dlss5RenoDxPackage.Feeder455),
-                2 => new Dlss5ManualOverrides(Dlss5RenoDxPackage.Native470),
-                3 when dfc.IsImported => new Dlss5ManualOverrides(DeepFriedChicken: true),
-                _ => (Dlss5ManualOverrides?)null,
-            };
+            var reShadeChannel = ViewModel.ResolveReShadeChannel(game.GameName, game.Source);
+            var overrides = selectedProfile == Dlss5InstallProfile.NeuralUpstream
+                ? null
+                : consumerCombo.SelectedIndex switch
+                {
+                    1 => new Dlss5ManualOverrides(Dlss5RenoDxPackage.Feeder455),
+                    2 => new Dlss5ManualOverrides(Dlss5RenoDxPackage.Native470),
+                    3 when dfc.IsImported => new Dlss5ManualOverrides(DeepFriedChicken: true),
+                    _ => (Dlss5ManualOverrides?)null,
+                };
             var installResult = await Task.Run(() => components.InstallAsync(
-                card.GameName,
+                game.GameName,
                 assessment,
                 progress,
                 reShadeChannel: reShadeChannel,
-                store: card.Source,
+                store: game.Source,
                 profile: selectedProfile,
                 cleanupApproval: cleanup,
                 overrides: overrides));
             progressDialog.Hide();
             var auxInstaller = App.Services.GetRequiredService<IAuxInstallService>();
-            var reShadeRecord = auxInstaller.FindRecord(card.GameName, assessment.DeploymentPath!, AuxInstallService.TypeReShade)
-                ?? auxInstaller.FindRecord(card.GameName, assessment.DeploymentPath!, AuxInstallService.TypeReShadeNormal);
+            var reShadeRecord = auxInstaller.FindRecord(game.GameName, assessment.DeploymentPath!, AuxInstallService.TypeReShade)
+                ?? auxInstaller.FindRecord(game.GameName, assessment.DeploymentPath!, AuxInstallService.TypeReShadeNormal);
             if (reShadeRecord != null)
                 MainViewModel.ApplyInstalledReShadeRecord(
                     card,
@@ -902,6 +1043,12 @@ public sealed partial class MainWindow
         if (installedRecord?.Profile == Dlss5InstallProfile.OpenGlBridge)
         {
             await ShowRenoDxSettingsAsync(path, installedRecord.Profile);
+            return;
+        }
+        if (installedRecord?.Profile == Dlss5InstallProfile.NeuralUpstream)
+        {
+            await ShowDlss5MessageAsync("Neural Upstream controls",
+                "Neural Upstream is configured from ReShade's Add-ons panel. Leave the game's own DLSS Super Resolution enabled, then open the overlay with Home. If Frame Generation stutters, set Neural Upstream cadence to Quality. Do not enable RenoDX, Deep Fried Chicken, OptiScaler, or another NGX hook in this game folder.");
             return;
         }
         if (!Dlss5CompatibilityService.IsFeederMode(mode))

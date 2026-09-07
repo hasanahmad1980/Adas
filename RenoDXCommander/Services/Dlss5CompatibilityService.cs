@@ -52,20 +52,25 @@ public sealed class Dlss5CompatibilityService
     public Dlss5Probe Probe(
         GameCardViewModel card,
         GraphicsApiType? userApiOverride = null)
+        => Probe(Dlss5GameOperation.Capture(card), userApiOverride);
+
+    internal Dlss5Probe Probe(
+        Dlss5GameOperation game,
+        GraphicsApiType? userApiOverride = null)
     {
-        var emulator = Dlss5EmulatorService.FindInstallation(card.InstallPath);
-        var resolution = emulator == null ? ResolveDeploymentPath(card.InstallPath)
+        var emulator = Dlss5EmulatorService.FindInstallation(game.InstallPath);
+        var resolution = emulator == null ? ResolveDeploymentPath(game.InstallPath)
             : new Dlss5PathResolution(Dlss5PathResolutionKind.Resolved, Path.GetDirectoryName(emulator.Executable), new[] { Path.GetDirectoryName(emulator.Executable)! });
         var path = resolution.Path;
         var environment = emulator == null
-            ? GraphicsEnvironmentService.Detect(path ?? card.InstallPath)
+            ? GraphicsEnvironmentService.Detect(path ?? game.InstallPath)
             : GraphicsEnvironmentService.Detect(path!, emulator.Executable);
         if (emulator == null)
             environment = GraphicsEnvironmentService.ApplyUserOverride(environment, userApiOverride);
         var selectedApi = emulator == null ? environment.Api : Dlss5EmulatorService.LoadRenderer(emulator) ?? GraphicsApiType.Unknown;
         var files = path == null ? Array.Empty<string>() : EnumerateFilesSafe(path, maxDepth: 3).ToArray();
-        var safetyFiles = Directory.Exists(card.InstallPath)
-            ? EnumerateFilesSafe(card.InstallPath, maxDepth: 5, skipExcludedDirectories: false).ToArray()
+        var safetyFiles = Directory.Exists(game.InstallPath)
+            ? EnumerateFilesSafe(game.InstallPath, maxDepth: 5, skipExcludedDirectories: false).ToArray()
             : files;
 
         bool HasFile(string name) => files.Any(file =>
@@ -92,7 +97,7 @@ public sealed class Dlss5CompatibilityService
         var installRecord = path == null ? null : Dlss5ComponentService.LoadRecord(path);
         var detectedMachine = emulator != null ? _peHeaderService.DetectArchitecture(emulator.Executable)
             : path == null ? MachineType.Native : _peHeaderService.DetectGameArchitecture(path);
-        var is64Bit = ResolveActualIs64Bit(detectedMachine, card.Is32Bit);
+        var is64Bit = ResolveActualIs64Bit(detectedMachine, game.Is32Bit);
         if (path != null && installRecord != null && !is64Bit)
             Dlss5LaunchRecoveryService.TryRecordRecentWindowsCrash(path, installRecord, selectedApi);
         var preferDxvkForDirectX9 = selectedApi == GraphicsApiType.DirectX9
@@ -100,8 +105,10 @@ public sealed class Dlss5CompatibilityService
             && (installRecord?.PreferDxvkForDirectX9 == true
                 || installRecord?.Mode == Dlss5DeploymentMode.Dx9ViaDxvkFeeder);
         var hasNativeDlss = emulator == null && path != null
-            && (HasOriginalRuntime(path, files, installRecord, "nvngx_dlss.dll", "sl.dlss.dll")
-                || HasNativeRuntimeInUnrealPlugins(path, "nvngx_dlss.dll", "sl.dlss.dll"));
+            && (HasOriginalRuntime(path, files, installRecord,
+                    "nvngx_dlss.dll", "sl.dlss.dll", "sl.dlss_d.dll")
+                || HasNativeRuntimeInUnrealPlugins(
+                    path, "nvngx_dlss.dll", "sl.dlss.dll", "sl.dlss_d.dll"));
         var hasLegacyTranslation = path != null && selectedApi switch
         {
             GraphicsApiType.DirectX8 => HasFile("d3d8.dll") && HasFile("dgVoodoo.conf"),
@@ -115,12 +122,12 @@ public sealed class Dlss5CompatibilityService
             _ => true,
         };
         if (detectedMachine is MachineType.I386 or MachineType.x64
-            && is64Bit == card.Is32Bit)
-            CrashReporter.Log($"[Dlss5CompatibilityService] Corrected stale card architecture for '{card.GameName}' from {(card.Is32Bit ? "32" : "64")}-bit to {(is64Bit ? "64" : "32")}-bit");
+            && is64Bit == game.Is32Bit)
+            CrashReporter.Log($"[Dlss5CompatibilityService] Corrected stale card architecture for '{game.GameName}' from {(game.Is32Bit ? "32" : "64")}-bit to {(is64Bit ? "64" : "32")}-bit");
 
         return new Dlss5Probe
         {
-            GameName = card.GameName,
+            GameName = game.GameName,
             DeploymentPath = path,
             HasAmbiguousDeploymentPath = resolution.Kind == Dlss5PathResolutionKind.Ambiguous,
             GraphicsApi = selectedApi,

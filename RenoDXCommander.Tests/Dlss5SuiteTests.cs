@@ -155,6 +155,17 @@ public sealed class Dlss5SuiteTests
     }
 
     [Fact]
+    public void HasOriginalRuntime_RecognizesStreamlineDlssDVariant()
+    {
+        var root = @"C:\Games\Spider-Man 2";
+        var runtime = Path.Combine(root, "sl.dlss_d.dll");
+
+        Assert.True(Dlss5CompatibilityService.HasOriginalRuntime(
+            root, new[] { runtime }, new Dlss5InstallRecord(),
+            "nvngx_dlss.dll", "sl.dlss.dll", "sl.dlss_d.dll"));
+    }
+
+    [Fact]
     public void DetectDynamicApiHints_FindsRuntimeAndEntryPointAcrossReadBoundary()
     {
         const int scanChunkSize = 1024 * 1024;
@@ -398,7 +409,7 @@ public sealed class Dlss5SuiteTests
         Assert.Equal(Dlss5RenoDxPackage.Feeder455, beta.RenoDxPackage);
         Assert.True(beta.InstallFeeder);
         Assert.True(beta.UsesLatestFeederBeta);
-        Assert.Contains("0.14.0-beta.2", beta.ProfileName);
+        Assert.Contains("0.14.0-beta.5", beta.ProfileName);
         Assert.False(beta.PatchFeederForUnifiedName);
     }
 

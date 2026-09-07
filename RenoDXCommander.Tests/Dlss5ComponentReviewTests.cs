@@ -1,6 +1,8 @@
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
+using RenoDXCommander.ViewModels;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Xunit;
@@ -9,6 +11,45 @@ namespace RenoDXCommander.Tests;
 
 public sealed class Dlss5ComponentReviewTests
 {
+    [Fact]
+    public void InstallOperation_CapturesStableGameIdentityBeforeBackgroundRefresh()
+    {
+        var originalRoot = CreateTemporaryDirectory("adas-dlss5-original-root");
+        var refreshedRoot = CreateTemporaryDirectory("adas-dlss5-refreshed-root");
+        try
+        {
+            var card = new GameCardViewModel
+            {
+                GameName = "Generic test game",
+                InstallPath = originalRoot,
+                Source = "Original store",
+                Is32Bit = true,
+            };
+
+            var operation = Dlss5GameOperation.Capture(card);
+
+            card.GameName = "Refreshed card";
+            card.InstallPath = refreshedRoot;
+            card.Source = "Refreshed store";
+            card.Is32Bit = false;
+
+            Assert.Equal("Generic test game", operation.GameName);
+            Assert.Equal(Path.GetFullPath(originalRoot), operation.InstallPath);
+            Assert.Equal("Original store", operation.Source);
+            Assert.True(operation.Is32Bit);
+
+            var service = new Dlss5ComponentService(null!, new NoopCrashReporter(), null!, null!, null!, null!);
+            var deploymentPath = Path.Combine(operation.InstallPath, "bin");
+            Directory.CreateDirectory(deploymentPath);
+            Assert.Empty(service.RemoveOtherManagedDeployments(operation.InstallPath, deploymentPath));
+        }
+        finally
+        {
+            Directory.Delete(originalRoot, recursive: true);
+            Directory.Delete(refreshedRoot, recursive: true);
+        }
+    }
+
     [Fact]
     public void ExperimentalUnifiedFeederRequiresEarlyLoadHooks()
     {
@@ -27,6 +68,236 @@ public sealed class Dlss5ComponentReviewTests
             ProfileName: "Experimental unified");
 
         Assert.True(Dlss5ComponentService.RequiresEarlyLoadSettings(assessment, plan));
+    }
+
+    [Fact]
+    public void NativeEarlyLoad_UsesDeepFriedChickenAndRemovesStaleRenoDxConsumer()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-native-early-load");
+        File.WriteAllText(Path.Combine(root, "sl.interposer.dll"), "streamline");
+        File.WriteAllText(
+            Path.Combine(root, "ReShade.ini"),
+            "[ADDON]\nLoadFromDllMain=other.addon64,renodx-dlss5.addon64\n");
+        var plan = new Dlss5CompatibilityPlan(
+            Dlss5RenoDxPackage.Native470,
+            InstallFeeder: false,
+            InstallDx11Bridge: true,
+            PatchFeederForUnifiedName: false,
+            ProfileName: "native");
+        try
+        {
+            Dlss5ComponentService.EnsureNativeEarlyLoadSettings(
+                root,
+                plan,
+                new Dlss5InstallRecord(),
+                useDeepFriedChicken: true);
+
+            var ini = File.ReadAllText(Path.Combine(root, "ReShade.ini"));
+            Assert.Contains(DeepFriedChickenService.AddonFileName, ini, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(Dlss5ComponentService.BridgeAddon, ini, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("other.addon64", ini, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("renodx-dlss5.addon64", ini, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void NativeEarlyLoad_UsesOnlyNeuralUpstreamForItsProfile()
+    {
+        var root = CreateTemporaryDirectory("adas-neural-upstream-early-load");
+        File.WriteAllText(Path.Combine(root, "sl.interposer.dll"), "streamline");
+        File.WriteAllText(
+            Path.Combine(root, "ReShade.ini"),
+            "[ADDON]\nLoadFromDllMain=other.addon64,renodx-dlss5.addon64,deep-fried-chicken.addon64\n");
+        var plan = Dlss5ComponentService.GetCompatibilityPlan(
+            Dlss5DeploymentMode.NativeDirectX12,
+            is64Bit: true,
+            Dlss5InstallProfile.NeuralUpstream);
+        try
+        {
+            Dlss5ComponentService.EnsureNativeEarlyLoadSettings(
+                root,
+                plan,
+                new Dlss5InstallRecord(),
+                useNeuralUpstream: true);
+
+            var ini = File.ReadAllText(Path.Combine(root, "ReShade.ini"));
+            Assert.Contains(Dlss5ComponentService.NeuralUpstreamAddon, ini, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("other.addon64", ini, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("renodx-dlss5.addon64", ini, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(DeepFriedChickenService.AddonFileName, ini, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DeepFriedChickenConsumerSelection_SurvivesAnIncompleteLegacyInstall(bool is64Bit)
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-consumer-detection");
+        try
+        {
+            var consumerFolder = is64Bit
+                ? ModInstallService.GetAddonDeployPath(root)
+                : Path.Combine(root, "host64");
+            Directory.CreateDirectory(consumerFolder);
+            foreach (var name in DeepFriedChickenService.RequiredFiles)
+                WriteSource(consumerFolder, name, "dfc");
+
+            Assert.True(DeepFriedChickenService.IsSelectedConsumer(root, is64Bit));
+
+            File.Delete(Path.Combine(consumerFolder, DeepFriedChickenService.ConfigFileName));
+            Assert.True(DeepFriedChickenService.IsSelectedConsumer(root, is64Bit));
+
+            WriteSource(consumerFolder, Dlss5ComponentService.RenoDxDeploymentName, "renodx");
+            Assert.False(DeepFriedChickenService.IsSelectedConsumer(root, is64Bit));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RequestedDeepFriedChicken_NeverSilentlyFallsBackWhenImportIsUnavailable()
+    {
+        var cache = CreateTemporaryDirectory("adas-dfc-unavailable");
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                Dlss5ComponentService.ResolveDeepFriedChickenSelection(requested: true, dfc));
+
+            Assert.Contains("import", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(Dlss5ComponentService.ResolveDeepFriedChickenSelection(requested: false, dfc));
+        }
+        finally
+        {
+            Directory.Delete(cache, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DeepFriedChickenImportStatus_RequiresEveryNonEmptyCoreFile()
+    {
+        var cache = CreateTemporaryDirectory("adas-dfc-incomplete-cache");
+        try
+        {
+            WriteSource(cache, DeepFriedChickenService.AddonFileName, "addon");
+            WriteSource(cache, DeepFriedChickenService.NvngxShim, "shim");
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            Assert.False(dfc.IsImported);
+
+            WriteSource(cache, DeepFriedChickenService.ConfigFileName, "");
+            Assert.False(dfc.IsImported);
+        }
+        finally
+        {
+            Directory.Delete(cache, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DeepFriedChickenDefaultArchive_FindsNewestOfficialLookingZip()
+    {
+        var profile = CreateTemporaryDirectory("adas-dfc-download-discovery");
+        var downloads = Path.Combine(profile, "Downloads");
+        var dlss5Downloads = Path.Combine(downloads, "DLSS5");
+        Directory.CreateDirectory(dlss5Downloads);
+        var older = Path.Combine(downloads, "Deep-Fried-Chicken-v1.4.7-alpha.zip");
+        var newer = Path.Combine(dlss5Downloads, "Deep-Fried-Chicken-v1.4.8-alpha.zip");
+        File.WriteAllText(older, "older");
+        File.WriteAllText(newer, "newer");
+        File.SetLastWriteTimeUtc(older, DateTime.UtcNow.AddMinutes(-2));
+        File.SetLastWriteTimeUtc(newer, DateTime.UtcNow);
+
+        try
+        {
+            Assert.Equal(newer, DeepFriedChickenService.FindDefaultArchive(profile));
+        }
+        finally
+        {
+            Directory.Delete(profile, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeepFriedChickenImport_RejectsTamperingWithoutReplacingValidCache()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-tampered-import");
+        var cache = Path.Combine(root, "cache");
+        Directory.CreateDirectory(cache);
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(cache, name, "trusted " + name);
+        WriteSource(cache, "imported-version.txt", "trusted-version");
+        var archive = Path.Combine(root, "Deep-Fried-Chicken-v9.9.9.zip");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            WriteArchiveEntry(zip, DeepFriedChickenService.AddonFileName, "tampered addon");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NvngxShim, "new shim");
+            WriteArchiveEntry(zip, DeepFriedChickenService.ConfigFileName, "new config");
+            WriteArchiveEntry(zip, "SHA256SUMS.txt",
+                $"{Sha256("expected addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+                $"{Sha256("new shim")}  {DeepFriedChickenService.NvngxShim}\n");
+        }
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var error = await dfc.ImportAsync(archive);
+
+            Assert.Contains("SHA-256", error, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("trusted " + DeepFriedChickenService.AddonFileName,
+                File.ReadAllText(dfc.CachedFile(DeepFriedChickenService.AddonFileName)));
+            Assert.Equal("trusted-version", dfc.ImportedVersion);
+            Assert.True(dfc.IsImported);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeepFriedChickenImport_AcceptsChecksummedCoreWithoutCachingOlderBridge()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-valid-import");
+        var cache = Path.Combine(root, "cache");
+        var archive = Path.Combine(root, "Deep-Fried-Chicken-v1.4.8-alpha.zip");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            WriteArchiveEntry(zip, DeepFriedChickenService.AddonFileName, "verified addon");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NvngxShim, "verified shim");
+            WriteArchiveEntry(zip, DeepFriedChickenService.ConfigFileName, "verified config");
+            WriteArchiveEntry(zip, DeepFriedChickenService.Dx11Bridge, "older bridge");
+            WriteArchiveEntry(zip, "SHA256SUMS.txt",
+                $"{Sha256("verified addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+                $"{Sha256("verified shim")}  {DeepFriedChickenService.NvngxShim}\n" +
+                $"{Sha256("older bridge")}  {DeepFriedChickenService.Dx11Bridge}\n");
+        }
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var error = await dfc.ImportAsync(archive);
+
+            Assert.Null(error);
+            Assert.True(dfc.IsImported);
+            Assert.Equal("v1.4.8-alpha", dfc.ImportedVersion);
+            Assert.False(File.Exists(dfc.CachedFile(DeepFriedChickenService.Dx11Bridge)));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
@@ -344,7 +615,7 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Theory]
-    [InlineData(Dlss5DeploymentMode.Dx9Feeder, false)]      // 32-bit Feeder host route (e.g. F.E.A.R.)
+    [InlineData(Dlss5DeploymentMode.Dx9Feeder, false)]      // 32-bit Feeder host route
     [InlineData(Dlss5DeploymentMode.Dx12Feeder, true)]      // 64-bit Feeder route
     [InlineData(Dlss5DeploymentMode.NativeDirectX12, true)] // 64-bit native / non-Feeder route
     public void VerifyInstallation_WhenDeepFriedChickenFilesPresent_DoesNotDemandRenoDxConsumer(
@@ -388,7 +659,7 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Theory]
-    [InlineData(Dlss5DeploymentMode.Dx9Feeder, false)]      // 32-bit Feeder host route (e.g. F.E.A.R.)
+    [InlineData(Dlss5DeploymentMode.Dx9Feeder, false)]      // 32-bit Feeder host route
     [InlineData(Dlss5DeploymentMode.Dx12Feeder, true)]      // 64-bit Feeder route
     [InlineData(Dlss5DeploymentMode.NativeDirectX12, true)] // 64-bit native / non-Feeder route
     public void VerifyInstallation_WhenDeepFriedChickenRecordedButFilesMissing_FlagsDfcNotRenoDx(
@@ -497,6 +768,90 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public void RemoveIncompatibleDlssAddons_NeuralUpstreamRetiresEveryCompetingConsumer()
+    {
+        var root = CreateTemporaryDirectory("adas-neural-upstream-exclusive");
+        var addonPath = ModInstallService.GetAddonDeployPath(root);
+        Directory.CreateDirectory(addonPath);
+        WriteSource(addonPath, Dlss5ComponentService.NeuralUpstreamAddon, "upstream");
+        WriteSource(addonPath, Dlss5ComponentService.RenoDxDeploymentName, "renodx");
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(addonPath, name, "dfc");
+        var record = new Dlss5InstallRecord();
+        var plan = Dlss5ComponentService.GetCompatibilityPlan(
+            Dlss5DeploymentMode.NativeDirectX12,
+            is64Bit: true,
+            Dlss5InstallProfile.NeuralUpstream);
+        try
+        {
+            Dlss5ComponentService.RemoveIncompatibleDlssAddons(
+                root, addonPath, plan, record, useNeuralUpstream: true);
+
+            Assert.True(File.Exists(Path.Combine(addonPath, Dlss5ComponentService.NeuralUpstreamAddon)));
+            Assert.False(File.Exists(Path.Combine(addonPath, Dlss5ComponentService.RenoDxDeploymentName)));
+            Assert.All(DeepFriedChickenService.RequiredFiles,
+                name => Assert.False(File.Exists(Path.Combine(addonPath, name))));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void VerifyInstallation_NeuralUpstreamRequiresItsAddonInsteadOfRenoDx()
+    {
+        var root = CreateTemporaryDirectory("adas-neural-upstream-verify");
+        try
+        {
+            WriteSource(root, "dxgi.dll", "reshade");
+            WriteSource(root, "nvngx_dlssnr.dll", "nr runtime");
+            var addonPath = ModInstallService.GetAddonDeployPath(root);
+            Directory.CreateDirectory(addonPath);
+            WriteSource(addonPath, Dlss5ComponentService.NeuralUpstreamAddon, "upstream");
+            Dlss5ComponentService.SaveRecord(root, new Dlss5InstallRecord
+            {
+                Mode = Dlss5DeploymentMode.NativeDirectX12,
+                Profile = Dlss5InstallProfile.NeuralUpstream,
+                ComponentVersion = "Neural Upstream 0.3.0",
+                InstalledAtUtc = DateTime.UtcNow,
+            });
+
+            var problems = Dlss5DiagnosticService.VerifyInstallation(
+                root, Dlss5DeploymentMode.NativeDirectX12, is64Bit: true);
+
+            Assert.DoesNotContain(problems,
+                problem => problem.Contains("renodx", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(problems,
+                problem => problem.Contains(Dlss5ComponentService.NeuralUpstreamAddon, StringComparison.OrdinalIgnoreCase));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void VerifyInstallation_NeuralUpstreamReportsMissingModelRuntime()
+    {
+        var root = CreateTemporaryDirectory("adas-neural-upstream-runtime-missing");
+        try
+        {
+            WriteSource(root, "dxgi.dll", "reshade");
+            var addonPath = ModInstallService.GetAddonDeployPath(root);
+            Directory.CreateDirectory(addonPath);
+            WriteSource(addonPath, Dlss5ComponentService.NeuralUpstreamAddon, "upstream");
+            Dlss5ComponentService.SaveRecord(root, new Dlss5InstallRecord
+            {
+                Mode = Dlss5DeploymentMode.NativeDirectX12,
+                Profile = Dlss5InstallProfile.NeuralUpstream,
+                ComponentVersion = "Neural Upstream 0.3.0",
+                InstalledAtUtc = DateTime.UtcNow,
+            });
+
+            var problems = Dlss5DiagnosticService.VerifyInstallation(
+                root, Dlss5DeploymentMode.NativeDirectX12, is64Bit: true);
+
+            Assert.Contains(problems, problem => problem.Contains("nvngx_dlssnr.dll", StringComparison.OrdinalIgnoreCase));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
     public void DeepFriedChicken_RealDeployThenVerify_AgreeOnConsumerForFeederHostRoute()
     {
         var root = CreateTemporaryDirectory("adas-dfc-e2e");
@@ -549,6 +904,10 @@ public sealed class Dlss5ComponentReviewTests
             foreach (var name in DeepFriedChickenService.RequiredFiles)
                 Assert.True(File.Exists(Path.Combine(hostDir, name)), $"deploy should place {name}");
             Assert.False(File.Exists(Path.Combine(hostDir, Renodx5AddonService.AddonFileName)));
+            Assert.Contains(
+                $"LoadFromDllMain={DeepFriedChickenService.AddonFileName}",
+                File.ReadAllText(Path.Combine(hostDir, "ReShade.ini")),
+                StringComparison.OrdinalIgnoreCase);
 
             // The real verifier agrees: it never demands RenoDX and never reports a DFC file missing.
             var problems = Dlss5DiagnosticService.VerifyInstallation(root, Dlss5DeploymentMode.Dx11Feeder, is64Bit: false);
@@ -1091,6 +1450,9 @@ public sealed class Dlss5ComponentReviewTests
         using var writer = new StreamWriter(archive.CreateEntry(name).Open());
         writer.Write(content);
     }
+
+    private static string Sha256(string content)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
 
     private sealed class NoopCrashReporter : ICrashReporter
     {

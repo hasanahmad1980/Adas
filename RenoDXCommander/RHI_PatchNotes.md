@@ -1,3 +1,19 @@
+## v2.6.35 — DLSS 5 upstream refresh and consumer routing (2026-09-07)
+
+### Upstream component refresh
+
+- Updated the matched Feeder beta set to **0.14.0-beta.5**. Upstream beta.5 disables all versioned RenoDX copies so two neural consumers can't run at once, replaces misleading "hardware" NGX errors with specific process-blocked / GPU-architecture diagnostics, adds a UAV-less 64-bit shared-output texture fallback, adds GPU-hang frame-phase diagnostics, hardens the Vulkan teardown path, and improves the verifier's executable and dgVoodoo2 detection. The `DLSS5_Feed.fx` shader and both Vulkan fallback layers are unchanged from beta.4; only the add-ons and the 32-bit host binary moved.
+- Updated **Standalone AIO** to the stable **2.0.9** release. It folds in the 2.0.7 adaptive GPU-pressure governor and adds a source-resolution override, DPI virtualization correction, live color-profile switching, and selectable neural-rendering pass counts. Only the add-on and its proxy `nvngx.dll` changed; the AIO feed shader is byte-identical to 2.0.7-experimental.1.
+- Updated the verified **OneClick** helper launch to **0.11.23**, which fixes Red Dead Redemption 2 being misdetected as DirectX 9 and improves renderer detection using modern-API markers (`ffx_fsr2_api_dx12_x64.dll`, `nvlowlatencyvk.dll`).
+- Reconciled the `tools/build-adas.ps1` payload manifest with the shipped assets: refreshed the Feeder beta filenames/hashes to beta.5, the AIO add-on/nvngx hashes to 2.0.9, and corrected the stale `dlss5-bridge.addon64` hash to match the reviewed 1.4.12 asset.
+
+### Consumer routing
+
+- Added the optional **Neural Upstream 0.3.0** profile for 64-bit native DirectX 12 games that already use DLSS. It installs the pinned `nvngx.dll.addon64` release asset, keeps the game's own DLSS runtime, and verifies the required `nvngx_dlssnr.dll` model/runtime.
+- Neural Upstream is an exclusive route: Adas removes competing RenoDX, Deep Fried Chicken, OptiScaler, and other managed NGX hooks with recoverable backups. Its ReShade Add-ons panel provides the controls; Quality cadence is recommended when Frame Generation stutters.
+- Deep Fried Chicken imports now require the archive's SHA256SUMS.txt, cache atomically, and deploy only the three files Adas owns. Its older `dlss5-dx11-bridge.addon64` is never deployed because that filename collides with RenoDX's obsolete bridge.
+- DLSS 5 operations now use a stable snapshot of each game's full path and store identity, so background library refreshes cannot move an install into another game's folder.
+
 ## v2.6.34 — Full game cleanup and reliable folder confirmation
 
 - Fixed **Install anyway** for games with multiple executable folders. A folder explicitly chosen by the user now clears only the folder-resolution blocker while retaining real safety blocks such as anti-cheat detection.
@@ -8,8 +24,8 @@
 ## v2.6.33 — Current DLSS 5 components and simple native controls
 
 - Updated standalone AIO to **2.0.4-experimental.1**, including its buffered presentation path and improved windowed DLAA detection.
-- Updated DLSS5 Bridge to **1.4.11**, including recovery from temporary GPU stalls instead of disabling neural rendering for the rest of the session.
-- Updated the complete matched Feeder beta set to **0.14.0-beta.2**, including the matched 32-bit host protocol, deadlock recovery, D3D11 crash breadcrumbs, and stricter ReShade add-on validation.
+- Updated DLSS5 Bridge to **1.4.12**, including Vulkan `R16_FLOAT` exposure support and decoupled input/output format handling.
+- Updated the complete matched Feeder beta set to **0.14.0-beta.4**, including the matched 32-bit host protocol and the helper-window resize/deadlock fixes from upstream.
 - Added managed **DLSS 5 OpenGL Bridge 1.0.5**, verified **OneClick 0.11.13** launch, and a separate **mainline OptiScaler beta/nightly** install choice.
 - Ported the essential RHI 2.6.1 reliability changes without restoring its UI: zero-byte DLSS runtimes are rejected and current D3D12 game/config overrides are included.
 - Added simple persistent neural-rendering and appearance controls for the native stable and ShortFuse experimental routes. The full ReShade interface is no longer required for normal on/off configuration.

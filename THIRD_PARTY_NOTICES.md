@@ -20,13 +20,22 @@ Copyright (c) 2026 Jean-Laurent ROUZIES
 
 Portions derived from DLSS5 Bridge, Copyright (c) 2026 NIGos (MIT).
 
-Adas bundles the author's matched stable `v0.7.0` release set and separately bundles the matched `v0.13.1-beta.1` test set. The beta's x86 add-on and x64 host use protocol v7 and are never mixed with stable protocol-v2 files. Only when the user selects the experimental unified RenoDX profile with stable Feeder does Adas change the null-terminated filename probe in the x64 add-on/host from `renodx-dlss5.addon64` to `renodx-dlss.addon64`; code and protocol data are unchanged.
+Adas bundles the author's matched stable `v0.7.0` release set and separately bundles the matched `v0.14.0-beta.5` test set. The beta's x86 add-on and x64 host use protocol v7 and are never mixed with stable protocol-v2 files. Only when the user selects the experimental unified RenoDX profile with stable Feeder does Adas change the null-terminated filename probe in the x64 add-on/host from `renodx-dlss5.addon64` to `renodx-dlss.addon64`; code and protocol data are unchanged.
 
 ## DLSS5 Bridge
 
 Source: <https://github.com/NIGos/dlss5-bridge>
 
-Copyright (c) 2026 NIGos. Licensed under the MIT License. Adas bundles release 1.4.8 for the recommended native DirectX 11 and native Vulkan mirror routes.
+Copyright (c) 2026 NIGos. Licensed under the MIT License. Adas bundles release 1.4.12 for the recommended native DirectX 11 and native Vulkan mirror routes.
+
+## Neural Upstream
+
+Source: <https://github.com/matiasLombo/neural-upstream>
+
+Copyright (c) 2026 matiasLombo. Licensed under the MIT License. Adas bundles the
+author's `v0.3.0` `nvngx.dll.addon64` release asset, pinned by SHA-256, for the
+separate 64-bit native DirectX 12 Neural Upstream profile. It is not installed
+beside RenoDX, Deep Fried Chicken, OptiScaler or another NGX hook.
 
 ## MFG Ada Unlock
 

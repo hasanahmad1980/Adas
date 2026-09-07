@@ -59,6 +59,16 @@
 
 #include "ReShade.fxh"
 
+// D3D9 is not a target. The add-on attaches to D3D10/11/12, OpenGL and Vulkan runtimes only,
+// so if ReShade is on its DirectX 9 backend the effect could never be fed anyway -- and the
+// geometric-fit solver below cannot compile there (SM3 has no tex2Dfetch and must unroll the
+// [loop]s over dynamically indexed arrays, which is the "error X3531: can't unroll loops
+// marked with loop attribute" of issue #56). Say which of those two facts the user is looking
+// at, because the compiler error alone sends people hunting through their shader list.
+#if __RENDERER__ < 0xA000
+    #error "DLSS5_Feed needs D3D10 or newer, and ReShade has loaded its DirectX 9 backend. For a D3D9 game the dgVoodoo2 wrapper must be in effect first (check DisableAndPassThru=false in dgVoodoo.conf); see the README's 'Install for a DirectX 9 game' section. A 64-bit D3D9 game does not need this add-on at all -- renodx-dlss handles those on its own."
+#endif
+
 // Expose ReShade's completed frame to the add-on as an SRV. The 64-bit D3D11 path
 // uses this only when its work-resolution control is below 100%; no extra pass or
 // copy is introduced by this declaration.

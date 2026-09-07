@@ -1,4 +1,4 @@
-# Standalone AIO in Adas 2.6.18
+# Standalone AIO in Adas
 
 ## Decision
 
@@ -29,7 +29,7 @@ Adas obtains and places the files, preserves backups and verifies the installati
 Existing `nvngx.dll` or non-ReShade wrappers block installation rather than being overwritten.
 Shared external add-on folders/presets must be changed to game-local paths first.
 
-AIO 2.0.3 and its reviewed VORT motion bundle are packaged with Adas. Installation is offline and the local cache is populated from the verified installer payload.
+AIO 2.0.9 and its reviewed VORT motion bundle are packaged with Adas. Installation is offline and the local cache is populated from the verified installer payload. The adaptive GPU-pressure governor that 2.0.9 folds in from the 2.0.7 experimental build is not forced on by Adas, which does not change its per-game preference. The AIO feed shader is unchanged from 2.0.7-experimental.1; only the add-on and its proxy nvngx.dll moved.
 Vulkan needs an already-registered 64-bit ReShade layer. Adas does not silently register or
 remove a system-wide layer as part of this AIO profile.
 

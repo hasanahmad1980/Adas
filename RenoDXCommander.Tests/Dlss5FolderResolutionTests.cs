@@ -8,14 +8,14 @@ namespace RenoDXCommander.Tests;
 
 public sealed class Dlss5FolderResolutionTests
 {
-    // Reproduces the F.E.A.R. 2 shape: game .exe at the root plus an uninstaller in
+    // Reproduces a common game layout: game .exe at the root plus an uninstaller in
     // an \Uninstall subfolder. The uninstaller folder must NOT create a false
     // "multiple equally likely game binary folders" ambiguity.
     [Fact]
     public void ResolveDeploymentPath_IgnoresUninstallerFolder()
     {
         using var temp = new TempDir();
-        File.WriteAllText(Path.Combine(temp.Path, "FEAR2.exe"), "stub");
+        File.WriteAllText(Path.Combine(temp.Path, "Game.exe"), "stub");
         File.WriteAllText(Path.Combine(temp.Path, "language_setup.exe"), "stub");
         Directory.CreateDirectory(Path.Combine(temp.Path, "Uninstall"));
         File.WriteAllText(Path.Combine(temp.Path, "Uninstall", "unins000.exe"), "stub");

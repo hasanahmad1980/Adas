@@ -9,9 +9,9 @@ public sealed class Dlss5UpstreamRefreshTests
     [Fact]
     public void RequestedUpstreamOptionsArePinnedAndRendererScoped()
     {
-        Assert.Equal("0.14.0-beta.2", Dlss5ComponentService.BundledFeederBetaVersion);
+        Assert.Equal("0.14.0-beta.5", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
-        Assert.Equal("0.11.15", Dlss5ComponentService.OneClickVersion);
+        Assert.Equal("0.11.23", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, false));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.Dx11Feeder, true));
@@ -21,6 +21,76 @@ public sealed class Dlss5UpstreamRefreshTests
         Assert.True(plan.InstallOpenGlBridge);
         Assert.False(plan.InstallFeeder);
         Assert.Contains("1.0.5", plan.ProfileName, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(null, false)]
+    public void VulkanImplicitLayerDisabledRegistrationIsNotReportedAsInstalled(object? registryValue, bool expected)
+        => Assert.Equal(expected, VulkanLayerService.IsEnabledRegistryValue(registryValue));
+
+    [Fact]
+    public void BundledFeederBetaPayloadIsTheMatchedBeta5Set()
+    {
+        var assetRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5");
+        var expected = new[]
+        {
+            "dlss5-feed-0.14.0-beta.5.addon64",
+            "dlss5-feed-0.14.0-beta.5.addon32",
+            "dlss5-feed-host64-0.14.0-beta.5.exe",
+            "DLSS5_Feed-0.14.0-beta.5.fx",
+            "feed-vk-layer-0.14.0-beta.5-x64.zip",
+            "feed-vk-layer-0.14.0-beta.5-x86.zip",
+        };
+
+        foreach (var name in expected)
+            Assert.True(File.Exists(Path.Combine(assetRoot, name)), $"Missing packaged beta payload: {name}");
+
+        using var layer = System.IO.Compression.ZipFile.OpenRead(Path.Combine(assetRoot, expected[4]));
+        Assert.Contains(layer.Entries, entry => entry.Name.Equals("VkLayer_feed_vk.dll", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(layer.Entries, entry => entry.Name.Equals("VkLayer_feed_vk.json", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BundledBridgeMatchesThePinned14Release()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5", Dlss5ComponentService.BridgeAddon);
+        Assert.Equal(Dlss5ComponentService.BridgeSha256, FileHelper.ComputeSha256(path), ignoreCase: true);
+    }
+
+    [Theory]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12, true, true)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12, false, false)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX11, true, false)]
+    [InlineData(Dlss5DeploymentMode.Dx12Feeder, true, false)]
+    [InlineData(Dlss5DeploymentMode.NativeVulkan, true, false)]
+    public void NeuralUpstreamIsLimitedToItsPublishedNativeDx12Contract(
+        Dlss5DeploymentMode mode, bool is64Bit, bool expected)
+        => Assert.Equal(expected, Dlss5ComponentService.SupportsNeuralUpstream(mode, is64Bit));
+
+    [Fact]
+    public void NeuralUpstreamReleaseIsPinnedAndIntegrityChecked()
+    {
+        Assert.Equal("0.3.0", Dlss5ComponentService.NeuralUpstreamVersion);
+        Assert.Equal("nvngx.dll.addon64", Dlss5ComponentService.NeuralUpstreamAddon);
+        var asset = Path.Combine(
+            AppContext.BaseDirectory, "Assets", "DLSS5", Dlss5ComponentService.NeuralUpstreamAddon);
+        Dlss5ComponentService.ValidateNeuralUpstreamAsset(asset);
+    }
+
+    [Fact]
+    public void NeuralUpstreamPlanLeavesRenoDxAndFeederOutOfTheRoute()
+    {
+        var plan = Dlss5ComponentService.GetCompatibilityPlan(
+            Dlss5DeploymentMode.NativeDirectX12,
+            is64Bit: true,
+            Dlss5InstallProfile.NeuralUpstream);
+
+        Assert.False(plan.InstallFeeder);
+        Assert.False(plan.InstallDx11Bridge);
+        Assert.False(plan.InstallOpenGlBridge);
+        Assert.Contains("Neural Upstream 0.3.0", plan.ProfileName, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -44,6 +114,8 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5DeploymentMode.Dx10Feeder, false, Dlss5InstallProfile.MaximumQuality, Dlss5InstallProfile.LatestFeederBeta)]
     [InlineData(Dlss5DeploymentMode.VulkanFeeder, false, Dlss5InstallProfile.MaximumQuality, Dlss5InstallProfile.LatestFeederBeta)]
     [InlineData(Dlss5DeploymentMode.NativeVulkan, true, Dlss5InstallProfile.ExperimentalUnified, Dlss5InstallProfile.MaximumQuality)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX11, true, Dlss5InstallProfile.NeuralUpstream, Dlss5InstallProfile.MaximumQuality)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12, true, Dlss5InstallProfile.NeuralUpstream, Dlss5InstallProfile.NeuralUpstream)]
     [InlineData(Dlss5DeploymentMode.Dx11Feeder, true, Dlss5InstallProfile.MaximumQuality, Dlss5InstallProfile.MaximumQuality)]
     public void ProfileNormalizationRunsBeforeRepairConflictChecks(
         Dlss5DeploymentMode mode,
@@ -106,15 +178,17 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.12.1-beta.1", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.13.1-beta.1", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.1", true)]
-    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.2", false)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.4", true)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.5", false)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 1.7.24", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.3", true)]
-    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.7-experimental.1", false)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.7-experimental.1", true)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.9", false)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.1.2", true)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.2.0", false)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.7", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.8", true)]
-    [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.11", false)]
+    [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.12", false)]
     public void DashboardFlagsOnlySupersededManagedComponentSets(
         Dlss5InstallProfile profile, Dlss5DeploymentMode mode, string version, bool expected)
         => Assert.Equal(expected, Dlss5ComponentService.IsComponentUpdateAvailable(new Dlss5InstallRecord
@@ -127,7 +201,7 @@ public sealed class Dlss5UpstreamRefreshTests
     [Fact]
     public void ExclusivePipelinesCanRepairButMustBeRemovedBeforeSwitching()
     {
-        foreach (var profile in new[] { Dlss5InstallProfile.StandaloneAio, Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5InstallProfile.OptiScalerNrBeforeSr })
+        foreach (var profile in new[] { Dlss5InstallProfile.StandaloneAio, Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5InstallProfile.OptiScalerNrBeforeSr, Dlss5InstallProfile.NeuralUpstream })
         {
             Assert.False(Dlss5ComponentService.RequiresPipelineRemoval(null, profile));
             Assert.False(Dlss5ComponentService.RequiresPipelineRemoval(profile, profile));

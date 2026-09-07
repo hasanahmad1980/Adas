@@ -84,8 +84,12 @@ public static class VulkanLayerService
             using var key = registryHive.OpenSubKey(registryKeyPath, writable: false);
             if (key == null) return false;
 
+            // Vulkan's implicit-layer registry uses DWORD 0 for enabled and
+            // DWORD 1 for disabled. Treat a disabled registration as absent:
+            // this is especially important for 32-bit DXVK games, which read
+            // the Registry32 view independently of the 64-bit view.
             var value = key.GetValue(manifestPath);
-            if (value == null) return false;
+            if (value == null || !IsEnabledRegistryValue(value)) return false;
 
             // Check manifest file
             if (!File.Exists(manifestPath)) return false;
@@ -98,6 +102,19 @@ public static class VulkanLayerService
         catch (Exception ex)
         {
             CrashReporter.Log($"[VulkanLayerService.IsLayerInstalled] Error checking layer status — {ex.Message}");
+            return false;
+        }
+    }
+
+    internal static bool IsEnabledRegistryValue(object? value)
+    {
+        if (value is null) return false;
+        try
+        {
+            return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) == 0;
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+        {
             return false;
         }
     }

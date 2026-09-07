@@ -24,7 +24,8 @@ public sealed partial class Dlss5ComponentService
     internal static bool RequiresPipelineRemoval(Dlss5InstallProfile? installed, Dlss5InstallProfile selected)
         => installed.HasValue && installed != selected
             && (IsOptiScalerNrProfile(installed) || IsOptiScalerNrProfile(selected)
-                || installed == Dlss5InstallProfile.StandaloneAio || selected == Dlss5InstallProfile.StandaloneAio);
+                || installed == Dlss5InstallProfile.StandaloneAio || selected == Dlss5InstallProfile.StandaloneAio
+                || installed == Dlss5InstallProfile.NeuralUpstream || selected == Dlss5InstallProfile.NeuralUpstream);
 
     internal static string? OptiScalerNrDestination(string relative)
     {

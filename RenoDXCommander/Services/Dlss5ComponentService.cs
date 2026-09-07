@@ -40,16 +40,20 @@ public sealed partial class Dlss5ComponentService
 
     private const string FeederRepo = "jlrouzies-fr/DLSS5-Feeder";
     private const string BundledRenoDxVersion = "SF-2026-09-02";
-    private const string RenoDxDeploymentName = "renodx-dlss5.addon64";
+    internal const string RenoDxDeploymentName = "renodx-dlss5.addon64";
     private const string NativeRenoDxAsset = "renodx-dlss5-4.70.addon64";
     private const string FeederRenoDxAsset = "renodx-dlss5-4.55.addon64";
     private const string NativeRenoDxVersion = "stable-v4.70";
     private const string FeederRenoDxVersion = "feeder-pinned-v4.55";
-    internal const string BridgeVersion = "v1.4.11";
+    internal const string BridgeVersion = "v1.4.12";
+    internal const string BridgeSha256 = "4F2ACECC1026AE89AC0B92767BE66CEEA2662AD0EF88710B89C7DA7840D548D4";
     private const string BundledFeederVersion = "0.7.0";
-    internal const string BundledFeederBetaVersion = "0.14.0-beta.2";
+    internal const string BundledFeederBetaVersion = "0.14.0-beta.5";
     internal const string OpenGlBridgeVersion = "1.0.5";
-    internal const string OneClickVersion = "0.11.15";
+    internal const string NeuralUpstreamVersion = "0.3.0";
+    internal const string NeuralUpstreamAddon = "nvngx.dll.addon64";
+    internal const string NeuralUpstreamSha256 = "43C00412EB07339FBBEECEA62C5D0C96595F7A7B5E41C4CC4A948618C2A100EC";
+    internal const string OneClickVersion = "0.11.23";
     private const string BundledStableReShadeVersion = "6.8.0";
     private const string BundledLegacyReShadeVersion = "6.3.3";
     private const string DgVoodooRepo = "dege-diosg/dgVoodoo2";
@@ -79,6 +83,16 @@ public sealed partial class Dlss5ComponentService
         bool is64Bit,
         Dlss5InstallProfile profile = Dlss5InstallProfile.MaximumQuality)
     {
+        if (profile == Dlss5InstallProfile.NeuralUpstream && SupportsNeuralUpstream(mode, is64Bit))
+        {
+            return new(
+                Dlss5RenoDxPackage.Native470,
+                InstallFeeder: false,
+                InstallDx11Bridge: false,
+                PatchFeederForUnifiedName: false,
+                ProfileName: $"Neural Upstream {NeuralUpstreamVersion} (beta)");
+        }
+
         if (profile == Dlss5InstallProfile.OpenGlBridge && SupportsOpenGlBridge(mode, is64Bit))
         {
             return new(
@@ -150,6 +164,7 @@ public sealed partial class Dlss5ComponentService
             Dlss5InstallProfile.OptiScalerNrBeforeSr => !version.Contains(OptiScalerSplitVersion, StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.LatestFeederBeta => !version.Contains($"Feeder {BundledFeederBetaVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.OpenGlBridge => !version.Contains($"OpenGL Bridge {OpenGlBridgeVersion}", StringComparison.OrdinalIgnoreCase),
+            Dlss5InstallProfile.NeuralUpstream => false,
             Dlss5InstallProfile.MaximumQuality when record.Mode is Dlss5DeploymentMode.NativeDirectX11 or Dlss5DeploymentMode.NativeVulkan
                 => !version.Contains($"Bridge {BridgeVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.MaximumQuality when IsFeederMode(record.Mode)
@@ -299,6 +314,8 @@ public sealed partial class Dlss5ComponentService
         };
         if (renoDxNames.Any(name => HasCompatibleAddon(deploymentPath, addonPath, name, is32Bit: false)))
             return Dlss5DeploymentMode.NativeDirectX12;
+        if (HasCompatibleAddon(deploymentPath, addonPath, NeuralUpstreamAddon, is32Bit: false))
+            return Dlss5DeploymentMode.NativeDirectX12;
         return Dlss5DeploymentMode.None;
     }
 
@@ -378,13 +395,18 @@ public sealed partial class Dlss5ComponentService
 
         progress?.Report(("Preparing author-published components...", 5));
         var compatibilityPlan = GetCompatibilityPlan(assessment.Mode, assessment.Is64Bit, profile);
+        var useNeuralUpstream = profile == Dlss5InstallProfile.NeuralUpstream;
         // Manual mode can override the profile's recommended neural consumer (e.g. force the
         // feeder-pinned v4.55 or the native/latest v4.70) without changing the curated profile.
         if (overrides?.RenoDxPackage is { } renoDxOverride)
             compatibilityPlan = compatibilityPlan with { RenoDxPackage = renoDxOverride };
         // Deep Fried Chicken is an alternative neural consumer, imported locally (never bundled).
         // When chosen it is deployed wherever the RenoDX consumer would go, replacing it.
-        var useDfc = overrides?.DeepFriedChicken == true && _deepFriedChicken?.IsImported == true;
+        var useDfc = ResolveDeepFriedChickenSelection(
+            overrides?.DeepFriedChicken == true,
+            _deepFriedChicken);
+        if (useNeuralUpstream && useDfc)
+            throw new InvalidOperationException("Neural Upstream and Deep Fried Chicken are separate consumers. Select only one route.");
         StagedComponent? staged = null;
         if (compatibilityPlan.InstallFeeder)
             staged = await EnsureStagedAsync(assessment.Mode, assessment.Is64Bit, profile, cancellationToken).ConfigureAwait(false);
@@ -414,11 +436,15 @@ public sealed partial class Dlss5ComponentService
             if (!_renodx5AddonService.IsStagingReady)
                 throw new InvalidOperationException("The experimental unified RenoDX DLSS add-on could not be staged. No suite files were installed.");
         }
-        else
+        else if (!useNeuralUpstream)
         {
             if (!File.Exists(selectedStableRenoDx))
                 throw new FileNotFoundException($"The required {compatibilityPlan.ProfileName} RenoDX package is missing from Adas.", selectedStableRenoDx);
             ValidateComponent(Path.GetFileName(selectedStableRenoDx), selectedStableRenoDx);
+        }
+        else
+        {
+            ValidateNeuralUpstreamAsset(Path.Combine(GetBundledComponentDirectory(), NeuralUpstreamAddon));
         }
         if (compatibilityPlan.InstallDx11Bridge)
         {
@@ -510,12 +536,19 @@ public sealed partial class Dlss5ComponentService
         {
             // Deploy the imported Deep Fried Chicken consumer into the same add-on folder Adas
             // resolved for this game; RenoDX is dropped below by RemoveIncompatibleDlssAddons.
-            foreach (var name in _deepFriedChicken!.DeployFiles(includeDx11Bridge: false))
+            foreach (var name in _deepFriedChicken!.DeployFiles())
             {
                 var dfcDestination = Path.Combine(addonDeployPath, name);
                 InstallTrackedFile(_deepFriedChicken.CachedFile(name), dfcDestination, path, record);
                 installed.Add(dfcDestination);
             }
+        }
+        else if (assessment.Is64Bit && useNeuralUpstream)
+        {
+            var upstreamSource = Path.Combine(GetBundledComponentDirectory(), NeuralUpstreamAddon);
+            var upstreamDestination = Path.Combine(addonDeployPath, NeuralUpstreamAddon);
+            InstallTrackedFile(upstreamSource, upstreamDestination, path, record);
+            installed.Add(upstreamDestination);
         }
         else if (assessment.Is64Bit)
         {
@@ -541,18 +574,20 @@ public sealed partial class Dlss5ComponentService
             InstallTrackedFile(bundledOpenGlBridge, bridgeDestination, path, record);
             installed.Add(bridgeDestination);
         }
-        RemoveIncompatibleDlssAddons(path, addonDeployPath, compatibilityPlan, record, useDfc);
+        RemoveIncompatibleDlssAddons(path, addonDeployPath, compatibilityPlan, record, useDfc, useNeuralUpstream);
         RepairReShadeAddonState(path);
         if (assessment.Is64Bit && compatibilityPlan.UsesExperimentalUnified)
             EnsureUnifiedRenoDxSettings(path, record);
-        if (assessment.Is64Bit && compatibilityPlan.RenoDxPackage == Dlss5RenoDxPackage.Native470)
+        if (assessment.Is64Bit && !useNeuralUpstream && compatibilityPlan.RenoDxPackage == Dlss5RenoDxPackage.Native470)
             EnsureStableRenoDxSettings(path, record);
         if (RequiresEarlyLoadSettings(assessment, compatibilityPlan))
             EnsureNativeEarlyLoadSettings(
                 path,
                 compatibilityPlan,
                 record,
-                force: assessment.Mode == Dlss5DeploymentMode.NativeVulkan);
+                force: assessment.Mode == Dlss5DeploymentMode.NativeVulkan,
+                useDeepFriedChicken: useDfc,
+                useNeuralUpstream: useNeuralUpstream);
         if (assessment.Mode == Dlss5DeploymentMode.NativeVulkan)
             EnsureTrackedConfig(Path.Combine(path, BridgeConfig), NativeVulkanBridgeDefaults, path, record);
 
@@ -1031,6 +1066,17 @@ public sealed partial class Dlss5ComponentService
     internal static bool SupportsOpenGlBridge(Dlss5DeploymentMode mode, bool is64Bit)
         => is64Bit && mode == Dlss5DeploymentMode.OpenGlFeeder;
 
+    internal static bool SupportsNeuralUpstream(Dlss5DeploymentMode mode, bool is64Bit)
+        => is64Bit && mode == Dlss5DeploymentMode.NativeDirectX12;
+
+    internal static void ValidateNeuralUpstreamAsset(string path)
+    {
+        if (!File.Exists(path)
+            || !FileHelper.ComputeSha256(path).Equals(NeuralUpstreamSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"Neural Upstream {NeuralUpstreamVersion} is missing or failed its SHA-256 integrity check.");
+        ValidatePortableExecutable(path, 64 * 1024, NeuralUpstreamAddon, expectedMachine: 0x8664);
+    }
+
     internal static bool IsUsableRuntimeFile(string path)
     {
         try
@@ -1211,7 +1257,8 @@ public sealed partial class Dlss5ComponentService
 
         // The beta applies only to Feeder routes. The unified ShortFuse package
         // does not replace the native Vulkan bridge contract.
-        if ((!IsFeederMode(mode) && profile == Dlss5InstallProfile.LatestFeederBeta)
+        if ((profile == Dlss5InstallProfile.NeuralUpstream && !SupportsNeuralUpstream(mode, is64Bit))
+            || (!IsFeederMode(mode) && profile == Dlss5InstallProfile.LatestFeederBeta)
             || (profile == Dlss5InstallProfile.OpenGlBridge && !SupportsOpenGlBridge(mode, is64Bit))
             || (mode == Dlss5DeploymentMode.NativeVulkan
                 && profile == Dlss5InstallProfile.ExperimentalUnified))
@@ -1818,24 +1865,50 @@ public sealed partial class Dlss5ComponentService
         string root,
         Dlss5CompatibilityPlan compatibilityPlan,
         Dlss5InstallRecord record,
-        bool force = false)
+        bool force = false,
+        bool useDeepFriedChicken = false,
+        bool useNeuralUpstream = false)
+        => EnsureEarlyLoadSettings(
+            root,
+            root,
+            compatibilityPlan,
+            record,
+            force,
+            useDeepFriedChicken,
+            useNeuralUpstream);
+
+    private static void EnsureEarlyLoadSettings(
+        string ownershipRoot,
+        string settingsDirectory,
+        Dlss5CompatibilityPlan compatibilityPlan,
+        Dlss5InstallRecord record,
+        bool force,
+        bool useDeepFriedChicken,
+        bool useNeuralUpstream)
     {
-        if (!force && !File.Exists(Path.Combine(root, "sl.interposer.dll"))) return;
-        var reShadeIniPath = Path.Combine(root, "ReShade.ini");
+        if (!force && !File.Exists(Path.Combine(settingsDirectory, "sl.interposer.dll"))) return;
+        var reShadeIniPath = Path.Combine(settingsDirectory, "ReShade.ini");
         var ini = IniTextDocument.Load(reShadeIniPath);
         ini.TryGetValue("ADDON", "LoadFromDllMain", out var existing);
         var values = (existing?.Text ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(value => !value.Equals(RenoDxDeploymentName, StringComparison.OrdinalIgnoreCase)
+                && !value.Equals(Renodx5AddonService.AddonFileName, StringComparison.OrdinalIgnoreCase)
+                && !value.Equals(DeepFriedChickenService.AddonFileName, StringComparison.OrdinalIgnoreCase)
+                && !value.Equals(NeuralUpstreamAddon, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var renoDxName = compatibilityPlan.UsesExperimentalUnified
-            ? Renodx5AddonService.AddonFileName
-            : RenoDxDeploymentName;
-        if (!values.Contains(renoDxName, StringComparer.OrdinalIgnoreCase))
-            values.Add(renoDxName);
+        var consumerName = useNeuralUpstream
+            ? NeuralUpstreamAddon
+            : useDeepFriedChicken
+            ? DeepFriedChickenService.AddonFileName
+            : compatibilityPlan.UsesExperimentalUnified
+                ? Renodx5AddonService.AddonFileName
+                : RenoDxDeploymentName;
+        values.Add(consumerName);
         if (compatibilityPlan.InstallDx11Bridge
             && !values.Contains(BridgeAddon, StringComparer.OrdinalIgnoreCase))
             values.Add(BridgeAddon);
-        SetTrackedIniValue(root, record, reShadeIniPath, "ADDON", "LoadFromDllMain", string.Join(',', values));
+        SetTrackedIniValue(ownershipRoot, record, reShadeIniPath, "ADDON", "LoadFromDllMain", string.Join(',', values));
     }
 
     internal static bool RequiresEarlyLoadSettings(
@@ -1846,6 +1919,16 @@ public sealed partial class Dlss5ComponentService
                 || assessment.Mode is Dlss5DeploymentMode.NativeDirectX11
                     or Dlss5DeploymentMode.NativeDirectX12
                     or Dlss5DeploymentMode.NativeVulkan);
+
+    internal static bool ResolveDeepFriedChickenSelection(
+        bool requested,
+        DeepFriedChickenService? deepFriedChicken)
+    {
+        if (!requested) return false;
+        if (deepFriedChicken?.IsImported == true) return true;
+        throw new InvalidOperationException(
+            "Deep Fried Chicken was selected, but its complete imported release is unavailable. Import it again and retry; Adas did not substitute another neural consumer.");
+    }
 
     internal static void RepairReShadeConfiguration(string root, Dlss5InstallRecord record)
     {
@@ -1918,6 +2001,7 @@ public sealed partial class Dlss5ComponentService
         var fileName = GetAddonReferenceFileName(value);
         return fileName.StartsWith("renodx-dlss5", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("renodx-dlss.addon", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals(NeuralUpstreamAddon, StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("dlss5-feed", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("dlss5-bridge", StringComparison.OrdinalIgnoreCase)
             || fileName.StartsWith("dlss5-opengl-bridge", StringComparison.OrdinalIgnoreCase)
@@ -2164,7 +2248,7 @@ public sealed partial class Dlss5ComponentService
         if (deepFriedChicken is { IsImported: true })
         {
             // Deep Fried Chicken replaces the RenoDX consumer inside the Feeder host folder.
-            foreach (var name in deepFriedChicken.DeployFiles(includeDx11Bridge: false))
+            foreach (var name in deepFriedChicken.DeployFiles())
                 InstallHostFile(deepFriedChicken.CachedFile(name), name);
             foreach (var stale in new[] { RenoDxDeploymentName, Renodx5AddonService.AddonFileName })
             {
@@ -2187,6 +2271,15 @@ public sealed partial class Dlss5ComponentService
                 if (File.Exists(stalePath)) RetireComponentFiles(root, new[] { stalePath }, record);
             }
         }
+
+        EnsureEarlyLoadSettings(
+            root,
+            hostDirectory,
+            compatibilityPlan,
+            record,
+            force: true,
+            useDeepFriedChicken: deepFriedChicken is { IsImported: true },
+            useNeuralUpstream: false);
 
         foreach (var runtimeName in HostedRuntimeNames)
         {
@@ -2401,13 +2494,16 @@ public sealed partial class Dlss5ComponentService
         string addonDeployPath,
         Dlss5CompatibilityPlan compatibilityPlan,
         Dlss5InstallRecord record,
-        bool useDeepFriedChicken = false)
+        bool useDeepFriedChicken = false,
+        bool useNeuralUpstream = false)
     {
         var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // With Deep Fried Chicken as the consumer, RenoDX must be removed (DFC replaces it), and
         // DFC's own files are deployed separately and kept. With RenoDX as the consumer the reverse
         // holds: RenoDX is kept and any Deep Fried Chicken files from a prior install are retired.
-        if (!useDeepFriedChicken)
+        if (useNeuralUpstream)
+            keep.Add(NeuralUpstreamAddon);
+        else if (!useDeepFriedChicken)
             keep.Add(compatibilityPlan.UsesExperimentalUnified
                 ? Renodx5AddonService.AddonFileName
                 : RenoDxDeploymentName);
@@ -2421,6 +2517,7 @@ public sealed partial class Dlss5ComponentService
             Renodx5AddonService.AddonFileName,
             RenoDxDeploymentName,
             "renodx-dlss5(2).addon64",
+            NeuralUpstreamAddon,
             BridgeAddon,
             OpenGlBridgeAddon,
             ObsoleteBridgeAddon,
@@ -2764,12 +2861,16 @@ public sealed partial class Dlss5ComponentService
                 throw new InvalidDataException($"The ownership record reuses a backup path: {pair.Value}");
         }
 
-        var allowedIniPath = Path.Combine(root, "ReShade.ini");
+        var allowedIniPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.Combine(root, "ReShade.ini"),
+            Path.Combine(root, "host64", "ReShade.ini"),
+        };
         var iniKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var setting in record.IniSettingBackups)
         {
             var path = ValidateManagedDestination(root, adasRoot, setting.Path, "INI setting path");
-            if (!path.Equals(allowedIniPath, StringComparison.OrdinalIgnoreCase))
+            if (!allowedIniPaths.Contains(path))
                 throw new InvalidDataException($"The ownership record contains an unsupported INI setting path: {setting.Path}");
             if (string.IsNullOrWhiteSpace(setting.Key)
                 || setting.Key.Contains('=')

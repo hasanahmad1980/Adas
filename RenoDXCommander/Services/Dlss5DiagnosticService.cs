@@ -131,8 +131,14 @@ internal static partial class Dlss5DiagnosticService
 
         void RequireConsumer(string consumerFolder)
         {
-            var usesDeepFriedChicken = record.DeepFriedChicken || DeployedWithoutRenoDx(consumerFolder);
-            if (usesDeepFriedChicken)
+            if (record.Profile == Dlss5InstallProfile.NeuralUpstream)
+            {
+                required.Add(Path.Combine(consumerFolder, Dlss5ComponentService.NeuralUpstreamAddon));
+                // Neural Upstream is only the ReShade NGX hook; its model/runtime remains the
+                // game-local nvngx_dlssnr.dll selected for the user's GPU.
+                required.Add(Path.Combine(root, "nvngx_dlssnr.dll"));
+            }
+            else if (record.DeepFriedChicken || DeployedWithoutRenoDx(consumerFolder))
             {
                 foreach (var name in DeepFriedChickenService.RequiredFiles)
                     required.Add(Path.Combine(consumerFolder, name));
