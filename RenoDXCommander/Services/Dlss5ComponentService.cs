@@ -39,7 +39,7 @@ public sealed partial class Dlss5ComponentService
     private const string ObsoleteBridgeLog = "dlss5-dx11-bridge.log";
 
     private const string FeederRepo = "jlrouzies-fr/DLSS5-Feeder";
-    private const string BundledRenoDxVersion = "SF-2026-09-02";
+    private const string BundledRenoDxVersion = "SF-2026-09-07";
     internal const string RenoDxDeploymentName = "renodx-dlss5.addon64";
     private const string NativeRenoDxAsset = "renodx-dlss5-4.70.addon64";
     private const string FeederRenoDxAsset = "renodx-dlss5-4.55.addon64";
@@ -53,7 +53,7 @@ public sealed partial class Dlss5ComponentService
     internal const string NeuralUpstreamVersion = "0.3.0";
     internal const string NeuralUpstreamAddon = "nvngx.dll.addon64";
     internal const string NeuralUpstreamSha256 = "43C00412EB07339FBBEECEA62C5D0C96595F7A7B5E41C4CC4A948618C2A100EC";
-    internal const string OneClickVersion = "0.11.24";
+    internal const string OneClickVersion = "0.12.0";
     private const string BundledStableReShadeVersion = "6.8.0";
     private const string BundledLegacyReShadeVersion = "6.3.3";
     private const string DgVoodooRepo = "dege-diosg/dgVoodoo2";

@@ -11,7 +11,7 @@ public sealed class Dlss5UpstreamRefreshTests
     {
         Assert.Equal("0.14.0-beta.5", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
-        Assert.Equal("0.11.24", Dlss5ComponentService.OneClickVersion);
+        Assert.Equal("0.12.0", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, false));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.Dx11Feeder, true));
@@ -125,7 +125,7 @@ public sealed class Dlss5UpstreamRefreshTests
         => Assert.Equal(expected, Dlss5ComponentService.NormalizeProfileForMode(mode, is64Bit, selected));
 
     [Theory]
-    [InlineData("SF-2026-09-02", true)]
+    [InlineData("SF-2026-09-07", true)]
     [InlineData("SF-0.3", false)]
     [InlineData("SF-2026-99-02", false)]
     [InlineData(null, false)]

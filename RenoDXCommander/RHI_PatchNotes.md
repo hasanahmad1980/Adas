@@ -1,7 +1,8 @@
-## Unreleased — DLSS 5 upstream refresh (follow-up)
+## v2.6.36 — DLSS 5 upstream refresh (follow-up) (2026-09-08)
 
 - Updated **Standalone AIO** to **2.1.1**. Upstream 2.1.1 adds native 32-bit D3D9 support and a Vulkan effects-boundary fallback shader; Adas keeps its reviewed 64-bit route, where only the add-on and the AIO caller-bridge `nvngx.dll` changed (the feed shader is byte-identical to 2.0.9). The new 32-bit/D3D9 route and the redundant Vulkan boundary shader are intentionally not pulled in.
-- Updated the verified **OneClick** helper launch to **0.11.24** (dgVoodoo2 games with `d3d9.dll`/`dgVoodoo.conf` present are correctly classified as D3D11 instead of being refused).
+- Updated the verified **OneClick** helper launch to **0.12.0**. It collapses a doubled `\**\**` recursive glob that ReShade's own path UI can write into `ReShade.ini` — the malformed path fails Win32 resolution with `ERROR_INVALID_NAME` and makes the overlay report "No effect files (.fx) found" even when every shader is present (the doubled path was only half-fixed in 0.11.25). It also stops a named `.exe` being redirected into a sibling game's folder by parent-directory scanning, keeping the deliberate `-Shipping.exe`-beside-launcher case. Adds an optional Settings page (install defaults + offline `dlss5-feed.cfg` editor).
+- Refreshed the optional unified **ShortFuse** neural add-on to the supplied 2026-09-07 build (`SF-2026-09-07`), deployed as `renodx-dlss.addon64` with no download suffix. Stable RenoDX 4.55/4.70 remain separate; the payload manifest hash was updated to match.
 
 ## v2.6.35 — DLSS 5 upstream refresh and consumer routing (2026-09-07)
 
