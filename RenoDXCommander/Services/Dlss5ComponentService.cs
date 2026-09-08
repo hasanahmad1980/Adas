@@ -162,6 +162,7 @@ public sealed partial class Dlss5ComponentService
             Dlss5InstallProfile.StandaloneAio => !version.Contains($"AIO {AioVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.OptiScalerNeuralRendering => !version.Contains($"NR {OptiScalerNrVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.OptiScalerNrBeforeSr => !version.Contains(OptiScalerSplitVersion, StringComparison.OrdinalIgnoreCase),
+            Dlss5InstallProfile.OptiScalerPreSrMultipass => !version.Contains(OptiScalerMultipassVersion, StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.LatestFeederBeta => !version.Contains($"Feeder {BundledFeederBetaVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.OpenGlBridge => !version.Contains($"OpenGL Bridge {OpenGlBridgeVersion}", StringComparison.OrdinalIgnoreCase),
             Dlss5InstallProfile.NeuralUpstream => false,

@@ -174,6 +174,43 @@ public sealed class Dlss5UpstreamRefreshTests
         finally { Directory.Delete(root, true); }
     }
 
+    [Fact]
+    public void PreSrMultipassForkIsPinnedAndUsesRunBeforeSrNotSplitKeys()
+    {
+        Assert.Equal("0.7.1-hybrid", Dlss5ComponentService.OptiScalerMultipassVersion);
+        Assert.True(Dlss5ComponentService.IsOptiScalerNrProfile(Dlss5InstallProfile.OptiScalerPreSrMultipass));
+        Assert.True(Dlss5ComponentService.IsOptiScalerPreSrProfile(Dlss5InstallProfile.OptiScalerPreSrMultipass));
+        Assert.False(Dlss5ComponentService.ShouldWriteOptiScalerSplitKeys(Dlss5InstallProfile.OptiScalerPreSrMultipass));
+
+        var root = Directory.CreateTempSubdirectory("adas-opti-mp-").FullName;
+        var path = Path.Combine(root, "OptiScaler.ini");
+        try
+        {
+            File.WriteAllText(path, "[Upscalers]\nDx11Upscaler=auto\n[DlssNr]\nEnabled=auto\nRunBeforeSR=auto\nSplitPipeline=auto\nSplitIncludeRR=auto\n");
+            var ini = IniTextDocument.Load(path);
+            Dlss5ComponentService.ConfigureOptiScalerNrIni(
+                ini, Dlss5DeploymentMode.NativeDirectX12, Dlss5InstallProfile.OptiScalerPreSrMultipass);
+            ini.Save(path);
+            ini = IniTextDocument.Load(path);
+
+            Assert.True(ini.TryGetValue("DlssNr", "RunBeforeSR", out var runBeforeSr));
+            Assert.Equal("true", runBeforeSr.Text);
+            // The Markxiao94 split keys must never be written for the wilsjo2 pre-SR fork.
+            Assert.False(ini.TryGetValue("DlssNr", "SplitPipeline", out _));
+            Assert.False(ini.TryGetValue("DlssNr", "SplitIncludeRR", out _));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void BundledPreSrMultipassArchiveMatchesThePinnedRelease()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5", "optiscaler-multipass.zip");
+        Assert.Equal(
+            "EE0824F7FA58649F8333D23DED5D7C48A0252A34D22EAC30FD236E65ECE034DF",
+            FileHelper.ComputeSha256(path), ignoreCase: true);
+    }
+
     [Theory]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.12.1-beta.1", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.13.1-beta.1", true)]
@@ -187,6 +224,8 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.1.1", false)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.1.2", true)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.2.0", false)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.0-hybrid", true)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.1-hybrid", false)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.7", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.8", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.12", false)]

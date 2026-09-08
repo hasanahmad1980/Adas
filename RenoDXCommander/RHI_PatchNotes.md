@@ -1,3 +1,9 @@
+## v2.6.37 — OptiScaler pre-SR multipass profile (2026-09-08)
+
+- Added the **OptiScaler pre-SR multipass** profile (wilsjo2 fork `0.7.1-hybrid`) as a separate experimental route beside the existing NR-before-SR option. It runs Neural Rendering before Super Resolution with configurable 1–3 pass processing and FP8/NVFP4-hybrid model precision (NVFP4 needs a Blackwell/RTX 50 GPU; FP8 is the cross-generation default). Adas enables `RunBeforeSR` and leaves pass count and precision at their upstream defaults; the separate `nvngx_dlssnr.dll` 310.8 runtime is still user-supplied. Native DirectX 12 only, driver 616.56+.
+- The OptiScaler extractor now also deploys the fork's `OptiScaler/nvfp4/` model-data tree (packed weights, compiled kernels, contract manifests); the standard 0.2 and split forks are unaffected because they ship no non-DLL backend files.
+- Bundled `optiscaler-multipass.zip` (GPL-3.0) and pinned its SHA-256 in the build payload manifest.
+
 ## v2.6.36 — DLSS 5 upstream refresh (follow-up) (2026-09-08)
 
 - Updated **Standalone AIO** to **2.1.1**. Upstream 2.1.1 adds native 32-bit D3D9 support and a Vulkan effects-boundary fallback shader; Adas keeps its reviewed 64-bit route, where only the add-on and the AIO caller-bridge `nvngx.dll` changed (the feed shader is byte-identical to 2.0.9). The new 32-bit/D3D9 route and the redundant Vulkan boundary shader are intentionally not pulled in.

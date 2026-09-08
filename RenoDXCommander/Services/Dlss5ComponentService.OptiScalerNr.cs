@@ -6,10 +6,18 @@ public sealed partial class Dlss5ComponentService
 {
     internal const string OptiScalerNrVersion = "0.2.0";
     internal const string OptiScalerSplitVersion = "0.1.2 NR-before-SR English";
+    internal const string OptiScalerMultipassVersion = "0.7.1-hybrid";
     private static readonly SemaphoreSlim OptiScalerNrCacheLock = new(1, 1);
 
     internal static bool IsOptiScalerNrProfile(Dlss5InstallProfile? profile)
-        => profile is Dlss5InstallProfile.OptiScalerNeuralRendering or Dlss5InstallProfile.OptiScalerNrBeforeSr;
+        => profile is Dlss5InstallProfile.OptiScalerNeuralRendering
+            or Dlss5InstallProfile.OptiScalerNrBeforeSr
+            or Dlss5InstallProfile.OptiScalerPreSrMultipass;
+
+    // Pre-SR forks (Markxiao94 split, wilsjo2 multipass) run Neural Rendering before Super
+    // Resolution and are restricted to native DirectX 12; the standard 0.2 fork also takes DX11/Vulkan.
+    internal static bool IsOptiScalerPreSrProfile(Dlss5InstallProfile profile)
+        => profile is Dlss5InstallProfile.OptiScalerNrBeforeSr or Dlss5InstallProfile.OptiScalerPreSrMultipass;
 
     internal static bool SupportsOptiScalerNr(Dlss5DeploymentMode mode, bool is64Bit, bool split)
         => is64Bit && (mode == Dlss5DeploymentMode.NativeDirectX12
@@ -33,10 +41,14 @@ public sealed partial class Dlss5ComponentService
         if (relative.StartsWith('/') || relative.Contains(':') || relative.Split('/').Any(part => part is ".." or "."))
             throw new InvalidDataException("Invalid OptiScaler package path.");
         if (relative.Equals("OptiScaler.dll", StringComparison.OrdinalIgnoreCase)) return "dxgi.dll";
+        // The OptiScaler backend folder carries libraries plus, on the wilsjo2 pre-SR fork,
+        // an nvfp4/ model-data tree (packed weights, compiled kernels, contract manifests) that
+        // the hybrid precision needs. Data extensions are copied verbatim; setup scripts never are.
+        var optiScalerBackend = relative.StartsWith("OptiScaler/", StringComparison.OrdinalIgnoreCase)
+            && Path.GetExtension(relative).ToLowerInvariant() is ".dll" or ".cubin" or ".bin" or ".txt" or ".json";
         if (relative.Equals("nvngx.dll_dlssnr.dll", StringComparison.OrdinalIgnoreCase)
             || relative.Equals("OptiScaler.ini", StringComparison.OrdinalIgnoreCase)
-            || relative.StartsWith("OptiScaler/", StringComparison.OrdinalIgnoreCase)
-                && relative.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+            || optiScalerBackend
             || relative.StartsWith("Licenses/", StringComparison.OrdinalIgnoreCase)
                 && Path.GetExtension(relative).ToLowerInvariant() is ".md" or ".txt")
             return relative.Replace('/', Path.DirectorySeparatorChar);
@@ -67,20 +79,28 @@ public sealed partial class Dlss5ComponentService
     private async Task<Dlss5InstallResult> InstallOptiScalerNrAsync(Dlss5Assessment assessment,
         Dlss5InstallProfile profile, IProgress<(string message, double percent)>? progress, CancellationToken cancellationToken)
     {
-        var split = profile == Dlss5InstallProfile.OptiScalerNrBeforeSr;
-        if (!SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, split))
-            throw new InvalidOperationException("This OptiScaler NR route requires a 64-bit native-DLSS game: DX11, DX12, or Vulkan for the standard NR fork. Use Feeder or AIO for other games.");
+        var preSr = IsOptiScalerPreSrProfile(profile);
+        if (!SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, preSr))
+            throw new InvalidOperationException("This OptiScaler NR route requires a 64-bit native-DLSS game: DX11, DX12, or Vulkan for the standard NR fork, or native DX12 for the pre-SR forks. Use Feeder or AIO for other games.");
         var root = Path.GetFullPath(assessment.DeploymentPath!);
         var record = LoadRecord(root);
         ValidateOptiScalerNrConflicts(root, record, assessment.Mode);
         var proxyName = OptiScalerNrProxy(assessment.Mode);
-        var version = split ? OptiScalerSplitVersion : OptiScalerNrVersion;
-        var name = split ? "optiscaler-split.zip" : "optiscaler-nr.zip";
-        var expectedHash = split ? "38BB8DDA6EF288FA3546DBF294886E9223DB767F36D7FB933F71C0A1E4CF4449"
-            : "8EECE7A4D7DE6DE5917F0C99AC60540B2D77022E7699BBA717B0A6D9E1829BCE";
-        var url = split
-            ? "https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/releases/download/v0.1.2-nr-before-sr-english/OptiScaler-NR-before-SR-English-x64-20260903.zip"
-            : "https://github.com/Dagherbou/OptiScaler_DLSSNR/releases/download/v0.2.0-dlssnr/OptiScaler-DLSSNR-v0.2.0.zip";
+        var (version, name, expectedHash, url) = profile switch
+        {
+            Dlss5InstallProfile.OptiScalerNrBeforeSr => (
+                OptiScalerSplitVersion, "optiscaler-split.zip",
+                "38BB8DDA6EF288FA3546DBF294886E9223DB767F36D7FB933F71C0A1E4CF4449",
+                "https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/releases/download/v0.1.2-nr-before-sr-english/OptiScaler-NR-before-SR-English-x64-20260903.zip"),
+            Dlss5InstallProfile.OptiScalerPreSrMultipass => (
+                OptiScalerMultipassVersion, "optiscaler-multipass.zip",
+                "EE0824F7FA58649F8333D23DED5D7C48A0252A34D22EAC30FD236E65ECE034DF",
+                "https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/releases/download/v0.7.1-hybrid/OptiScaler-DLSSNR-v0.7.1-hybrid.zip"),
+            _ => (
+                OptiScalerNrVersion, "optiscaler-nr.zip",
+                "8EECE7A4D7DE6DE5917F0C99AC60540B2D77022E7699BBA717B0A6D9E1829BCE",
+                "https://github.com/Dagherbou/OptiScaler_DLSSNR/releases/download/v0.2.0-dlssnr/OptiScaler-DLSSNR-v0.2.0.zip"),
+        };
         var cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RHI", "Adas", "DLSS5", "OptiScalerNR", expectedHash);
         var archive = Path.Combine(cache, name);
         await OptiScalerNrCacheLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -155,12 +175,16 @@ public sealed partial class Dlss5ComponentService
             if (issues.Count > 0)
                 throw new InvalidDataException("OptiScaler NR installation needs repair: " + string.Join("; ", issues));
             progress?.Report(("OptiScaler NR files installed. Restart and verify with Insert.", 100));
-            return new(true, assessment.Mode, root, record.InstalledHashes.Keys.ToArray(), new[]
+            var tips = new List<string>
             {
                 "Experimental: enable the game's own DLSS, press Insert, and verify Neural Rendering in OptiScaler. These controls are not in ReShade.",
                 "OptiScaler 0.2 exposes hybrid color composition, live exposure, frame hold, and model supersampling with selectable downscalers. The split fork separately exposes internal SR presets and optional RR supersampling; RR requires real game ray-reconstruction inputs.",
                 "Driver 616.56 or newer is required by upstream. File installation is not a GPU compatibility or image-quality test.",
-            }, $"OptiScaler NR {version} installed as {proxyName}. Any replaced ReShade loader is backed up for removal; no Feeder, Bridge or RenoDX DLSS pipeline was added.");
+            };
+            if (profile == Dlss5InstallProfile.OptiScalerPreSrMultipass)
+                tips.Add("Pre-SR multipass fork: Adas enables RunBeforeSR. Pass count (1-3) and model precision (0 = FP8, 2 = NVFP4 hybrid, Blackwell only) are changed from the Insert overlay or OptiScaler.ini; FP8 is the safe cross-generation default, and higher pass counts cost roughly N× the model time. Requires your separately supplied nvngx_dlssnr.dll 310.8 runtime beside the game (RTX 50: NVIDIA-signed; RTX 20/30/40: ShortFuse compatibility build).");
+            return new(true, assessment.Mode, root, record.InstalledHashes.Keys.ToArray(), tips.ToArray(),
+                $"OptiScaler NR {version} installed as {proxyName}. Any replaced ReShade loader is backed up for removal; no Feeder, Bridge or RenoDX DLSS pipeline was added.");
         }
         finally { Directory.Delete(stage, recursive: true); }
     }
@@ -195,5 +219,11 @@ public sealed partial class Dlss5ComponentService
             ini.RemoveValue("DlssNr", "SplitPipeline");
             ini.RemoveValue("DlssNr", "SplitIncludeRR");
         }
+
+        if (profile == Dlss5InstallProfile.OptiScalerPreSrMultipass)
+            // wilsjo2's pre-SR fork uses RunBeforeSR rather than the Markxiao94 Split* keys.
+            // Enable pre-SR placement and leave Passes (default 1) and Precision (default 0 = FP8)
+            // at their upstream values so the route stays cross-generation safe until the user opts in.
+            SetIfAutomatic(ini, "DlssNr", "RunBeforeSR", "true");
     }
 }

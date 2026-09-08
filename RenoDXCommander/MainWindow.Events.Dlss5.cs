@@ -214,6 +214,7 @@ public sealed partial class MainWindow
                 => Dlss5InstallProfile.NeuralUpstream,
             Dlss5InstallProfile.OptiScalerNeuralRendering => Dlss5InstallProfile.OptiScalerNeuralRendering,
             Dlss5InstallProfile.OptiScalerNrBeforeSr => Dlss5InstallProfile.OptiScalerNrBeforeSr,
+            Dlss5InstallProfile.OptiScalerPreSrMultipass => Dlss5InstallProfile.OptiScalerPreSrMultipass,
             Dlss5InstallProfile.StandaloneAio when Dlss5ComponentService.SupportsAio(assessment.Mode, assessment.Is64Bit)
                 => Dlss5InstallProfile.StandaloneAio,
             Dlss5InstallProfile.ExperimentalUnified when assessment.Is64Bit
@@ -374,6 +375,12 @@ public sealed partial class MainWindow
             IsChecked = selectedProfile == Dlss5InstallProfile.OptiScalerNrBeforeSr,
             IsEnabled = true,
         };
+        var multipassProfile = new RadioButton
+        {
+            GroupName = "Dlss5InstallProfile", Content = $"NR before upscaling — multipass {Dlss5ComponentService.OptiScalerMultipassVersion} (experimental OptiScaler fork; native DLSS DX12)",
+            IsChecked = selectedProfile == Dlss5InstallProfile.OptiScalerPreSrMultipass,
+            IsEnabled = true,
+        };
         string UnsupportedReason(string reason)
             => $"Not recommended — {reason}";
 
@@ -410,6 +417,7 @@ public sealed partial class MainWindow
         var upstreamSupported = Dlss5ComponentService.SupportsNeuralUpstream(assessment.Mode, assessment.Is64Bit);
         var optiSupported = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, false);
         var splitSupported = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, true);
+        var multipassSupported = Dlss5ComponentService.SupportsOptiScalerNr(assessment.Mode, assessment.Is64Bit, true);
 
         bool ProfileSupported(Dlss5InstallProfile profile) => profile switch
         {
@@ -421,6 +429,7 @@ public sealed partial class MainWindow
             Dlss5InstallProfile.NeuralUpstream => upstreamSupported,
             Dlss5InstallProfile.OptiScalerNeuralRendering => optiSupported,
             Dlss5InstallProfile.OptiScalerNrBeforeSr => splitSupported,
+            Dlss5InstallProfile.OptiScalerPreSrMultipass => multipassSupported,
             _ => false,
         };
 
@@ -481,6 +490,13 @@ public sealed partial class MainWindow
             false,
             !assessment.Is64Bit ? "the NR-before-upscaling fork requires a 64-bit game"
                 : "the NR-before-upscaling fork requires native DirectX 12");
+        AddProfileOption(
+            multipassProfile,
+            "For 64-bit native DirectX 12 games wanting the wilsjo2 pre-SR fork: Neural Rendering before Super Resolution with configurable 1-3 pass processing and FP8/NVFP4-hybrid precision (NVFP4 needs a Blackwell/RTX 50 GPU; FP8 works on RTX 20-40). Needs a separately supplied nvngx_dlssnr.dll runtime. Highest-risk experimental fork.",
+            multipassSupported,
+            false,
+            !assessment.Is64Bit ? "the pre-SR multipass fork requires a 64-bit game"
+                : "the pre-SR multipass fork requires native DirectX 12");
         advancedProfiles.Children.Add(MakeDlss5Text(
             "Red means Adas does not recommend that route for this detected game shape, but it remains selectable so you can override detection. Amber means the route is selectable but experimental. Green means it is the recommended fit; the profile summary below explains the exact files and game settings.",
             ResourceKeys.TextTertiaryBrush));
@@ -583,6 +599,7 @@ public sealed partial class MainWindow
             selectedProfile = openGlBridgeProfile.IsChecked == true ? Dlss5InstallProfile.OpenGlBridge
                 : neuralUpstreamProfile.IsChecked == true ? Dlss5InstallProfile.NeuralUpstream
                 : splitProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNrBeforeSr
+                : multipassProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerPreSrMultipass
                 : optiNrProfile.IsChecked == true ? Dlss5InstallProfile.OptiScalerNeuralRendering
                 : aioProfile.IsChecked == true ? Dlss5InstallProfile.StandaloneAio : betaProfile.IsChecked == true
                 ? Dlss5InstallProfile.LatestFeederBeta
@@ -593,6 +610,8 @@ public sealed partial class MainWindow
             var summary = selectedProfile switch
             {
                 Dlss5InstallProfile.NeuralUpstream => $"Selected: Neural Upstream {Dlss5ComponentService.NeuralUpstreamVersion} (beta). Adas installs the verified upstream add-on as nvngx.dll.addon64 for 64-bit native DirectX 12 games, leaves the game's own DLSS runtime in place, and removes competing NGX consumers. Leave the game's DLSS Super Resolution enabled. Configure Neural Upstream from its ReShade panel; use Quality cadence if Frame Generation is enabled. Tested upstream support is limited, so expect game-specific issues.",
+                Dlss5InstallProfile.OptiScalerPreSrMultipass
+                    => $"Selected: experimental OptiScaler pre-SR multipass {Dlss5ComponentService.OptiScalerMultipassVersion}. Keep the game's own DLSS ON. Adas enables RunBeforeSR so Neural Rendering runs before Super Resolution; pass count (1-3) and model precision (FP8, or NVFP4 hybrid on Blackwell/RTX 50) are changed with Insert or in OptiScaler.ini, with FP8 the safe cross-generation default. You must supply nvngx_dlssnr.dll 310.8 yourself (RTX 50: NVIDIA-signed; RTX 20/30/40: ShortFuse build). Native DX12 only; driver 616.56+. This is the highest-risk experimental route.",
                 Dlss5InstallProfile.OptiScalerNeuralRendering or Dlss5InstallProfile.OptiScalerNrBeforeSr
                     => "Selected: experimental OptiScaler neural rendering. Keep the game's own DLSS ON. Version 0.2 adds hybrid color composition, live exposure, frame hold and optional model supersampling; DX11 is configured through its D3D11-on-12 DLSS path. Press Insert for controls. Driver 616.56+ is required. Apply switches the current pipeline automatically and saves its visual settings.",
                 Dlss5InstallProfile.StandaloneAio => $"Selected: standalone AIO {Dlss5ComponentService.AioVersion}. Downloads three verified files once, then reuses the cache. NR starts on; frame generation starts off. Disable the game's own DLSS, frame generation and antialiasing. Native resolution uses DLAA; a smaller game backbuffer enables upscaling.\n\nApply switches pipelines and preserves each profile's visual settings. Ada asks before cleaning up conflicts or changing a shared Vulkan route, then does the removal itself. Vulkan needs an installed 64-bit ReShade layer. DX9/DX11 guidance and frame pacing remain experimental.",
@@ -621,6 +640,7 @@ public sealed partial class MainWindow
         neuralUpstreamProfile.Checked += (_, _) => UpdateProfileSummary();
         optiNrProfile.Checked += (_, _) => UpdateProfileSummary();
         splitProfile.Checked += (_, _) => UpdateProfileSummary();
+        multipassProfile.Checked += (_, _) => UpdateProfileSummary();
         UpdateProfileSummary();
         advancedProfiles.Children.Add(MakeDlss5Text($"Renderer target: {assessment.DeploymentPath ?? "Not resolved"}", ResourceKeys.TextTertiaryBrush));
 

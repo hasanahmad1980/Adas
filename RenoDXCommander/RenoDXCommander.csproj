@@ -99,6 +99,9 @@
     <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\optiscaler-split.zip">
       <CanonicalName>optiscaler-split.zip</CanonicalName>
     </_RequiredDlss5Payload>
+    <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\optiscaler-multipass.zip">
+      <CanonicalName>optiscaler-multipass.zip</CanonicalName>
+    </_RequiredDlss5Payload>
     <_RequiredDlss5Payload Include="$(MSBuildProjectDirectory)\Assets\DLSS5\standalone-dlssnr.addon64">
       <CanonicalName>standalone-dlssnr.addon64</CanonicalName>
     </_RequiredDlss5Payload>

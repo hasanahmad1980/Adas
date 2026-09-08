@@ -43,6 +43,9 @@ public enum Dlss5InstallProfile
     OpenGlBridge,
     // Neural Upstream runs DLSS-NR before the game's own DLSS Super Resolution.
     NeuralUpstream,
+    // wilsjo2 OptiScaler pre-SR fork: NR before Super Resolution with configurable
+    // 1-3 pass processing and FP8/NVFP4-hybrid model precision. Appended for record compatibility.
+    OptiScalerPreSrMultipass,
 }
 
 public sealed record Dlss5Probe

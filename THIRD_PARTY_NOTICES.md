@@ -4,10 +4,11 @@ Adas is based on **RHI** by RankFTW and is distributed under the repository's GN
 
 ## Experimental OptiScaler Neural Rendering packages
 
-The standard OptiScaler NR 0.2.0 and NR-before-SR English 0.1.2 release archives are included in this private local package. Their sources are GPL-3.0; dependency notices and licenses remain in the original archives and are copied alongside installed dependencies.
+The standard OptiScaler NR 0.2.0, NR-before-SR English 0.1.2, and pre-SR multipass 0.7.1-hybrid release archives are included in this private local package. Their sources are GPL-3.0; dependency notices and licenses (including the RenoDX attribution, FidelityFX, XeSS and DirectX notices carried in the pre-SR multipass archive) remain in the original archives and are copied alongside installed dependencies.
 
 - OptiScaler NR source at the packaged tag: <https://github.com/Dagherbou/OptiScaler_DLSSNR/tree/v0.2.0-dlssnr>
 - NR-before-SR source at the packaged tag: <https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/tree/v0.1.2-nr-before-sr-english>
+- Pre-SR multipass source at the packaged tag: <https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/tree/v0.7.1-hybrid>
 - Original OptiScaler project: <https://github.com/optiscaler/OptiScaler>
 
 NVIDIA, Intel and AMD dependency binaries retain their own terms. Inclusion in this private package does not establish permission for public redistribution; audit every dependency and corresponding-source obligation before publishing an installer. The local Adas installer includes hash-pinned AIO release files for offline use; the upstream repository did not expose redistribution terms when reviewed.

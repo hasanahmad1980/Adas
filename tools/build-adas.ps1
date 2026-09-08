@@ -32,6 +32,7 @@ $requiredDlss5Payload = @(
     'streamline.zip',
     'optiscaler-nr.zip',
     'optiscaler-split.zip',
+    'optiscaler-multipass.zip',
     'standalone-dlssnr.addon64',
     'nvngx.dll',
     'DLSS5_AIO_Feed.fx',
@@ -65,6 +66,7 @@ $expectedDlss5Hashes = @{
     'streamline.zip'                       = 'CD9DF8F513E2BA9D13A9278100FAA2AD025599F59AEF26DBFF3420DAC74F1F09'
     'optiscaler-nr.zip'                    = '8EECE7A4D7DE6DE5917F0C99AC60540B2D77022E7699BBA717B0A6D9E1829BCE'
     'optiscaler-split.zip'                 = '38BB8DDA6EF288FA3546DBF294886E9223DB767F36D7FB933F71C0A1E4CF4449'
+    'optiscaler-multipass.zip'             = 'EE0824F7FA58649F8333D23DED5D7C48A0252A34D22EAC30FD236E65ECE034DF'
     'standalone-dlssnr.addon64'            = '684223CADB54BEDF13751A6540D62AD0D27DDBD6C0A0E456F5788B26B98B8A27'
     'nvngx.dll'                            = 'C61AE2B5ECA6D7E8EBA60DBAAA75CE01155F1D5BC3425B21DEC0334D2B8CB67F'
     'DLSS5_AIO_Feed.fx'                    = 'B0EF9EE8F9C7675C0224B87A614905D4283363438BD7E104B132E7200AD84748'
