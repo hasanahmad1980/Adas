@@ -1,3 +1,9 @@
+## v2.6.40 — Feeder 0.15.1 (2026-09-09)
+
+- Updated the **latest Feeder** set (the `LatestFeederBeta` route) from **0.14.0-beta.5** to the stable **0.15.1** release. Upstream 0.15.0 graduated the line to stable, added **OptiScaler DLSS-NR as a supported neural consumer**, and fixed six motion-tracker bugs — two of which had been disabling whole classes of games; **0.15.1** additionally fixes the neural pass wrecking HDR highlights. The 0.15.x IPC protocol is **v9** (the bundled x86 add-on and x64 host are a matched pair). The `DLSS5_Feed.fx` shader is byte-identical to beta.5; only the add-ons, the 32-bit host, and the Vulkan layers moved. Stable Feeder 0.7 is unchanged and remains a separate set.
+- Updated the verified **OneClick** helper launch to **0.13.10** (URL + SHA-256 re-pinned).
+- Refreshed the `tools/build-adas.ps1` payload manifest + csproj entries for the 0.15.1 filenames/hashes.
+
 ## v2.6.39 — Graphics-API detection fixes (2026-09-09)
 
 - Fixed the **Unity `boot.config` renderer mapping**. `gfx-device-type` values were mis-mapped: `2` (Direct3D11) was read as DX9, `17` (OpenGLCore) as DX11, and `4` (Null device) as OpenGL. Corrected to the real Unity `GraphicsDeviceType` values (2→DX11, 18→DX12, 21→Vulkan, 0/8/11/17→OpenGL, 1→DX9), so Unity games that pin a renderer are no longer routed down the wrong path (the common DX11 case was being treated as DX9).

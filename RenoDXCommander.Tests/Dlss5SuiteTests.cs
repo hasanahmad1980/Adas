@@ -409,7 +409,7 @@ public sealed class Dlss5SuiteTests
         Assert.Equal(Dlss5RenoDxPackage.Feeder455, beta.RenoDxPackage);
         Assert.True(beta.InstallFeeder);
         Assert.True(beta.UsesLatestFeederBeta);
-        Assert.Contains("0.14.0-beta.5", beta.ProfileName);
+        Assert.Contains("0.15.1", beta.ProfileName);
         Assert.False(beta.PatchFeederForUnifiedName);
     }
 

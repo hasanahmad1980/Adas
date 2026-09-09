@@ -48,12 +48,12 @@ public sealed partial class Dlss5ComponentService
     internal const string BridgeVersion = "v1.4.12";
     internal const string BridgeSha256 = "4F2ACECC1026AE89AC0B92767BE66CEEA2662AD0EF88710B89C7DA7840D548D4";
     private const string BundledFeederVersion = "0.7.0";
-    internal const string BundledFeederBetaVersion = "0.14.0-beta.5";
+    internal const string BundledFeederBetaVersion = "0.15.1";
     internal const string OpenGlBridgeVersion = "1.0.5";
     internal const string NeuralUpstreamVersion = "0.3.0";
     internal const string NeuralUpstreamAddon = "nvngx.dll.addon64";
     internal const string NeuralUpstreamSha256 = "43C00412EB07339FBBEECEA62C5D0C96595F7A7B5E41C4CC4A948618C2A100EC";
-    internal const string OneClickVersion = "0.13.7";
+    internal const string OneClickVersion = "0.13.10";
     private const string BundledStableReShadeVersion = "6.8.0";
     private const string BundledLegacyReShadeVersion = "6.3.3";
     private const string DgVoodooRepo = "dege-diosg/dgVoodoo2";

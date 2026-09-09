@@ -10,16 +10,16 @@ Adas adds a reviewable DLSS 5 component to every detected RHI game. It inspects 
 | 64-bit Vulkan with native DLSS | Native Vulkan DLSS mirror | Uses RenoDX DLSS5 4.70 with Bridge 1.4.12 and mirrors the game's own DLSS contract, depth, motion vectors, jitter, and quality preset onto D3D12. |
 | DirectX 11 without DLSS | Feeder | Builds a DLAA contract from ReShade depth and estimated motion vectors. |
 | DirectX 12 without DLSS | Feeder | Evaluates directly on the game's D3D12 device and queue. |
-| Vulkan without native DLSS | Feeder | Imports shared D3D12 textures, fences, and semaphores into the game's Vulkan device. The 32-bit Vulkan route requires the matched 0.14.0-beta.5 set. |
+| Vulkan without native DLSS | Feeder | Imports shared D3D12 textures, fences, and semaphores into the game's Vulkan device. The 32-bit Vulkan route requires the matched 0.15.1 set. |
 | OpenGL | Feeder | Installs local ReShade as `opengl32.dll` and uses NVIDIA OpenGL/D3D12 interop. |
 | DirectX 9 | Feeder through dgVoodoo2 | Downloads and configures current dgVoodoo2 to translate D3D9 to D3D11. ReShade is installed as `dxgi.dll`; dgVoodoo owns `d3d9.dll`. |
-| 32-bit DirectX 10 | Native Feeder relay | Feeder 0.14.0-beta.5 creates a private D3D11 relay and installs normally through `dxgi.dll`; no DXVK or machine-wide Vulkan layer is needed. |
+| 32-bit DirectX 10 | Native Feeder relay | Feeder 0.15.1 creates a private D3D11 relay and installs normally through `dxgi.dll`; no DXVK or machine-wide Vulkan layer is needed. |
 | 64-bit DirectX 10 | Feeder through DXVK | The upstream x64 add-on has no D3D10 backend, so Adas installs stable DXVK and the 64-bit Vulkan ReShade layer. |
 | 32-bit supported path | Hosted Feeder | Installs the x86 add-on in the game and creates a `host64` folder with the helper and complete x64 runtime. |
 
 RHI's current ShortFuse neural-rendering runtime supports GeForce RTX 20-, 30-, 40-, and 50-series GPUs. Adas refuses installation when it finds anti-cheat or multiplayer/online-only evidence, requires explicit single-player/offline confirmation, and refuses to guess between equally likely executable folders.
 
-> The ReShade suite and OptiScaler hook routes must not be installed together. Stable Feeder 0.7 also requires NVIDIA Smooth Motion to be disabled. The separately labelled 0.14.0-beta.5 test route includes the current Smooth Motion synchronization fixes, but remains an upstream test build.
+> The ReShade suite and OptiScaler hook routes must not be installed together. Stable Feeder 0.7 also requires NVIDIA Smooth Motion to be disabled. The separately labelled 0.15.1 test route includes the current Smooth Motion synchronization fixes, but remains an upstream test build.
 
 ## Install profiles
 
@@ -31,7 +31,7 @@ The default **Maximum Quality** profile uses a route-specific, reviewed componen
 - NVIDIA's matched Streamline/DLSS runtime ZIP, ReShade **6.8.0** x86/x64 runtimes, and the standard `ReShade.fxh`, `ReShadeUI.fxh`, and `DrawText.fxh` headers. ReShade **6.3.3** remains packaged only as an explicit legacy channel; no game title is hardcoded to it.
 - The exact known-good DLSSNR standby-repair implementation for `nvngx_dlssnr.dll` 310.8.0.0. Repair does not broaden its accepted source hash when RHI adds newer NR downloads.
 
-The optional **Latest Feeder test build** profile packages the matched **0.14.0-beta.5** x64/x86 add-ons, protocol-v7 x64 host, shader, and Vulkan fallback. It adds a native 32-bit DirectX 10 relay on top of the current D3D11 Smooth Motion binding fix, 32-bit Feature Level 10 texture fix, non-blocking Vulkan/DXVK present path, in-game host controls, minidumps, crash logs, and upstream verifier. Adas never mixes these beta files with stable 0.7. It is selected automatically for native 32-bit D3D10 and other 32-bit routes that require the newer transport; elsewhere it remains an explicit beta choice.
+The optional **Latest Feeder test build** profile packages the matched **0.15.1** x64/x86 add-ons, protocol-v7 x64 host, shader, and Vulkan fallback. It adds a native 32-bit DirectX 10 relay on top of the current D3D11 Smooth Motion binding fix, 32-bit Feature Level 10 texture fix, non-blocking Vulkan/DXVK present path, in-game host controls, minidumps, crash logs, and upstream verifier. Adas never mixes these beta files with stable 0.7. It is selected automatically for native 32-bit D3D10 and other 32-bit routes that require the newer transport; elsewhere it remains an explicit beta choice.
 
 The **OptiScaler DLSS-NR 0.2.0** profile supports 64-bit native-DLSS DX11, DX12 and Vulkan games. Adas selects `dlss_12` automatically for DX11 because that D3D11-on-12 backend is the one that can run Neural Rendering. The upstream Insert overlay exposes hybrid color composition, live exposure, frame hold, working-scale supersampling and downscalers. The separate NR-before-SR fork remains pinned independently and DX12-only.
 
