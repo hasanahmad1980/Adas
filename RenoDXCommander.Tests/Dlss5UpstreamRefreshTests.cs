@@ -11,7 +11,7 @@ public sealed class Dlss5UpstreamRefreshTests
     {
         Assert.Equal("0.14.0-beta.5", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
-        Assert.Equal("0.12.0", Dlss5ComponentService.OneClickVersion);
+        Assert.Equal("0.13.7", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, false));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.Dx11Feeder, true));
@@ -177,7 +177,7 @@ public sealed class Dlss5UpstreamRefreshTests
     [Fact]
     public void PreSrMultipassForkIsPinnedAndUsesRunBeforeSrNotSplitKeys()
     {
-        Assert.Equal("0.7.1-hybrid", Dlss5ComponentService.OptiScalerMultipassVersion);
+        Assert.Equal("0.7.5-nr-fixes", Dlss5ComponentService.OptiScalerMultipassVersion);
         Assert.True(Dlss5ComponentService.IsOptiScalerNrProfile(Dlss5InstallProfile.OptiScalerPreSrMultipass));
         Assert.True(Dlss5ComponentService.IsOptiScalerPreSrProfile(Dlss5InstallProfile.OptiScalerPreSrMultipass));
         Assert.False(Dlss5ComponentService.ShouldWriteOptiScalerSplitKeys(Dlss5InstallProfile.OptiScalerPreSrMultipass));
@@ -207,7 +207,7 @@ public sealed class Dlss5UpstreamRefreshTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5", "optiscaler-multipass.zip");
         Assert.Equal(
-            "EE0824F7FA58649F8333D23DED5D7C48A0252A34D22EAC30FD236E65ECE034DF",
+            "3E735F825B85872D20C35C0D75404C1A28B7B6E11CA28EF06243A18225191037",
             FileHelper.ComputeSha256(path), ignoreCase: true);
     }
 
@@ -221,11 +221,12 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.3", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.7-experimental.1", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.9", true)]
-    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.1.1", false)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.1.1", true)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.2.0", false)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.1.2", true)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.2.0", false)]
-    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.0-hybrid", true)]
-    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.1-hybrid", false)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.1-hybrid", true)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.5-nr-fixes", false)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.7", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.8", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.12", false)]

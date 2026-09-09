@@ -1,3 +1,10 @@
+## v2.6.38 — DLSS 5 upstream refresh (2026-09-09)
+
+- Updated the **OptiScaler pre-SR multipass** fork (wilsjo2) to **0.7.5-nr-fixes**: fixes Neural Rendering staying stuck at startup under DXVK/Proton, fixes flashing in the generate-before/apply-after mode, and folds in an NR motion-vector fix (independent depth/MV offsets and per-axis scaling) for the pre-SR and multipass DX12/Vulkan paths. The `RunBeforeSR` / `Passes` / `Precision` keys Adas writes are unchanged; FP8 remains the cross-generation default.
+- Updated **Standalone AIO** to **2.2.0**. Upstream makes NVIDIA Optical Flow the default motion source, pipelined ahead of Neural Rendering on D3D11/D3D12/Vulkan, cutting temporal boiling/smearing/ghosting on 2x/3x NR with automatic fallback to VORT or zero-motion guides. Unlike 2.1.2/2.1.3 (32-bit only), this changes Adas's reviewed 64-bit route: the add-on, the caller-bridge `nvngx.dll`, and the feed shader all moved. Adas neither forces nor disables Optical Flow and keeps each game's per-game preference.
+- Updated the verified **OneClick** helper launch to **0.13.7** (URL + SHA-256 re-pinned).
+- Refreshed the `tools/build-adas.ps1` payload manifest hashes for the AIO 2.2.0 files and the wilsjo2 0.7.5 archive.
+
 ## v2.6.37 — OptiScaler pre-SR multipass profile (2026-09-08)
 
 - Added the **OptiScaler pre-SR multipass** profile (wilsjo2 fork `0.7.1-hybrid`) as a separate experimental route beside the existing NR-before-SR option. It runs Neural Rendering before Super Resolution with configurable 1–3 pass processing and FP8/NVFP4-hybrid model precision (NVFP4 needs a Blackwell/RTX 50 GPU; FP8 is the cross-generation default). Adas enables `RunBeforeSR` and leaves pass count and precision at their upstream defaults; the separate `nvngx_dlssnr.dll` 310.8 runtime is still user-supplied. Native DirectX 12 only, driver 616.56+.
