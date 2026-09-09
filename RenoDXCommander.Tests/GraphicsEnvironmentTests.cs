@@ -26,6 +26,23 @@ public sealed class GraphicsEnvironmentTests : IDisposable
         return path;
     }
 
+    [Theory]
+    [InlineData(1, GraphicsApiType.DirectX9)]
+    [InlineData(2, GraphicsApiType.DirectX11)]   // Direct3D11 (was wrongly mapped to DX9)
+    [InlineData(18, GraphicsApiType.DirectX12)]
+    [InlineData(21, GraphicsApiType.Vulkan)]
+    [InlineData(17, GraphicsApiType.OpenGL)]     // OpenGLCore (was wrongly mapped to DX11)
+    [InlineData(0, GraphicsApiType.OpenGL)]      // legacy OpenGL2
+    [InlineData(4, GraphicsApiType.Unknown)]     // Null device (was wrongly mapped to OpenGL)
+    [InlineData(16, GraphicsApiType.Unknown)]    // Metal (not a Windows renderer)
+    public void UnityBootConfigMapsGfxDeviceTypeToTheCorrectApi(int deviceType, GraphicsApiType expected)
+    {
+        var data = Path.Combine(root, "Game_Data");
+        Directory.CreateDirectory(data);
+        File.WriteAllText(Path.Combine(data, "boot.config"), $"gfx-device-type={deviceType}\n");
+        Assert.Equal(expected, GraphicsApiDetector.DetectUnityFromBootConfig(root));
+    }
+
     [Fact]
     public void MultipleApisDoNotSelectTheHighestOrAssumeDx11()
     {

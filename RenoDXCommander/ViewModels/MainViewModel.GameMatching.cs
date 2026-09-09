@@ -621,6 +621,13 @@ public partial class MainViewModel
             or "d3d11.dll" or "d3d12.dll" or "dxgi.dll" or "vulkan-1.dll" or "opengl32.dll")
             return true;
 
+        // Translation-wrapper stubs (dgVoodoo2 / DXVK / nGlide) proxy these legacy names but
+        // internally import d3d11/dxgi/vulkan. Scanning them would misread a wrapped legacy
+        // game (DDraw/Glide via dgVoodoo2) as native DX11/DX12. The game's own exe imports
+        // already carry its real API; the wrapper is reconciled by hasLegacyTranslation.
+        if (name is "ddraw.dll" or "d3dimm.dll" or "glide.dll" or "glide2x.dll" or "glide3x.dll")
+            return true;
+
         // System / CRT / VC runtime
         if (name.StartsWith("api-ms-win-") || name.StartsWith("vcruntime")
             || name.StartsWith("msvcp") || name.StartsWith("ucrtbase"))

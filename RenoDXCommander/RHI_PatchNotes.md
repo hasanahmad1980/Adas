@@ -1,3 +1,9 @@
+## v2.6.39 — Graphics-API detection fixes (2026-09-09)
+
+- Fixed the **Unity `boot.config` renderer mapping**. `gfx-device-type` values were mis-mapped: `2` (Direct3D11) was read as DX9, `17` (OpenGLCore) as DX11, and `4` (Null device) as OpenGL. Corrected to the real Unity `GraphicsDeviceType` values (2→DX11, 18→DX12, 21→Vulkan, 0/8/11/17→OpenGL, 1→DX9), so Unity games that pin a renderer are no longer routed down the wrong path (the common DX11 case was being treated as DX9).
+- Fixed an **over-eager `dxgi.dll` → DX12 inference**. A `dxgi.dll` import alongside a real lower-priority Direct3D API (e.g. `d3d10.dll`) no longer promotes the game to DX12, and a game that delay-loads `d3d11.dll`/`d3d12.dll` now gets its delay-import scan instead of returning DX12 early. The dxgi-only → DX12 fallback is deferred until after that scan and only fires when no explicit Direct3D DLL was found.
+- **Translation-wrapper hardening for older games.** The install-folder DLL scan now also skips `ddraw.dll` / `d3dimm.dll` / `glide*.dll` wrapper stubs (dgVoodoo2 / DXVK / nGlide), which internally import `d3d11`/`dxgi`/`vulkan`. Previously a DDraw/Glide game translated by dgVoodoo2 could be misread as native DX11/DX12 from the wrapper stub; the game's own executable imports remain the source of truth.
+
 ## v2.6.38 — DLSS 5 upstream refresh (2026-09-09)
 
 - Updated the **OptiScaler pre-SR multipass** fork (wilsjo2) to **0.7.5-nr-fixes**: fixes Neural Rendering staying stuck at startup under DXVK/Proton, fixes flashing in the generate-before/apply-after mode, and folds in an NR motion-vector fix (independent depth/MV offsets and per-axis scaling) for the pre-SR and multipass DX12/Vulkan paths. The `RunBeforeSR` / `Passes` / `Precision` keys Adas writes are unchanged; FP8 remains the cross-generation default.

@@ -277,11 +277,11 @@ public static class GraphicsApiDetector
                 }
             }
 
-            // If dxgi.dll was imported but no explicit D3D DLL was found (or only
-            // a lower-priority API like OpenGL), infer DX12. Modern DX12 games
-            // often create devices through DXGI alone without importing d3d12.dll.
-            if (importsDxgi && bestPriority < Priority[GraphicsApiType.DirectX11])
-                return GraphicsApiType.DirectX12;
+            // NOTE: DXGI is shared by DX10/DX11/DX12. A dxgi.dll import next to a real
+            // lower-priority D3D API (e.g. d3d10.dll → DX10) must NOT be promoted to DX12,
+            // and a game that delay-loads d3d11/d3d12 must still get its delay scan. So the
+            // dxgi-only → DX12 inference is deferred until after the delay-load scan, and
+            // only fires when no explicit D3D DLL was found at all (see below).
 
             // Scan delay-load import table ONLY when no explicit DX11+ was found in regular imports.
             // UE4 games that support DX12 optionally but default to DX11 explicitly import d3d11.dll —
@@ -704,14 +704,17 @@ public static class GraphicsApiDetector
                     var valueStr = trimmed.Substring("gfx-device-type=".Length).Trim();
                     if (int.TryParse(valueStr, out int deviceType))
                     {
+                        // Unity's Rendering.GraphicsDeviceType: Direct3D9=1, Direct3D11=2,
+                        // Direct3D12=18, Vulkan=21, OpenGLCore=17, OpenGLES2=8, OpenGLES3=11,
+                        // OpenGL2(legacy)=0, Null=4, Metal=16.
                         return deviceType switch
                         {
-                            2  => GraphicsApiType.DirectX9,
-                            17 => GraphicsApiType.DirectX11,
+                            1  => GraphicsApiType.DirectX9,
+                            2  => GraphicsApiType.DirectX11,
                             18 => GraphicsApiType.DirectX12,
                             21 => GraphicsApiType.Vulkan,
-                            4  => GraphicsApiType.OpenGL,
-                            _  => GraphicsApiType.Unknown,
+                            0 or 8 or 11 or 17 => GraphicsApiType.OpenGL,
+                            _  => GraphicsApiType.Unknown, // 4 = Null (no device), 16 = Metal, etc.
                         };
                     }
                 }
