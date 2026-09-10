@@ -1,3 +1,8 @@
+## v2.6.47 — Move NeuralScreen to a global Tools menu (2026-09-10)
+
+- **NeuralScreen is now in the top toolbar's "Tools" menu**, not inside each game's DLSS 5 setup dialog. It is a whole-desktop Neural Rendering overlay unrelated to any specific game, so listing it per-game was misleading. Launching it from the toolbar also shows a proper progress/result dialog (the per-game location couldn't, because the setup screen is itself a `ContentDialog` and WinUI's single-dialog gate swallowed the feedback).
+- The per-game "alternate tools" note now points to the Tools menu for the desktop overlay.
+
 ## v2.6.46 — Fix NeuralScreen launch (2026-09-10)
 
 - Fixed **"Launch NeuralScreen … does nothing"**. Two causes: the pinned download URL 404'd (the old `v1.5.1` asset never actually shipped — the release carried a differently-named file), and the launch button's status/error messages were shown through a `ContentDialog` opened *inside* the DLSS 5 setup screen, which WinUI's single-dialog gate silently swallowed — so a failed download produced no visible feedback.

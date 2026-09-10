@@ -79,6 +79,17 @@
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>
+                    <Button x:Name="ToolsBtn" Content="Tools"
+                            Background="{StaticResource SurfaceInputBrush}" Foreground="{StaticResource AccentTealBrush}"
+                            BorderBrush="{StaticResource AccentTealBorderBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="12,7" FontSize="12"
+                            ToolTipService.ToolTip="Whole-desktop tools, unrelated to any specific game">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuFlyoutItem x:Name="LaunchNeuralScreenItem" Click="LaunchNeuralScreenButton_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
 
                     <Border Width="1" Height="20" Background="{StaticResource BorderSubtleBrush}" Margin="4,0"/>
 

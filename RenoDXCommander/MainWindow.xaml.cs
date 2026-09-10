@@ -62,6 +62,7 @@ public sealed partial class MainWindow : Window
         _optiScalerService = App.Services.GetRequiredService<IOptiScalerService>();
         _addonPackService = viewModel.AddonPackServiceInstance;
         InitializeComponent();
+        LaunchNeuralScreenItem.Text = $"Launch NeuralScreen {Dlss5ComponentService.NeuralScreenVersion} (whole-desktop NR)";
         // Hide immediately if starting minimized — must be before any Activate() call
         if (App._startMinimized)
             AppWindow.Hide();

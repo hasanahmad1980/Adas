@@ -1080,6 +1080,45 @@ public sealed partial class MainWindow
     private void ChooseShadersButton_Click(object sender, RoutedEventArgs e)
         => _installEventHandler.ChooseShadersButton_Click(sender, e);
 
+    // NeuralScreen is a standalone whole-desktop Neural Rendering overlay — not a per-game route —
+    // so it lives in the global Tools menu, not inside any game's DLSS 5 setup dialog. Because no
+    // ContentDialog is open here, a progress/result dialog shows correctly (unlike inside the setup
+    // dialog, where the single-dialog gate would swallow it — see the nested-ContentDialog gotcha).
+    private async void LaunchNeuralScreenButton_Click(object sender, RoutedEventArgs e)
+    {
+        var progressText = new TextBlock
+        {
+            Text = $"Downloading and verifying NeuralScreen {Dlss5ComponentService.NeuralScreenVersion} (~215 MB, first run only)…",
+            FontSize = 13,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = UIFactory.Brush(ResourceKeys.TextSecondaryBrush),
+        };
+        var progressPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        progressPanel.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
+        progressPanel.Children.Add(progressText);
+        var progressDialog = new ContentDialog
+        {
+            Title = "Launching NeuralScreen…",
+            Content = progressPanel,
+            XamlRoot = Content.XamlRoot,
+            RequestedTheme = ElementTheme.Dark,
+        };
+        _ = DialogService.ShowSafeAsync(progressDialog);
+        try
+        {
+            var components = App.Services.GetRequiredService<Dlss5ComponentService>();
+            await components.LaunchNeuralScreenAsync();
+            progressDialog.Hide();
+            await ShowDlss5MessageAsync("NeuralScreen launched",
+                "NeuralScreen is a separate whole-desktop Neural Rendering overlay (RTX 30/40/50). It is not a per-game install — it processes the whole screen or a selected window and touches no game files. Do not run it in competitive online games: a process named nvngx.dll plus a fullscreen overlay is exactly what anti-cheat looks for.");
+        }
+        catch (Exception ex)
+        {
+            progressDialog.Hide();
+            await ShowDlss5MessageAsync("NeuralScreen could not start", ex.Message);
+        }
+    }
+
     private async void ReShadeAddonsButton_Click(object sender, RoutedEventArgs e)
     {
         try

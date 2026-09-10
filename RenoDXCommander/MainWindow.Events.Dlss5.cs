@@ -753,39 +753,9 @@ public sealed partial class MainWindow
         };
         alternateTools.Children.Add(mainlineOptiButton);
 
-        var neuralScreenButton = new Button
-        {
-            Content = $"Launch NeuralScreen {Dlss5ComponentService.NeuralScreenVersion} (whole-desktop NR)",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-        };
-        var neuralScreenStatus = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            Visibility = Visibility.Collapsed,
-            Margin = new Thickness(0, 2, 0, 0),
-            Foreground = UIFactory.Brush(ResourceKeys.TextTertiaryBrush),
-        };
-        neuralScreenButton.Click += async (_, _) =>
-        {
-            neuralScreenButton.IsEnabled = false;
-            neuralScreenStatus.Visibility = Visibility.Visible;
-            neuralScreenStatus.Foreground = UIFactory.Brush(ResourceKeys.TextTertiaryBrush);
-            neuralScreenStatus.Text = $"Downloading and verifying NeuralScreen {Dlss5ComponentService.NeuralScreenVersion} (~215 MB, first run only)…";
-            try
-            {
-                await components.LaunchNeuralScreenAsync();
-                neuralScreenStatus.Text = "NeuralScreen launched. It is a whole-desktop Neural Rendering overlay — not a per-game install, and it touches no game files. Do not run it in competitive online games (a process named nvngx.dll plus a fullscreen overlay is exactly what anti-cheat looks for).";
-            }
-            catch (Exception ex)
-            {
-                neuralScreenStatus.Foreground = UIFactory.Brush(ResourceKeys.AccentRedBrush);
-                neuralScreenStatus.Text = $"NeuralScreen could not start — {ex.Message}";
-            }
-            finally { neuralScreenButton.IsEnabled = true; }
-        };
-        alternateTools.Children.Add(neuralScreenButton);
-        alternateTools.Children.Add(neuralScreenStatus);
-        alternateTools.Children.Add(MakeDlss5Text("These are separate upstream methods. OneClick manages its own files; mainline OptiScaler beta uses a separate nightly cache and configuration from stable. NeuralScreen is a standalone whole-desktop overlay, downloaded on demand and unrelated to this game's install.", ResourceKeys.TextTertiaryBrush));
+        // NeuralScreen is a whole-desktop overlay unrelated to this game, so it now lives in the
+        // top toolbar's global "Tools" menu instead of this per-game dialog.
+        alternateTools.Children.Add(MakeDlss5Text("These are separate upstream methods. OneClick manages its own files; mainline OptiScaler beta uses a separate nightly cache and configuration from stable. For the whole-desktop NeuralScreen overlay (not tied to any game), use the Tools menu in the top toolbar.", ResourceKeys.TextTertiaryBrush));
         advancedProfiles.Children.Add(alternateTools);
         if (!assessment.Is64Bit)
             advancedProfiles.Children.Add(MakeDlss5Text(
