@@ -5,18 +5,18 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    internal const string NeuralScreenVersion = "1.5.1";
+    internal const string NeuralScreenVersion = "1.5.3";
     private const string NeuralScreenUrl =
-        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.5.1/neuralscreen-v1.5.1-full.zip";
+        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.5.3/neuralscreen-v1.5.3-full.zip";
     private const string NeuralScreenSha256 =
-        "D9D983F4C236BFDF898834F1337CDCDC42880C7161BC083A3C0552C9B422FA52";
+        "A157FA5E3E39F0F9372D5EF63CA86BE6239C8A5920FD1F0556AF87F5D8C12737";
     private static readonly SemaphoreSlim NeuralScreenCacheLock = new(1, 1);
 
     /// <summary>
     /// Launches DLSS5-NeuralScreen — a standalone whole-desktop real-time Neural Rendering
     /// overlay. It is not a per-game route: it processes the whole screen (or one selected
     /// window) and touches no game files. Adas downloads the author's pinned release archive
-    /// at run time (never bundled — 226 MB, and it carries NVIDIA's leaked pre-release
+    /// at run time (never bundled — ~215 MB, and it carries NVIDIA's leaked pre-release
     /// nvngx_dlssnr.dll which Adas must not redistribute), verifies its SHA-256, extracts it
     /// once into the per-user tool cache, and starts NeuralScreen.exe. RTX 30/40/50 only.
     /// </summary>

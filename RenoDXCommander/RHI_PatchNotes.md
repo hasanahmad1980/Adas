@@ -1,3 +1,9 @@
+## v2.6.46 — Fix NeuralScreen launch (2026-09-10)
+
+- Fixed **"Launch NeuralScreen … does nothing"**. Two causes: the pinned download URL 404'd (the old `v1.5.1` asset never actually shipped — the release carried a differently-named file), and the launch button's status/error messages were shown through a `ContentDialog` opened *inside* the DLSS 5 setup screen, which WinUI's single-dialog gate silently swallowed — so a failed download produced no visible feedback.
+- NeuralScreen is now pinned to **v1.5.3** (`neuralscreen-v1.5.3-full.zip`, ~215 MB, SHA-256 verified) from the official GitHub release, and the button now reports progress and any error **inline** under it (downloading/verifying, launched, or the failure reason) instead of via a swallowed dialog.
+- Still never bundled — the archive (with its Python runtime and NVIDIA's leaked pre-release `nvngx_dlssnr.dll`) is downloaded on demand from the author's release only.
+
 ## v2.6.45 — Fix Deep Fried Chicken import button (2026-09-10)
 
 - Fixed the **"Import or update Deep Fried Chicken…" button doing nothing when clicked**. The source chooser was a `ContentDialog`, but WinUI only allows one `ContentDialog` open at a time — and the whole DLSS 5 setup screen already *is* one, so the chooser was silently swallowed by the dialog gate. The chooser is now a **flyout menu** ("Select the official .zip archive…" / "Select an extracted release folder…"); the OS file/folder pickers it opens work correctly from inside the setup dialog. This also fixes the same silent no-op when first selecting the Deep Fried Chicken consumer with nothing cached.
