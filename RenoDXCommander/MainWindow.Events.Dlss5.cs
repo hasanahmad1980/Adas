@@ -241,6 +241,8 @@ public sealed partial class MainWindow
             _ => Dlss5InstallProfile.MaximumQuality,
         };
 
+        var driverWarning = await Task.Run(() => Dlss5CompatibilityService.GetDriverPreflightWarning(assessment.Mode));
+
         var content = new StackPanel { Spacing = 12, MaxWidth = 650 };
         var isInstalled = installedMode != Dlss5DeploymentMode.None;
         content.Children.Add(MakeDlss5StatusCard(
@@ -264,6 +266,12 @@ public sealed partial class MainWindow
         content.Children.Add(MakeDlss5Text("✓ Install or repair the selected rendering components and required runtime files.", ResourceKeys.AccentGreenBrush));
         content.Children.Add(MakeDlss5Text("✓ Apply the selected profile's settings and preserve your existing tuning during repair.", ResourceKeys.AccentGreenBrush));
         content.Children.Add(MakeDlss5Text("✓ Remove obsolete suite files, preserve backups, and verify the finished installation.", ResourceKeys.AccentGreenBrush));
+
+        if (!string.IsNullOrWhiteSpace(driverWarning))
+        {
+            content.Children.Add(MakeDlss5Heading("Driver check"));
+            content.Children.Add(MakeDlss5Text("⚠ " + driverWarning, ResourceKeys.AccentAmberBrush));
+        }
 
         if (assessment.BlockingReasons.Count > 0)
         {

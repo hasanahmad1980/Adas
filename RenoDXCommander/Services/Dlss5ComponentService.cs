@@ -2726,6 +2726,19 @@ public sealed partial class Dlss5ComponentService
         if (record == null) return Array.Empty<string>();
 
         var errors = new List<string>();
+
+        if (record.GpuPreferenceExes.Count > 0)
+        {
+            foreach (var exe in record.GpuPreferenceExes.ToArray())
+                GpuPreferenceService.Clear(exe);
+            record.GpuPreferenceExes.Clear();
+            try { SaveRecord(deploymentPath, record); }
+            catch (Exception ex)
+            {
+                crashReporter.Log("[Dlss5ComponentService.Uninstall] Could not persist cleared GPU-preference list: " + ex.Message);
+            }
+        }
+
         var trackedPaths = record.InstalledHashes.Keys
             .Concat(record.OriginalBackups.Keys)
             .Distinct(StringComparer.OrdinalIgnoreCase)

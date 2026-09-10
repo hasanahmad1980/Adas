@@ -38,6 +38,7 @@ public sealed partial class Dlss5ComponentService
             {
                 var result = await InstallCoreAsync(gameName, assessment, progress, cancellationToken, reShadeChannel, store, profile, overrides).ConfigureAwait(false);
                 if (previous == null) RestoreProfileSettings(root);
+                ApplyGpuPreferenceForInstall(root, assessment.Is64Bit);
                 return result;
             }
 
@@ -81,6 +82,7 @@ public sealed partial class Dlss5ComponentService
                 var issues = Dlss5DiagnosticService.VerifyInstallation(root, assessment.Mode, assessment.Is64Bit);
                 if (issues.Count > 0) throw new IOException(string.Join("; ", issues));
                 journal?.Commit();
+                ApplyGpuPreferenceForInstall(root, assessment.Is64Bit);
                 return result with { Message = "Previous components were removed automatically. Conflicting files are saved in .adas\\preserved. " + result.Message };
             }
             catch (Exception failure)
@@ -97,6 +99,46 @@ public sealed partial class Dlss5ComponentService
             finally { journal?.Dispose(); }
         }
         finally { InstallationLock.Release(); }
+    }
+
+    /// <summary>
+    /// After a successful install, pin the game's executable — and the host64 Feeder helper on 32-bit
+    /// routes — to the discrete/high-performance GPU on hybrid machines, and record the exact exe paths
+    /// on the install record so uninstall clears only what Adas wrote. Best-effort: a registry failure
+    /// never fails the install (the DLSS files are already in place and verified).
+    /// </summary>
+    private void ApplyGpuPreferenceForInstall(string root, bool is64Bit)
+    {
+        try
+        {
+            var exes = new List<string>();
+            var gameExe = new PeHeaderService().FindGameExe(root);
+            if (!string.IsNullOrWhiteSpace(gameExe)) exes.Add(Path.GetFullPath(gameExe));
+            if (!is64Bit)
+            {
+                var host64 = Path.Combine(root, "host64", FeederHost64);
+                if (File.Exists(host64)) exes.Add(Path.GetFullPath(host64));
+            }
+
+            var pinned = exes
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(File.Exists)
+                .Where(GpuPreferenceService.Set)
+                .ToList();
+            if (pinned.Count == 0) return;
+
+            var record = LoadRecord(root);
+            if (record == null) return;
+            foreach (var exe in pinned)
+                if (!record.GpuPreferenceExes.Contains(exe, StringComparer.OrdinalIgnoreCase))
+                    record.GpuPreferenceExes.Add(exe);
+            SaveRecord(root, record);
+            _crashReporter.Log($"[Dlss5ComponentService] Pinned {pinned.Count} exe(s) to the high-performance GPU for '{root}'.");
+        }
+        catch (Exception ex)
+        {
+            _crashReporter.Log("[Dlss5ComponentService] Could not set the hybrid-GPU preference: " + ex.Message);
+        }
     }
 
     private void SaveInstalledProfileSettings(string root)

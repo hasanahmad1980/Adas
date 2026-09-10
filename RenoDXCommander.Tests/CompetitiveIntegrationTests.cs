@@ -1,3 +1,5 @@
+using Microsoft.Win32;
+using RenoDXCommander.Models;
 using RenoDXCommander.Services;
 using Xunit;
 
@@ -50,5 +52,77 @@ public sealed class CompetitiveIntegrationTests
         {
             Directory.Delete(dir, recursive: true);
         }
+    }
+
+    // ── Hybrid-GPU preference (DLSS5oneclick) ──────────────────────────────────
+    private const string GpuPrefSubKey = @"Software\Microsoft\DirectX\UserGpuPreferences";
+
+    [Fact]
+    public void GpuPreferenceSetThenClearRoundTrips()
+    {
+        // A unique, non-existent exe path so we never touch a real game's preference.
+        var exe = Path.Combine(Path.GetTempPath(), "adas-gpupref-" + Guid.NewGuid().ToString("N") + ".exe");
+        var name = Path.GetFullPath(exe);
+        try
+        {
+            Assert.True(GpuPreferenceService.Set(exe));
+            using (var key = Registry.CurrentUser.OpenSubKey(GpuPrefSubKey))
+                Assert.Equal(GpuPreferenceService.HighPerformanceValue, key?.GetValue(name) as string);
+
+            // Idempotent: a second Set is a no-op that still reports success.
+            Assert.True(GpuPreferenceService.Set(exe));
+
+            GpuPreferenceService.Clear(exe);
+            using (var key = Registry.CurrentUser.OpenSubKey(GpuPrefSubKey))
+                Assert.Null(key?.GetValue(name));
+        }
+        finally
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(GpuPrefSubKey, writable: true);
+            key?.DeleteValue(name, throwOnMissingValue: false);
+        }
+    }
+
+    [Fact]
+    public void GpuPreferenceClearLeavesAUserSetValueUntouched()
+    {
+        var exe = Path.Combine(Path.GetTempPath(), "adas-gpupref-" + Guid.NewGuid().ToString("N") + ".exe");
+        var name = Path.GetFullPath(exe);
+        try
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(GpuPrefSubKey, writable: true))
+                key!.SetValue(name, "GpuPreference=1;", RegistryValueKind.String);
+
+            GpuPreferenceService.Clear(exe); // value is not ours → must be preserved
+
+            using var check = Registry.CurrentUser.OpenSubKey(GpuPrefSubKey);
+            Assert.Equal("GpuPreference=1;", check?.GetValue(name) as string);
+        }
+        finally
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(GpuPrefSubKey, writable: true);
+            key?.DeleteValue(name, throwOnMissingValue: false);
+        }
+    }
+
+    // ── Driver pre-flight gate (Feeder/oneclick) ───────────────────────────────
+    [Theory]
+    [InlineData(Dlss5DeploymentMode.Dx11Feeder)]
+    [InlineData(Dlss5DeploymentMode.Dx12Feeder)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12)]
+    [InlineData(Dlss5DeploymentMode.NativeVulkan)]
+    public void DriverPreflightWarnsOn61664ForAffectedRoutes(Dlss5DeploymentMode mode)
+    {
+        Assert.NotNull(Dlss5CompatibilityService.GetDriverPreflightWarning(mode, "616.64"));
+    }
+
+    [Fact]
+    public void DriverPreflightIsSilentForGoodDriverOrUnknownRoute()
+    {
+        // A known-good driver on an affected route, and a known-bad driver on a route that does not
+        // use the RenoDX consumer, both stay silent. (An empty version falls back to the machine's real
+        // driver by design, so it is not asserted here.)
+        Assert.Null(Dlss5CompatibilityService.GetDriverPreflightWarning(Dlss5DeploymentMode.Dx11Feeder, "616.56"));
+        Assert.Null(Dlss5CompatibilityService.GetDriverPreflightWarning(Dlss5DeploymentMode.None, "616.64"));
     }
 }

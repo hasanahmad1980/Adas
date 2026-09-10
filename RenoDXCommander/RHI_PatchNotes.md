@@ -1,3 +1,11 @@
+## v2.6.52 — Hybrid-GPU fix, driver pre-flight, GitHub rate-limit hardening (2026-09-11)
+
+Three engine improvements borrowed from the leading community tools — pure install-engine work, so they apply to every route:
+
+- **Hybrid-GPU preference fix** (from [DLSS5oneclick](https://github.com/faisalkindi/DLSS5oneclick)) — on laptops/desktops with both an integrated and a discrete GPU, a successful install now pins the game executable (and the 64-bit Feeder helper on 32-bit routes) to the **High-performance** GPU via `HKCU\…\DirectX\UserGpuPreferences`, so DLSS 5 does not silently render on the integrated GPU. The write is idempotent and uninstall clears **only** the exact value Adas wrote — a preference you set by hand is left alone.
+- **Driver pre-flight warning** (from [DLSS5-Feeder](https://github.com/jlrouzies-fr/DLSS5-Feeder)) — the install dialog now warns **before** you install when the currently installed NVIDIA driver is a known-bad build for the selected route (e.g. **616.64**, which fails inside D3D12Core with the RenoDX v4.6/v4.7 neural consumer) and recommends driver 616.56, Deep Fried Chicken, or a classic-engine route. Adas still installs if you continue.
+- **GitHub rate-limit hardening** — the two MFG-unlock release lookups (mavismmg MFG Ada Unlock and dashdogy RTXMFG) now go through the shared ETag cache, so installing into many games no longer trips GitHub's API rate limit with 403s.
+
 ## v2.6.51 — Ideas from higher-star DLSS 5 tools (2026-09-11)
 
 Three additions informed by the leading community DLSS 5 tools:

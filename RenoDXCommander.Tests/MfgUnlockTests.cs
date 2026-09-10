@@ -99,7 +99,7 @@ public sealed class MfgUnlockTests
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static MfgUnlockService NewService() => new(new HttpClient(), new NoopCrashReporter());
+    private static MfgUnlockService NewService() => new(new HttpClient(), new NoopCrashReporter(), new GitHubETagCache());
 
     private sealed class NoopCrashReporter : ICrashReporter
     {

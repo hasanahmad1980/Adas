@@ -121,6 +121,12 @@ informed by <https://github.com/Kizzuwatnaa/DLSS5-Autopilot>
 Ada's C# installation and recovery implementation is local to this project; it does not run their installer scripts.
 The MIT permission notice below applies to the Swapper-derived catalog information.
 
+The **hybrid-GPU preference fix** (pinning the game exe to the high-performance GPU via
+`HKCU\Software\Microsoft\DirectX\UserGpuPreferences` after install) was informed by
+<https://github.com/faisalkindi/DLSS5oneclick>, and the **pre-install driver warning** for
+known-bad NVIDIA builds by <https://github.com/jlrouzies-fr/DLSS5-Feeder>. Both are original C#
+in this project; no code or binaries from those tools are used for these features.
+
 ## MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:

@@ -27,6 +27,14 @@ internal sealed class Dlss5InstallRecord
     public bool UnifiedRenoDxSettingsMigrated { get; set; }
     public bool PreferDxvkForDirectX9 { get; set; }
     public DateTime? Dx9FallbackDetectedAtUtc { get; set; }
+
+    /// <summary>
+    /// Full paths of the executables Adas pinned to the high-performance GPU via
+    /// <see cref="RenoDXCommander.Services.GpuPreferenceService"/> during install (the game exe, plus
+    /// the host64 Feeder helper on 32-bit routes). Uninstall clears exactly these entries so a
+    /// hybrid-GPU preference the user set by hand is never removed.
+    /// </summary>
+    public List<string> GpuPreferenceExes { get; set; } = new();
 }
 
 internal sealed class Dlss5IniSettingBackup

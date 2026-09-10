@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 
 namespace RenoDXCommander.Services;
@@ -26,15 +25,16 @@ public sealed class DiagnosticsBundleService
 
     private const int MaxTailLines = 400;
 
-    public async Task<string> BuildReportAsync(string? gameFolder, CancellationToken cancellationToken = default)
+    public Task<string> BuildReportAsync(string? gameFolder, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var sb = new StringBuilder();
         sb.AppendLine("═══════════════════════════════════════════════════════════");
         sb.AppendLine($" Adas diagnostics — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine($" App version : {CrashReporter.AppVersion}");
         sb.AppendLine($" OS          : {Environment.OSVersion}");
         sb.AppendLine($" GPU         : {Nz(Dlss5CompatibilityService.DetectedGpuName)}");
-        sb.AppendLine($" NV driver   : {Nz(await DetectDriverVersionAsync(cancellationToken).ConfigureAwait(false))}");
+        sb.AppendLine($" NV driver   : {Nz(Dlss5CompatibilityService.DetectedDriverVersion)}");
         sb.AppendLine("═══════════════════════════════════════════════════════════");
         sb.AppendLine();
 
@@ -43,7 +43,7 @@ public sealed class DiagnosticsBundleService
         AppendFileTail(sb, "── Current session log", CrashReporter.CurrentSessionLogPath);
         AppendFileTail(sb, "── Most recent crash report", LatestFile("crash_*.txt"));
 
-        return sb.ToString();
+        return Task.FromResult(sb.ToString());
     }
 
     private static void AppendGameSection(StringBuilder sb, string? gameFolder)
@@ -109,27 +109,6 @@ public sealed class DiagnosticsBundleService
                 .FirstOrDefault()?.FullName;
         }
         catch { return null; }
-    }
-
-    private static async Task<string> DetectDriverVersionAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "nvidia-smi.exe",
-                Arguments = "--query-gpu=driver_version --format=csv,noheader",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
-            if (process == null) return "";
-            var output = await process.StandardOutput.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            process.WaitForExit(2500);
-            return output?.Trim() ?? "";
-        }
-        catch { return ""; }
     }
 
     private static string Nz(string? value) => string.IsNullOrWhiteSpace(value) ? "(unknown)" : value;

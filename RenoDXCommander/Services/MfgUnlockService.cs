@@ -41,13 +41,15 @@ public class MfgUnlockService : IMfgUnlockService
 
     private readonly HttpClient _http;
     private readonly ICrashReporter _crashReporter;
+    private readonly GitHubETagCache _etagCache;
     private readonly string _stagingDir;
     private readonly string _versionFile;
 
-    public MfgUnlockService(HttpClient http, ICrashReporter crashReporter)
+    public MfgUnlockService(HttpClient http, ICrashReporter crashReporter, GitHubETagCache etagCache)
     {
         _http = http;
         _crashReporter = crashReporter;
+        _etagCache = etagCache;
         _stagingDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RHI", "mfg-unlock");
@@ -258,18 +260,15 @@ public class MfgUnlockService : IMfgUnlockService
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, GitHubApiUrl);
-            request.Headers.Add("User-Agent", "RHI");
-            request.Headers.Add("Accept", "application/vnd.github+json");
-
-            using var response = await _http.SendAsync(request).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            var json = await _etagCache.GetWithETagAsync(_http, GitHubApiUrl).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(json))
             {
-                _crashReporter.Log($"[MfgUnlockService] GitHub API returned {response.StatusCode}");
+                _crashReporter.Log(_etagCache.IsRateLimited
+                    ? "[MfgUnlockService] GitHub API rate limited — could not fetch the latest MFG Unlock release."
+                    : "[MfgUnlockService] GitHub API returned no release data.");
                 return (null, null, null);
             }
 
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
 
             var candidates = new List<(string version, string? downloadUrl, string? body, Version parsed)>();

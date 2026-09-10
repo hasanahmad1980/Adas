@@ -24,6 +24,7 @@ public sealed class Dlss5CompatibilityService
     // MFG Ada Unlock only applies here: RTX 30 lacks the required machine code and RTX 50 already ships MFG natively.
     private static readonly Regex AdaRtxSeries = new(@"\bRTX\s*40\d{2}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Lazy<string> CachedGpuName = new(DetectGpuNameCore, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly Lazy<string> CachedDriverVersion = new(DetectDriverVersionCore, LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly IPeHeaderService _peHeaderService;
 
     public Dlss5CompatibilityService(IPeHeaderService peHeaderService)
@@ -369,6 +370,36 @@ public sealed class Dlss5CompatibilityService
     /// <summary>The detected primary GPU name (cached), e.g. "NVIDIA GeForce RTX 4080".</summary>
     public static string DetectedGpuName => CachedGpuName.Value;
 
+    /// <summary>The installed NVIDIA display-driver version (cached), e.g. "616.64"; empty when unknown.</summary>
+    public static string DetectedDriverVersion => CachedDriverVersion.Value;
+
+    // Driver builds known to break a specific route before install — the proactive twin of the
+    // post-hoc matrix in Dlss5DiagnosticService.AddKnownLogFindings. Keep the two in sync.
+    private static readonly Regex Driver61664 = new(@"\b616\.64\b", RegexOptions.Compiled);
+
+    /// <summary>
+    /// A pre-install warning when the currently installed NVIDIA driver is a known-bad build for the
+    /// selected route, or <c>null</c> when nothing is known against it. Uses <see cref="DetectedDriverVersion"/>
+    /// when <paramref name="driverVersion"/> is not supplied. Borrowed from the Feeder/oneclick driver
+    /// pre-flight; the recommendation mirrors what the post-install diagnostic already tells users.
+    /// </summary>
+    public static string? GetDriverPreflightWarning(Dlss5DeploymentMode mode, string? driverVersion = null)
+    {
+        var version = string.IsNullOrWhiteSpace(driverVersion) ? DetectedDriverVersion : driverVersion;
+        if (string.IsNullOrWhiteSpace(version)) return null;
+
+        // 616.64 fails inside D3D12Core with the RenoDX v4.6/v4.7 neural consumer that the Feeder
+        // and native RenoDX routes deploy. The classic AIO/OptiScaler routes do not use that consumer.
+        if (Driver61664.IsMatch(version)
+            && (IsFeederMode(mode)
+                || mode is Dlss5DeploymentMode.NativeDirectX12 or Dlss5DeploymentMode.NativeDirectX11
+                    or Dlss5DeploymentMode.NativeVulkan))
+            return "NVIDIA driver 616.64 is known to fail inside D3D12Core with this route's RenoDX neural consumer "
+                 + "(black screen / 0xC0000005). Recommended: roll back to driver 616.56, or use the Deep Fried Chicken "
+                 + "neural consumer / a classic-engine route. Adas will still install if you continue.";
+        return null;
+    }
+
     /// <summary>True when the given GPU name is a GeForce RTX 40-series (Ada) part — the only
     /// GPUs MFG Ada Unlock applies to.</summary>
     public static bool IsAdaGpu(string? gpuName)
@@ -548,6 +579,28 @@ public sealed class Dlss5CompatibilityService
                 if (!string.IsNullOrWhiteSpace(description) && description.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase))
                     return description;
             }
+        }
+        catch { }
+
+        return "";
+    }
+
+    private static string DetectDriverVersionCore()
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "nvidia-smi.exe",
+                Arguments = "--query-gpu=driver_version --format=csv,noheader",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            var output = process?.StandardOutput.ReadLine();
+            process?.WaitForExit(2500);
+            if (!string.IsNullOrWhiteSpace(output)) return output.Trim();
         }
         catch { }
 

@@ -43,13 +43,15 @@ public sealed class RtxMfgUnlockService
 
     private readonly HttpClient _http;
     private readonly ICrashReporter _crashReporter;
+    private readonly GitHubETagCache _etagCache;
     private readonly string _stagingDir;
     private readonly string _versionFile;
 
-    public RtxMfgUnlockService(HttpClient http, ICrashReporter crashReporter)
+    public RtxMfgUnlockService(HttpClient http, ICrashReporter crashReporter, GitHubETagCache etagCache)
     {
         _http = http;
         _crashReporter = crashReporter;
+        _etagCache = etagCache;
         _stagingDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RHI", "rtx40mfg-unlock");
@@ -228,18 +230,16 @@ public sealed class RtxMfgUnlockService
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, GitHubApiUrl);
-            request.Headers.Add("User-Agent", "RHI");
-            request.Headers.Add("Accept", "application/vnd.github+json");
-
-            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            cancellationToken.ThrowIfCancellationRequested();
+            var json = await _etagCache.GetWithETagAsync(_http, GitHubApiUrl).ConfigureAwait(false);
+            if (string.IsNullOrEmpty(json))
             {
-                _crashReporter.Log($"[RtxMfgUnlockService] GitHub API returned {response.StatusCode}");
+                _crashReporter.Log(_etagCache.IsRateLimited
+                    ? "[RtxMfgUnlockService] GitHub API rate limited — could not fetch the latest RTXMFG release."
+                    : "[RtxMfgUnlockService] GitHub API returned no release data.");
                 return (null, null);
             }
 
-            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
