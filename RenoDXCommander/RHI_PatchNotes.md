@@ -1,3 +1,9 @@
+## v2.6.44 — Deep Fried Chicken auto-update (2026-09-10)
+
+- **Deep Fried Chicken now updates itself.** Previously, once any DFC release was cached the import picker never reopened, so a stale build (e.g. the old `1.4.8-alpha`) stayed pinned even with a newer archive sitting in Downloads. Opening the DLSS 5 setup dialog now scans Downloads for the newest official-looking release — a `.zip` **or** an extracted folder — and, if it is a **strictly newer version** than the cache, silently re-imports it (verified against `SHA256SUMS.txt`). The same version is never re-imported on every launch; only a genuine upgrade replaces the cache.
+- Added an always-available **"Import or update Deep Fried Chicken…"** button under the neural-consumer picker. It works even when a cache already exists, so you can point Adas at a release stored anywhere (or force a re-import) instead of being locked to the cached build. Selecting the Deep Fried Chicken consumer also tries a silent Downloads auto-import before prompting.
+- Version comparison understands prerelease tags (`1.7.4` outranks `1.4.8-alpha`, and a stable build outranks the same-numbered prerelease), and folder sources without a dotted name fall back to the `SHA256SUMS.txt` header for their version.
+
 ## v2.6.43 — Deep Fried Chicken folder import (2026-09-10)
 
 - The **Deep Fried Chicken import** flow now accepts an **extracted folder** as well as a `.zip`. DFC releases ship as password-protected `.7z` archives, so after extracting one (password `chicken`) you can point Adas straight at the folder instead of re-zipping it. Import first asks whether to pick a `.zip` or a folder; both are verified against `SHA256SUMS.txt` exactly as before.

@@ -90,18 +90,58 @@ public sealed class DeepFriedChickenService
         HasNativeD3d11 ? new[] { NativeD3d11Addon, NativeD3d11Config } : Array.Empty<string>();
 
     /// <summary>
-    /// Reuses an existing verified cache, or imports the newest official-looking DFC archive from
-    /// the user's Downloads folder. The archive is still supplied by the user; Adas never bundles
-    /// or redistributes the restricted binaries.
+    /// Keeps the cached Deep Fried Chicken up to date automatically. On first use it imports the
+    /// newest official-looking release found in the user's Downloads folder; on later use it silently
+    /// upgrades the cache whenever a strictly newer local release is present (e.g. a stale 1.4.8 cache
+    /// is replaced once a 1.7.4 archive lands in Downloads), and otherwise leaves the cache untouched.
+    /// The release is always supplied by the user; Adas never bundles or redistributes the binaries.
     /// </summary>
     public async Task<bool> EnsureImportedFromDefaultLocationsAsync(string? userProfile = null)
     {
-        if (IsImported) return true;
-        var archive = FindDefaultArchive(userProfile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        if (archive == null) return false;
-        return await ImportAsync(archive).ConfigureAwait(false) == null && IsImported;
+        var source = FindDefaultSource(userProfile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        if (source == null) return IsImported;
+
+        // Nothing cached → import. Something cached → only replace it with a strictly newer release,
+        // so the same version is not re-imported on every launch but an old build is upgraded on sight.
+        if (IsImported && !IsNewerVersion(PeekVersion(source), ImportedVersion))
+            return true;
+
+        return await ImportAsync(source).ConfigureAwait(false) == null && IsImported;
     }
 
+    /// <summary>
+    /// The newest official-looking DFC release (a .zip or an extracted folder) in the user's Downloads,
+    /// preferring the highest version and then the most recently written. Null when none is present.
+    /// </summary>
+    internal static string? FindDefaultSource(string userProfile)
+    {
+        var roots = new[]
+        {
+            Path.Combine(userProfile, "Downloads", "DLSS5"),
+            Path.Combine(userProfile, "Downloads"),
+        }.Where(Directory.Exists);
+
+        var candidates = new List<string>();
+        foreach (var root in roots)
+        {
+            candidates.AddRange(Directory
+                .EnumerateFiles(root, "*.zip", SearchOption.TopDirectoryOnly)
+                .Where(IsOfficialLookingName));
+            // A folder the user extracted a password-protected .7z release into (1.7.4+ workflow):
+            // treat it as a source only when it actually holds the core add-on.
+            candidates.AddRange(Directory
+                .EnumerateDirectories(root, "*", SearchOption.TopDirectoryOnly)
+                .Where(IsOfficialLookingName)
+                .Where(dir => IsNonEmptyFile(Path.Combine(dir, AddonFileName))));
+        }
+
+        return candidates
+            .OrderByDescending(p => VersionSortKey(PeekVersion(p)))
+            .ThenByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+    }
+
+    /// <summary>Retained zip-only discovery used by the review tests; prefer <see cref="FindDefaultSource"/>.</summary>
     internal static string? FindDefaultArchive(string userProfile)
     {
         var roots = new[]
@@ -112,12 +152,77 @@ public sealed class DeepFriedChickenService
         return roots
             .Where(Directory.Exists)
             .SelectMany(root => Directory.EnumerateFiles(root, "*.zip", SearchOption.TopDirectoryOnly))
-            .Where(path => Regex.IsMatch(
-                Path.GetFileName(path),
-                "deep[-_ ]?fried[-_ ]?chicken",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            .Where(IsOfficialLookingName)
             .OrderByDescending(path => File.GetLastWriteTimeUtc(path))
             .FirstOrDefault();
+    }
+
+    private static bool IsOfficialLookingName(string path) => Regex.IsMatch(
+        Path.GetFileName(path),
+        "deep[-_ ]?fried[-_ ]?chicken",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>True when <paramref name="candidate"/> is a strictly newer release than <paramref name="current"/>.</summary>
+    internal static bool IsNewerVersion(string? candidate, string? current)
+    {
+        if (string.IsNullOrWhiteSpace(candidate)) return false;
+        if (string.IsNullOrWhiteSpace(current)) return true;
+        return VersionSortKey(candidate).CompareTo(VersionSortKey(current)) > 0;
+    }
+
+    /// <summary>
+    /// Reads a release's version without a full import: from the file/folder name when it carries a
+    /// dotted version, otherwise from the SHA256SUMS header inside it. Null when neither is available.
+    /// </summary>
+    private static string? PeekVersion(string sourcePath)
+    {
+        var name = Path.GetFileNameWithoutExtension(sourcePath);
+        var match = Regex.Match(name, @"v?\d+\.\d+(?:\.\d+)?[-.\w]*", RegexOptions.IgnoreCase);
+        if (match.Success) return match.Value;
+        var checksum = TryReadChecksumText(sourcePath);
+        return checksum == null ? null : DeriveVersionFromChecksum(checksum);
+    }
+
+    private static byte[]? TryReadChecksumText(string sourcePath)
+    {
+        try
+        {
+            if (File.Exists(sourcePath) && sourcePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                using var zip = ZipFile.OpenRead(sourcePath);
+                var entry = zip.Entries.FirstOrDefault(e =>
+                    Path.GetFileName(e.FullName).Equals(ChecksumFileName, StringComparison.OrdinalIgnoreCase));
+                if (entry == null) return null;
+                using var s = entry.Open();
+                using var ms = new MemoryStream();
+                s.CopyTo(ms);
+                return ms.ToArray();
+            }
+            if (Directory.Exists(sourcePath))
+            {
+                var file = Directory
+                    .EnumerateFiles(sourcePath, ChecksumFileName, SearchOption.AllDirectories)
+                    .FirstOrDefault();
+                return file == null ? null : File.ReadAllBytes(file);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+        }
+        return null;
+    }
+
+    private static (int Major, int Minor, int Patch, int Stability) VersionSortKey(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return (-1, -1, -1, -1);
+        var match = Regex.Match(version, @"(\d+)\.(\d+)(?:\.(\d+))?", RegexOptions.CultureInvariant);
+        if (!match.Success) return (-1, -1, -1, -1);
+        var major = int.Parse(match.Groups[1].Value);
+        var minor = int.Parse(match.Groups[2].Value);
+        var patch = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : 0;
+        // A prerelease (…-alpha/-beta/-rc/-pre/-dev) ranks below the stable build of the same numbers.
+        var stability = Regex.IsMatch(version, @"-(?:alpha|beta|rc|pre|dev)", RegexOptions.IgnoreCase) ? 0 : 1;
+        return (major, minor, patch, stability);
     }
 
     /// <summary>

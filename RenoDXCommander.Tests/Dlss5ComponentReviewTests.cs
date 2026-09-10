@@ -413,6 +413,108 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public async Task EnsureImported_UpgradesStaleCacheWhenNewerReleaseInDownloads()
+    {
+        var profile = CreateTemporaryDirectory("adas-dfc-auto-upgrade");
+        var cache = Path.Combine(profile, "cache");
+        var downloads = Path.Combine(profile, "Downloads");
+        Directory.CreateDirectory(cache);
+        Directory.CreateDirectory(downloads);
+        // Stale cache: an old imported 1.4.8-alpha build the user never cleared.
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(cache, name, "old " + name);
+        WriteSource(cache, "imported-version.txt", "v1.4.8-alpha");
+        // A newer official-looking release now sitting in Downloads.
+        var archive = Path.Combine(downloads, "Deep-Fried-Chicken-v1.7.4.zip");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            WriteArchiveEntry(zip, DeepFriedChickenService.AddonFileName, "new addon");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NvngxShim, "new shim");
+            WriteArchiveEntry(zip, DeepFriedChickenService.ConfigFileName, "new config");
+            WriteArchiveEntry(zip, "SHA256SUMS.txt",
+                $"{Sha256("new addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+                $"{Sha256("new shim")}  {DeepFriedChickenService.NvngxShim}\n");
+        }
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var ok = await dfc.EnsureImportedFromDefaultLocationsAsync(profile);
+
+            Assert.True(ok);
+            Assert.Equal("v1.7.4", dfc.ImportedVersion);
+            Assert.Equal("new addon", File.ReadAllText(dfc.CachedFile(DeepFriedChickenService.AddonFileName)));
+        }
+        finally
+        {
+            Directory.Delete(profile, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureImported_KeepsCacheWhenDownloadsReleaseIsNotNewer()
+    {
+        var profile = CreateTemporaryDirectory("adas-dfc-no-downgrade");
+        var cache = Path.Combine(profile, "cache");
+        var downloads = Path.Combine(profile, "Downloads");
+        Directory.CreateDirectory(cache);
+        Directory.CreateDirectory(downloads);
+        foreach (var name in DeepFriedChickenService.RequiredFiles)
+            WriteSource(cache, name, "current " + name);
+        WriteSource(cache, "imported-version.txt", "v1.7.4");
+        // An older release in Downloads must not clobber the newer cache.
+        var archive = Path.Combine(downloads, "Deep-Fried-Chicken-v1.4.8-alpha.zip");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            WriteArchiveEntry(zip, DeepFriedChickenService.AddonFileName, "old addon");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NvngxShim, "old shim");
+            WriteArchiveEntry(zip, DeepFriedChickenService.ConfigFileName, "old config");
+            WriteArchiveEntry(zip, "SHA256SUMS.txt",
+                $"{Sha256("old addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+                $"{Sha256("old shim")}  {DeepFriedChickenService.NvngxShim}\n");
+        }
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var ok = await dfc.EnsureImportedFromDefaultLocationsAsync(profile);
+
+            Assert.True(ok);
+            Assert.Equal("v1.7.4", dfc.ImportedVersion);
+            Assert.Equal("current " + DeepFriedChickenService.AddonFileName,
+                File.ReadAllText(dfc.CachedFile(DeepFriedChickenService.AddonFileName)));
+        }
+        finally
+        {
+            Directory.Delete(profile, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void FindDefaultSource_DiscoversExtractedReleaseFolder()
+    {
+        var profile = CreateTemporaryDirectory("adas-dfc-folder-discovery");
+        var downloads = Path.Combine(profile, "Downloads");
+        var folder = Path.Combine(downloads, "Deep-Fried-Chicken-v1.7.4");
+        Directory.CreateDirectory(folder);
+        // A folder only counts as a source once it actually holds the core add-on.
+        var emptyFolder = Path.Combine(downloads, "Deep-Fried-Chicken-notes");
+        Directory.CreateDirectory(emptyFolder);
+        WriteSource(folder, DeepFriedChickenService.AddonFileName, "addon");
+
+        try
+        {
+            Assert.Equal(folder, DeepFriedChickenService.FindDefaultSource(profile));
+        }
+        finally
+        {
+            Directory.Delete(profile, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RelocateLegacyReShadeProxy_MovesDx9ReShadeToDxgiAndFreesTranslatorSlot()
     {
         var root = CreateTemporaryDirectory("adas-dx9-reshade-relocation");

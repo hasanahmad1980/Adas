@@ -558,8 +558,26 @@ public sealed partial class MainWindow
         var consumerLabel = MakeDlss5Text("");
         content.Children.Add(consumerCombo);
         content.Children.Add(consumerLabel);
+        // Always-available manual path: Adas auto-imports/upgrades from Downloads on open, but the user
+        // must still be able to point at a release elsewhere (or re-import) even when a cache exists —
+        // the older selection-only flow left anyone with a stale cache unable to update.
+        var reimportDfc = new Button
+        {
+            Content = "Import or update Deep Fried Chicken…",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Visibility = Visibility.Collapsed,
+        };
+        reimportDfc.Click += async (_, _) =>
+        {
+            if (await ImportDeepFriedChickenAsync(dfc))
+                UpdateConsumerLabel();
+        };
+        content.Children.Add(reimportDfc);
         void UpdateConsumerLabel()
         {
+            reimportDfc.Visibility = selectedProfile != Dlss5InstallProfile.NeuralUpstream && consumerCombo.SelectedIndex == 3
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             if (selectedProfile == Dlss5InstallProfile.NeuralUpstream)
             {
                 consumerCombo.IsEnabled = false;
@@ -572,7 +590,7 @@ public sealed partial class MainWindow
             {
                 if (dfc.IsImported)
                 {
-                    consumerLabel.Text = $"✓ Deep Fried Chicken {dfc.ImportedVersion} imported and SHA-256 verified — replaces the RenoDX consumer wherever it deploys. Adas uses its newer reviewed DLSS 5 bridge on native routes instead of stacking the older bridge from the DFC archive. Frame Generation is available but remains experimental; disable it if a title black-screens or becomes unstable. Licence: personal / non-commercial; Adas never redistributes DFC.";
+                    consumerLabel.Text = $"✓ Deep Fried Chicken {dfc.ImportedVersion} imported and SHA-256 verified — replaces the RenoDX consumer wherever it deploys. Adas upgrades this cache automatically when a newer release is in Downloads; use the button below to point at a release elsewhere or force a re-import. Adas uses its newer reviewed DLSS 5 bridge on native routes instead of stacking the older bridge from the DFC archive. Frame Generation is available but remains experimental; disable it if a title black-screens or becomes unstable. Licence: personal / non-commercial; Adas never redistributes DFC.";
                     consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentGreenBrush);
                 }
                 else
@@ -619,7 +637,9 @@ public sealed partial class MainWindow
         {
             if (consumerCombo.SelectedIndex == 3 && !dfc.IsImported)
             {
-                if (!await ImportDeepFriedChickenAsync(dfc))
+                // Try a silent auto-import from Downloads first; only prompt when nothing is found.
+                await dfc.EnsureImportedFromDefaultLocationsAsync();
+                if (!dfc.IsImported && !await ImportDeepFriedChickenAsync(dfc))
                     consumerCombo.SelectedIndex = 0;
             }
             UpdateConsumerLabel();
