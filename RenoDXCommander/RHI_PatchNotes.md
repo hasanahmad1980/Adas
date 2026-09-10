@@ -1,3 +1,7 @@
+## v2.6.50 — NeuralScreen 1.5.6 (2026-09-11)
+
+- **NeuralScreen** re-pinned **1.5.5 → 1.5.6** (SHA-256 verified, `NeuralScreen.exe` at archive root). All other upstream components remain current.
+
 ## v2.6.49 — Upstream refresh: NeuralScreen 1.5.5, AIO 2.2.3, OneClick 0.13.12 (2026-09-10)
 
 - **NeuralScreen** re-pinned **1.5.3 → 1.5.5** (SHA-256 verified, `NeuralScreen.exe` at archive root).
