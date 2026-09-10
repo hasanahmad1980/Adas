@@ -36,6 +36,9 @@ public sealed class Dlss5CompatibilityService
         "EasyAntiCheat", "EasyAntiCheat_EOS", "BEService", "BattlEye", "BEClient",
         "EOSAntiCheat", "vgk", "RiotClient", "FACEIT", "XIGNCODE", "mhyprot",
         "nProtect", "GameGuard",
+        // Broadened to match DLSS5-Autopilot's install-time anti-cheat gate catalog.
+        "EAAntiCheat", "EAAntiCheatService", "PnkBstr", "PunkBuster", "denuvo",
+        "ACE-BASE", "anticheatexpert", "SGuard", "Wellbia",
     };
 
     private static readonly string[] MultiplayerMarkers =

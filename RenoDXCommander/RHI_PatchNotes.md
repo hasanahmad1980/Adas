@@ -1,3 +1,11 @@
+## v2.6.51 — Ideas from higher-star DLSS 5 tools (2026-09-11)
+
+Three additions informed by the leading community DLSS 5 tools:
+
+- **Universal MFG unlock (RTX 40)** — a new **Tools** action for dashdogy's [RTX40MFG-Unlock](https://github.com/dashdogy/RTX40MFG-Unlock) (MIT), a ReShade-free MFG unlock. Adas downloads the latest `RTXMFG.dll` at run time and deploys it under a proxy filename you pick (default `dxgi.dll`), backing up any existing DLL of that name for exact restore. In game, press **Backspace** for its menu (fixed multipliers up to 6x, Dynamic MFG). Offered as a separate route from the mavismmg MFG Ada Unlock add-on; never installed alongside it. RTX 40 only (RTX 30 experimental); single-player only.
+- **Broadened anti-cheat gate** — the install-time anti-cheat detection catalog now matches [DLSS5-Autopilot](https://github.com/Kizzuwatnaa/DLSS5-Autopilot)'s list, adding EA AntiCheat, PunkBuster, Denuvo Anti-Cheat, AntiCheat Expert (ACE), SGuard and Wellbia markers.
+- **Save diagnostics** — a new **Tools** action, informed by [DLSS5-Swapper](https://github.com/rakanki911/DLSS5-Swapper), that assembles one reviewable text report (app log, latest crash report, GPU + driver, and the selected game's install manifest and ReShade/Feeder logs), shows it to you before it is written, and never uploads it.
+
 ## v2.6.50 — NeuralScreen 1.5.6 (2026-09-11)
 
 - **NeuralScreen** re-pinned **1.5.5 → 1.5.6** (SHA-256 verified, `NeuralScreen.exe` at archive root). All other upstream components remain current.

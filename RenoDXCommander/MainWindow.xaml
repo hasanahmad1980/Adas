@@ -3144,6 +3144,9 @@
                                 <Button.Flyout>
                                     <MenuFlyout Placement="Bottom">
                                         <MenuFlyoutItem x:Name="LaunchNeuralScreenItem" Click="LaunchNeuralScreenButton_Click"/>
+                                        <MenuFlyoutItem x:Name="RtxMfgUnlockItem" Text="Universal MFG unlock (RTX 40, proxy DLL)…" Click="RtxMfgUnlockButton_Click"/>
+                                        <MenuFlyoutSeparator/>
+                                        <MenuFlyoutItem x:Name="SaveDiagnosticsItem" Text="Save diagnostics…" Click="SaveDiagnosticsButton_Click"/>
                                     </MenuFlyout>
                                 </Button.Flyout>
                             </Button>

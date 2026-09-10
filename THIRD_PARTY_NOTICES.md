@@ -46,6 +46,14 @@ A fork of the original add-on by Dreamt, itself built against <https://github.co
 
 Adas does not bundle this add-on. The MFG Unlock component downloads the author's prebuilt `renodx-mfgunlock.addon64` release asset directly from the official GitHub release at install time and deploys only that file. No NVIDIA DLSS/Streamline binaries are included with this integration; Adas manages the game's existing `nvngx_dlssg.dll` through its normal DLSS/Streamline flow.
 
+## Universal RTXMFG (RTX40MFG-Unlock)
+
+Source: <https://github.com/dashdogy/RTX40MFG-Unlock>
+
+Copyright (c) 2026 dashdogy. Licensed under the MIT License. A ReShade-free alternative DLSS Multi Frame Generation unlock for RTX 40-series (experimental RTX 30) GPUs: a single `RTXMFG.dll` renamed to a proxy filename the game loads early, with an in-game menu (Backspace) offering fixed multipliers up to 6x and Dynamic MFG. It modifies no NVIDIA runtime files and requires a game that already has a Streamline DLSS Frame Generation integration.
+
+Adas does not bundle it. The "Universal MFG unlock" Tools action downloads the current `RTXMFG-v*.zip` release archive from the official GitHub release at run time, extracts `RTXMFG.dll`, and deploys it under the proxy filename the user selects, backing up any existing DLL of that name in `.adas\backups\rtxmfg` for exact restoration. It is offered as a separate route from the mavismmg MFG Ada Unlock add-on and is never installed into the same folder alongside it.
+
 ## ReShade standard shader headers
 
 Source: <https://github.com/crosire/reshade-shaders>
@@ -102,9 +110,13 @@ License: <https://github.com/umar-afzaal/LumeniteFX/blob/mainline/LICENSE.md>
 
 ## DLSS5-Swapper / DLSS5-Autopilot
 
-The profile-switching workflow and emulator recognition catalog were informed by
-<https://github.com/rakanki911/DLSS5-Swapper> (MIT, Copyright (c) 2026 Rakan Alkhaldi)
-and the emulator catalog it credits at <https://github.com/Kizzuwatnaa/DLSS5-Autopilot>
+The profile-switching workflow, emulator recognition catalog, and the "save
+diagnostics" report (a single reviewable text file of the app log, latest crash
+report, GPU/driver, and the selected game's manifest and ReShade/Feeder logs,
+shown before it is written and never uploaded) were informed by
+<https://github.com/rakanki911/DLSS5-Swapper> (MIT, Copyright (c) 2026 Rakan Alkhaldi).
+The install-time anti-cheat gate catalog and the emulator catalog it credits were
+informed by <https://github.com/Kizzuwatnaa/DLSS5-Autopilot>
 (MIT, Copyright (c) 2026 DLSS 5 Autopilot contributors).
 Ada's C# installation and recovery implementation is local to this project; it does not run their installer scripts.
 The MIT permission notice below applies to the Swapper-derived catalog information.

@@ -110,6 +110,8 @@ public partial class App : Application
         services.AddSingleton<DlssPresetService>();
         services.AddSingleton<DofFixService>();
         services.AddSingleton<MfgUnlockService>();
+        services.AddSingleton<RtxMfgUnlockService>();
+        services.AddSingleton<DiagnosticsBundleService>();
         services.AddSingleton<AutoUpdateService>();
         services.AddSingleton<DlssEnablerService>();
         services.AddSingleton<Renodx5AddonService>();

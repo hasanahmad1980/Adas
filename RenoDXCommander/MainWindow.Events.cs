@@ -1119,6 +1119,168 @@ public sealed partial class MainWindow
         }
     }
 
+    // Universal MFG unlock (dashdogy/RTX40MFG-Unlock) — a ReShade-free alternative to the
+    // per-game MFG Ada Unlock add-on. It deploys a single RTXMFG.dll under a proxy filename
+    // the game loads early; the in-game menu opens with Backspace. Whole-app Tools action so
+    // its config/progress dialogs are not swallowed by the DLSS 5 setup dialog's single gate.
+    private async void RtxMfgUnlockButton_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = await PickGameFolderAsync(ViewModel.SelectedGame?.InstallPath);
+        if (string.IsNullOrEmpty(folder)) return;
+
+        var service = App.Services.GetRequiredService<RtxMfgUnlockService>();
+        var alreadyInstalled = RtxMfgUnlockService.IsInstalledIn(folder);
+
+        var combo = new ComboBox
+        {
+            Header = "Proxy filename (must be one the game loads early)",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            IsEnabled = !alreadyInstalled,
+        };
+        foreach (var name in RtxMfgUnlockService.ProxyFilenames) combo.Items.Add(name);
+        combo.SelectedItem = RtxMfgUnlockService.DefaultProxyFilename;
+
+        var panel = new StackPanel { Spacing = 10, MaxWidth = 460 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = alreadyInstalled
+                ? "Universal RTXMFG is already installed in this folder. You can restore the original file below."
+                : "Deploys dashdogy's Universal RTXMFG.dll beside the game executable under the proxy name you pick "
+                  + "(dxgi.dll suits most DX10/11/12 games). Adas backs up any existing DLL of that name and can restore it. "
+                  + "In game, press Backspace to open the menu (multipliers up to 6x, Dynamic MFG).",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = UIFactory.Brush(ResourceKeys.TextSecondaryBrush),
+        });
+        panel.Children.Add(combo);
+        panel.Children.Add(new TextBlock
+        {
+            Text = "⚠ RTX 40-series (Ada) only; RTX 30 support is experimental. Single-player only — a renamed proxy DLL "
+                   + "plus frame-gen hooks can trigger anti-cheat in online games.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12,
+            Foreground = UIFactory.Brush(ResourceKeys.TextSecondaryBrush),
+        });
+
+        var dialog = new ContentDialog
+        {
+            Title = "Universal MFG unlock (RTX 40)",
+            Content = panel,
+            PrimaryButtonText = alreadyInstalled ? "Reinstall" : "Install",
+            SecondaryButtonText = alreadyInstalled ? "Restore original" : string.Empty,
+            CloseButtonText = "Cancel",
+            XamlRoot = Content.XamlRoot,
+            RequestedTheme = ElementTheme.Dark,
+        };
+
+        var result = await DialogService.ShowSafeAsync(dialog);
+        if (result == ContentDialogResult.None) return;
+
+        if (result == ContentDialogResult.Secondary)
+        {
+            var restored = service.Uninstall(folder);
+            await ShowDlss5MessageAsync(
+                restored ? "Universal RTXMFG removed" : "Could not remove Universal RTXMFG",
+                restored ? "The proxy DLL was removed and any original file restored." : "See the log for details.");
+            return;
+        }
+
+        var proxyName = combo.SelectedItem as string ?? RtxMfgUnlockService.DefaultProxyFilename;
+        var progressPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        progressPanel.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
+        progressPanel.Children.Add(new TextBlock
+        {
+            Text = "Downloading the latest Universal RTXMFG and deploying…",
+            FontSize = 13,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = UIFactory.Brush(ResourceKeys.TextSecondaryBrush),
+        });
+        var progressDialog = new ContentDialog
+        {
+            Title = "Installing Universal MFG…",
+            Content = progressPanel,
+            XamlRoot = Content.XamlRoot,
+            RequestedTheme = ElementTheme.Dark,
+        };
+        _ = DialogService.ShowSafeAsync(progressDialog);
+        try
+        {
+            var ok = await service.InstallAsync(folder, proxyName);
+            progressDialog.Hide();
+            await ShowDlss5MessageAsync(
+                ok ? "Universal MFG installed" : "Universal MFG install failed",
+                ok
+                    ? $"Deployed as {proxyName}. Launch the game, enable DLSS Frame Generation, and press Backspace to open the menu. "
+                      + "Use \"Restore original\" here to remove it cleanly."
+                    : "The release could not be downloaded or deployed. See the log for details.");
+        }
+        catch (Exception ex)
+        {
+            progressDialog.Hide();
+            await ShowDlss5MessageAsync("Universal MFG install failed", ex.Message);
+        }
+    }
+
+    // Save diagnostics — one text report (app log + latest crash + GPU/driver + the selected
+    // game's manifest and ReShade/Feeder logs), shown before it is written and never uploaded.
+    private async void SaveDiagnosticsButton_Click(object sender, RoutedEventArgs e)
+    {
+        string report;
+        try
+        {
+            var service = App.Services.GetRequiredService<DiagnosticsBundleService>();
+            report = await service.BuildReportAsync(ViewModel.SelectedGame?.InstallPath);
+        }
+        catch (Exception ex)
+        {
+            await ShowDlss5MessageAsync("Could not build diagnostics", ex.Message);
+            return;
+        }
+
+        var preview = new TextBox
+        {
+            Text = report,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+            FontSize = 11,
+            Height = 360,
+            Width = 560,
+        };
+        ScrollViewer.SetVerticalScrollBarVisibility(preview, ScrollBarVisibility.Auto);
+        ScrollViewer.SetHorizontalScrollBarVisibility(preview, ScrollBarVisibility.Auto);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Diagnostics report",
+            Content = preview,
+            PrimaryButtonText = "Save…",
+            CloseButtonText = "Close",
+            XamlRoot = Content.XamlRoot,
+            RequestedTheme = ElementTheme.Dark,
+        };
+        if (await DialogService.ShowSafeAsync(dialog) != ContentDialogResult.Primary) return;
+
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker
+            {
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Desktop,
+                SuggestedFileName = $"adas-diagnostics-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}",
+            };
+            picker.FileTypeChoices.Add("Text file", new List<string> { ".txt" });
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            var file = await picker.PickSaveFileAsync();
+            if (file == null) return;
+            await Windows.Storage.FileIO.WriteTextAsync(file, report);
+            await ShowDlss5MessageAsync("Diagnostics saved", $"Saved to:\n{file.Path}");
+        }
+        catch (Exception ex)
+        {
+            await ShowDlss5MessageAsync("Could not save diagnostics", ex.Message);
+        }
+    }
+
     private async void ReShadeAddonsButton_Click(object sender, RoutedEventArgs e)
     {
         try

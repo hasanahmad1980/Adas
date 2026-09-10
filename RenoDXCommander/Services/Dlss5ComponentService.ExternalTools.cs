@@ -40,7 +40,7 @@ public sealed partial class Dlss5ComponentService
                 {
                     await DownloadFileAsync(NeuralScreenUrl, archive, cancellationToken).ConfigureAwait(false);
                     if (!FileHelper.ComputeSha256(archive).Equals(NeuralScreenSha256, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("NeuralScreen download did not match the official v1.5.1 SHA-256. Nothing was launched.");
+                        throw new InvalidDataException("NeuralScreen download did not match the official v1.5.6 SHA-256. Nothing was launched.");
                     ZipFile.ExtractToDirectory(archive, toolDirectory, overwriteFiles: true);
                     if (!File.Exists(executable))
                         throw new FileNotFoundException("NeuralScreen.exe was not found in the extracted archive.");
