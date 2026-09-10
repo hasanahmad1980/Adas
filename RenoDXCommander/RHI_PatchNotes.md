@@ -1,3 +1,7 @@
+## v2.6.48 — Show the Tools menu in the real header (2026-09-10)
+
+- Fixes v2.6.47: the "Tools" menu was added to the old legacy toolbar, which is hidden (`Visibility="Collapsed"`) in the current simple-shell layout, so it never appeared. The **Tools** button now sits in the visible header next to **Add game** / **Refresh**, where "Launch NeuralScreen {version} (whole-desktop NR)" lives.
+
 ## v2.6.47 — Move NeuralScreen to a global Tools menu (2026-09-10)
 
 - **NeuralScreen is now in the top toolbar's "Tools" menu**, not inside each game's DLSS 5 setup dialog. It is a whole-desktop Neural Rendering overlay unrelated to any specific game, so listing it per-game was misleading. Launching it from the toolbar also shows a proper progress/result dialog (the per-game location couldn't, because the setup screen is itself a `ContentDialog` and WinUI's single-dialog gate swallowed the feedback).
