@@ -1,3 +1,8 @@
+## v2.6.45 — Fix Deep Fried Chicken import button (2026-09-10)
+
+- Fixed the **"Import or update Deep Fried Chicken…" button doing nothing when clicked**. The source chooser was a `ContentDialog`, but WinUI only allows one `ContentDialog` open at a time — and the whole DLSS 5 setup screen already *is* one, so the chooser was silently swallowed by the dialog gate. The chooser is now a **flyout menu** ("Select the official .zip archive…" / "Select an extracted release folder…"); the OS file/folder pickers it opens work correctly from inside the setup dialog. This also fixes the same silent no-op when first selecting the Deep Fried Chicken consumer with nothing cached.
+- Import errors now show **inline** in red under the picker instead of via a second dialog (which the same gate would have hidden).
+
 ## v2.6.44 — Deep Fried Chicken auto-update (2026-09-10)
 
 - **Deep Fried Chicken now updates itself.** Previously, once any DFC release was cached the import picker never reopened, so a stale build (e.g. the old `1.4.8-alpha`) stayed pinned even with a newer archive sitting in Downloads. Opening the DLSS 5 setup dialog now scans Downloads for the newest official-looking release — a `.zip` **or** an extracted folder — and, if it is a **strictly newer version** than the cache, silently re-imports it (verified against `SHA256SUMS.txt`). The same version is never re-imported on every launch; only a genuine upgrade replaces the cache.

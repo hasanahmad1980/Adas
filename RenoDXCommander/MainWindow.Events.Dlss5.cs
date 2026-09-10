@@ -13,35 +13,20 @@ namespace RenoDXCommander;
 public sealed partial class MainWindow
 {
     /// <summary>
-    /// Prompts the user for the author's official Deep Fried Chicken zip and imports it (unmodified)
-    /// into Adas's cache. Returns true on success. DFC is never bundled — its licence forbids it.
+    /// Runs the file/folder picker for the author's official Deep Fried Chicken release and imports it
+    /// (unmodified) into Adas's cache. DFC releases ship as password-protected .7z archives the user
+    /// extracts, so <paramref name="useFolder"/> selects a folder; otherwise the official .zip.
+    /// Returns <c>null</c> on success, the empty string when the user cancelled the picker, or an error
+    /// message. This uses only OS pickers — never a nested <see cref="ContentDialog"/>, which cannot
+    /// open while the DLSS 5 setup dialog is showing (the dialog gate would swallow it). DFC is never
+    /// bundled — its licence forbids it.
     /// </summary>
-    private async Task<bool> ImportDeepFriedChickenAsync(DeepFriedChickenService dfc)
+    private async Task<string?> TryImportDeepFriedChickenAsync(DeepFriedChickenService dfc, bool useFolder)
     {
+        string? sourcePath;
         try
         {
-            // DFC releases now ship as password-protected .7z archives the user extracts, so accept
-            // either the official .zip or the extracted folder. ImportAsync handles both.
-            var choice = new ContentDialog
-            {
-                Title = "Import Deep Fried Chicken",
-                Content = "Pick the official .zip archive, or the folder you extracted a .7z release into.",
-                PrimaryButtonText = "Select .zip",
-                SecondaryButtonText = "Select folder",
-                CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = Content.XamlRoot,
-            };
-            var choiceResult = await DialogService.ShowSafeAsync(choice);
-            string? sourcePath;
-            if (choiceResult == ContentDialogResult.Primary)
-            {
-                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
-                picker.FileTypeFilter.Add(".zip");
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-                sourcePath = (await picker.PickSingleFileAsync())?.Path;
-            }
-            else if (choiceResult == ContentDialogResult.Secondary)
+            if (useFolder)
             {
                 var picker = new Windows.Storage.Pickers.FolderPicker
                 {
@@ -53,22 +38,18 @@ public sealed partial class MainWindow
             }
             else
             {
-                return false;
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
+                picker.FileTypeFilter.Add(".zip");
+                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                sourcePath = (await picker.PickSingleFileAsync())?.Path;
             }
-            if (string.IsNullOrEmpty(sourcePath)) return false;
-            var error = await dfc.ImportAsync(sourcePath);
-            if (error != null)
-            {
-                await ShowDlss5MessageAsync("Deep Fried Chicken import failed", error);
-                return false;
-            }
-            return true;
         }
         catch (Exception ex)
         {
-            await ShowDlss5MessageAsync("Deep Fried Chicken import failed", ex.Message);
-            return false;
+            return ex.Message;
         }
+        if (string.IsNullOrEmpty(sourcePath)) return string.Empty;
+        return await dfc.ImportAsync(sourcePath);
     }
 
     /// <summary>True when the NVIDIA driver string (e.g. "616.64") is at least major.minor.</summary>
@@ -560,19 +541,39 @@ public sealed partial class MainWindow
         content.Children.Add(consumerLabel);
         // Always-available manual path: Adas auto-imports/upgrades from Downloads on open, but the user
         // must still be able to point at a release elsewhere (or re-import) even when a cache exists —
-        // the older selection-only flow left anyone with a stale cache unable to update.
+        // the older selection-only flow left anyone with a stale cache unable to update. The source
+        // chooser is a MenuFlyout, NOT a ContentDialog: a second ContentDialog cannot open while the
+        // DLSS 5 setup dialog is showing (the dialog gate swallows it), which is why the earlier
+        // dialog-based button "did nothing". The OS file/folder pickers work fine nested.
+        // Declare and assign the button first so the UpdateConsumerLabel local function (which reads it)
+        // is never analysed against an unassigned capture, then attach the chooser flyout below.
         var reimportDfc = new Button
         {
             Content = "Import or update Deep Fried Chicken…",
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Visibility = Visibility.Collapsed,
         };
-        reimportDfc.Click += async (_, _) =>
-        {
-            if (await ImportDeepFriedChickenAsync(dfc))
-                UpdateConsumerLabel();
-        };
         content.Children.Add(reimportDfc);
+        async Task RunDeepFriedChickenImportAsync(bool useFolder)
+        {
+            var error = await TryImportDeepFriedChickenAsync(dfc, useFolder);
+            if (error == string.Empty) return; // user cancelled the picker
+            if (error != null)
+            {
+                consumerLabel.Text = $"Deep Fried Chicken import failed — {error}";
+                consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentRedBrush);
+                return;
+            }
+            UpdateConsumerLabel();
+        }
+        var reimportFlyout = new MenuFlyout();
+        var pickZipItem = new MenuFlyoutItem { Text = "Select the official .zip archive…" };
+        pickZipItem.Click += async (_, _) => await RunDeepFriedChickenImportAsync(useFolder: false);
+        var pickFolderItem = new MenuFlyoutItem { Text = "Select an extracted release folder…" };
+        pickFolderItem.Click += async (_, _) => await RunDeepFriedChickenImportAsync(useFolder: true);
+        reimportFlyout.Items.Add(pickZipItem);
+        reimportFlyout.Items.Add(pickFolderItem);
+        reimportDfc.Flyout = reimportFlyout;
         void UpdateConsumerLabel()
         {
             reimportDfc.Visibility = selectedProfile != Dlss5InstallProfile.NeuralUpstream && consumerCombo.SelectedIndex == 3
@@ -596,7 +597,7 @@ public sealed partial class MainWindow
                 else
                 {
                     var requiredFiles = string.Join(", ", DeepFriedChickenService.RequiredFiles);
-                    consumerLabel.Text = $"No verified Deep Fried Chicken release is cached yet. Adas automatically checks Downloads on first use, then keeps the verified core in local app data for every game and future launch. If it is not there, choose the author's official ZIP once. Its licence forbids Adas from bundling or redistributing the binaries; Adas verifies SHA256SUMS.txt before caching. A valid release contains {requiredFiles}.";
+                    consumerLabel.Text = $"No verified Deep Fried Chicken release is cached yet. Adas automatically checks Downloads on first use, then keeps the verified core in local app data for every game and future launch. If it is not there, use the “Import or update Deep Fried Chicken…” button below to choose the author's official .zip or an extracted release folder once. Its licence forbids Adas from bundling or redistributing the binaries; Adas verifies SHA256SUMS.txt before caching. A valid release contains {requiredFiles}.";
                     consumerLabel.Foreground = UIFactory.Brush(ResourceKeys.AccentAmberBrush);
                 }
                 return;
@@ -635,13 +636,11 @@ public sealed partial class MainWindow
         }
         consumerCombo.SelectionChanged += async (_, _) =>
         {
+            // Try a silent auto-import from Downloads; if nothing is found the visible "Import or update"
+            // flyout button is the manual path (no nested ContentDialog). Leaving it selected-but-unimported
+            // is safe — the install falls back to the recommended consumer unless DFC is actually cached.
             if (consumerCombo.SelectedIndex == 3 && !dfc.IsImported)
-            {
-                // Try a silent auto-import from Downloads first; only prompt when nothing is found.
                 await dfc.EnsureImportedFromDefaultLocationsAsync();
-                if (!dfc.IsImported && !await ImportDeepFriedChickenAsync(dfc))
-                    consumerCombo.SelectedIndex = 0;
-            }
             UpdateConsumerLabel();
         };
 
