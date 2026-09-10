@@ -5,7 +5,7 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    public const string AioVersion = "2.2.1";
+    public const string AioVersion = "2.2.3";
     public const string AioAddon = "standalone-dlssnr.addon64";
     public const string AioShader = "DLSS5_AIO_Feed.fx";
     public const string AioVortBundle = "vort-shaders.zip";
@@ -16,17 +16,13 @@ public sealed partial class Dlss5ComponentService
     // Pin the author-published release rather than a mutable latest URL.
     internal static readonly IReadOnlyDictionary<string, string> AioAssetHashes = new Dictionary<string, string>
     {
-        // v2.2.1 — maintenance release over 2.2.0's Optical Flow motion source. It
-        // quiesces the detached presentation worker before ReShade destroys/recreates the
-        // primary backbuffers, rechecks the resize-transition state right before proxy DXGI
-        // present (cancelling a stale present prepared before the resize), fixes a
-        // null-pointer crash when an overlay such as Discord intercepts the detached Present
-        // during a D3D12 resolution change, and removes Frame Generation pacing while the
-        // ReShade menu is open (restoring the cadence on close). All three reviewed 64-bit
-        // files changed — the add-on, the AIO caller-bridge nvngx.dll, and the feed shader.
+        // v2.2.3 — maintenance release over v2.2.1. The add-on and the AIO caller-bridge
+        // nvngx.dll changed; the feed shader (DLSS5_AIO_Feed.fx) is byte-identical to v2.2.1.
+        // Verified against the author's DLSS5-ReShade-AIO-v2.2.3-64-bit.zip
+        // (SHA-256 60f81ae0accd2e59654427ea78a2b87113bccfdc431ffd9d656c1f79a21210bb).
         // The redundant StandaloneBoundary.fx Vulkan fallback is still not bundled.
-        [AioAddon] = "2048DA1F79BDB22135F6322D42BAE37DF5EEBC9BCE31FE183FCAEAECA2CD66E6",
-        ["nvngx.dll"] = "AE53F7170123732FA6E2B988760CE0DBD833276AE0EB3E3ACEB4D2BBC15F14B7",
+        [AioAddon] = "5DB8CA5E44B3AB248742303E6D37591ADE2FAD76BCEF5EA20C2111F91E11ECF4",
+        ["nvngx.dll"] = "6165E5B4FD7B35D3F4AC3BBA38AEFF32C9403D68CC129837EDC4C7F7AF17E604",
         [AioShader] = "0710E17EEAFA1933AF18489BFB7D7A1D71BD6204D65D337474F835749FD6DE58",
     };
     internal static readonly IReadOnlyDictionary<string, string> AioDefaults = new Dictionary<string, string>

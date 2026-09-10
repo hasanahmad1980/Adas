@@ -1,3 +1,10 @@
+## v2.6.49 — Upstream refresh: NeuralScreen 1.5.5, AIO 2.2.3, OneClick 0.13.12 (2026-09-10)
+
+- **NeuralScreen** re-pinned **1.5.3 → 1.5.5** (SHA-256 verified, `NeuralScreen.exe` at archive root).
+- **DLSS5-ReShade-AIO** bundled binaries updated **2.2.1 → 2.2.3** — the add-on and AIO caller-bridge `nvngx.dll` changed (the feed shader is unchanged); all three files re-verified against the author's v2.2.3 64-bit release.
+- **OneClick** re-pinned **0.13.11 → 0.13.12** (SHA-256 verified).
+- Other upstream components were already current (Feeder 0.15.1, DLSS5 Bridge 1.4.12, Neural Upstream 0.3.0, OptiScaler NR forks), and MFG Ada Unlock / OptiScaler mainline / DXVK / dgVoodoo2 already fetch the latest release at run time.
+
 ## v2.6.48 — Show the Tools menu in the real header (2026-09-10)
 
 - Fixes v2.6.47: the "Tools" menu was added to the old legacy toolbar, which is hidden (`Visibility="Collapsed"`) in the current simple-shell layout, so it never appeared. The **Tools** button now sits in the visible header next to **Add game** / **Refresh**, where "Launch NeuralScreen {version} (whole-desktop NR)" lives.

@@ -64,7 +64,7 @@ Source: <https://github.com/perseval-BLR/DLSS5-NeuralScreen>
 
 Copyright (c) 2026 perseval-BLR. The application's own code is licensed under the MIT License (see the MIT text below). NeuralScreen is a standalone whole-desktop Neural Rendering overlay — not a per-game route — and processes the whole screen or one selected window on RTX 30/40/50 GPUs (RTX 40/30 via an architecture spoof to `0x1B0`).
 
-Adas does not bundle or redistribute NeuralScreen. The optional "Launch NeuralScreen" tool downloads the author's pinned `neuralscreen-v1.5.3-full.zip` release archive from the official GitHub release at run time (verified by SHA-256), extracts it into the per-user tool cache, and starts `NeuralScreen.exe`. The ~215 MB archive carries its own bundled Python runtime and NVIDIA's leaked pre-release `nvngx_dlssnr.dll` (310.8.0); that NVIDIA runtime is NVIDIA's property, is not covered by the MIT licence, and is never redistributed by Adas — it reaches the user only through the author's official release. Do not run NeuralScreen in competitive online games: a process named `nvngx.dll` plus a fullscreen overlay is exactly what anti-cheat systems look for.
+Adas does not bundle or redistribute NeuralScreen. The optional "Launch NeuralScreen" tool downloads the author's pinned `neuralscreen-v1.5.5-full.zip` release archive from the official GitHub release at run time (verified by SHA-256), extracts it into the per-user tool cache, and starts `NeuralScreen.exe`. The ~215 MB archive carries its own bundled Python runtime and NVIDIA's leaked pre-release `nvngx_dlssnr.dll` (310.8.0); that NVIDIA runtime is NVIDIA's property, is not covered by the MIT licence, and is never redistributed by Adas — it reaches the user only through the author's official release. Do not run NeuralScreen in competitive online games: a process named `nvngx.dll` plus a fullscreen overlay is exactly what anti-cheat systems look for.
 
 ## Deep Fried Chicken
 
@@ -119,7 +119,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 # Standalone AIO integration
 
 Adas packages the three unmodified author-published assets from
-[DLSS5-Reshade-AIO v2.2.1](https://github.com/kibblerz/DLSS5-Reshade-AIO/releases/tag/v2.2.1)
+[DLSS5-Reshade-AIO v2.2.3](https://github.com/kibblerz/DLSS5-Reshade-AIO/releases/tag/v2.2.3)
 for local offline installation. SHA-256 values are pinned.
 The repository did not expose a redistribution licence when checked on 2026-09-10;
 do not publicly redistribute this private installer without resolving that permission.

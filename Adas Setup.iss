@@ -1,5 +1,5 @@
 #define MyAppName "Adas"
-#define MyAppVersion "2.6.48"
+#define MyAppVersion "2.6.49"
 #define MyAppPublisher "Adas"
 #define MyAppURL "https://github.com/RankFTW/RHI"
 #define MyAppExeName "RHI.exe"

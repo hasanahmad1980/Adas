@@ -5,11 +5,11 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    internal const string NeuralScreenVersion = "1.5.3";
+    internal const string NeuralScreenVersion = "1.5.5";
     private const string NeuralScreenUrl =
-        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.5.3/neuralscreen-v1.5.3-full.zip";
+        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.5.5/neuralscreen-v1.5.5-full.zip";
     private const string NeuralScreenSha256 =
-        "A157FA5E3E39F0F9372D5EF63CA86BE6239C8A5920FD1F0556AF87F5D8C12737";
+        "4B9F4193AEDA0F09554A6567B3776EB8D223E7E9FF1B8115039DB257CDE2FEF5";
     private static readonly SemaphoreSlim NeuralScreenCacheLock = new(1, 1);
 
     /// <summary>
@@ -59,9 +59,9 @@ public sealed partial class Dlss5ComponentService
     }
 
     private const string OneClickUrl =
-        "https://github.com/faisalkindi/DLSS5oneclick/releases/download/v0.13.11/dlss5oneclick.exe";
+        "https://github.com/faisalkindi/DLSS5oneclick/releases/download/v0.13.12/dlss5oneclick.exe";
     private const string OneClickSha256 =
-        "73DAE613E68F3A4BC94B63216060F5229EAA1D09D7E734D52F980788F27F5660";
+        "119B143E08C833787AEECFDF0E8107D0C0003FB60FC007667CEAE9A0F16C5B76";
 
     public async Task LaunchOneClickAsync(string gameFolder, CancellationToken cancellationToken = default)
     {
@@ -83,7 +83,7 @@ public sealed partial class Dlss5ComponentService
                 await DownloadFileAsync(OneClickUrl, temporary, cancellationToken).ConfigureAwait(false);
                 ValidatePortableExecutable(temporary, 1024 * 1024, "dlss5oneclick.exe", expectedMachine: 0x8664);
                 if (!FileHelper.ComputeSha256(temporary).Equals(OneClickSha256, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("OneClick download did not match the official v0.13.11 SHA-256. Nothing was launched.");
+                    throw new InvalidDataException("OneClick download did not match the official v0.13.12 SHA-256. Nothing was launched.");
                 File.Move(temporary, executable, overwrite: true);
             }
             finally { DeleteIfExists(temporary); }

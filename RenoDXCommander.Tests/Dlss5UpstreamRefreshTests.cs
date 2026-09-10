@@ -11,7 +11,7 @@ public sealed class Dlss5UpstreamRefreshTests
     {
         Assert.Equal("0.15.1", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
-        Assert.Equal("0.13.11", Dlss5ComponentService.OneClickVersion);
+        Assert.Equal("0.13.12", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, false));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.Dx11Feeder, true));
@@ -224,7 +224,8 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.9", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.1.1", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.2.0", true)]
-    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.2.1", false)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.2.1", true)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.2.3", false)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.1.2", true)]
     [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.2.0", false)]
     [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.1-hybrid", true)]
