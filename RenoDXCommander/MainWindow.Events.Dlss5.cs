@@ -20,12 +20,43 @@ public sealed partial class MainWindow
     {
         try
         {
-            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
-            picker.FileTypeFilter.Add(".zip");
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-            var file = await picker.PickSingleFileAsync();
-            if (file == null) return false;
-            var error = await dfc.ImportAsync(file.Path);
+            // DFC releases now ship as password-protected .7z archives the user extracts, so accept
+            // either the official .zip or the extracted folder. ImportAsync handles both.
+            var choice = new ContentDialog
+            {
+                Title = "Import Deep Fried Chicken",
+                Content = "Pick the official .zip archive, or the folder you extracted a .7z release into.",
+                PrimaryButtonText = "Select .zip",
+                SecondaryButtonText = "Select folder",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = Content.XamlRoot,
+            };
+            var choiceResult = await DialogService.ShowSafeAsync(choice);
+            string? sourcePath;
+            if (choiceResult == ContentDialogResult.Primary)
+            {
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
+                picker.FileTypeFilter.Add(".zip");
+                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                sourcePath = (await picker.PickSingleFileAsync())?.Path;
+            }
+            else if (choiceResult == ContentDialogResult.Secondary)
+            {
+                var picker = new Windows.Storage.Pickers.FolderPicker
+                {
+                    SuggestedStartLocation = PickerLocationId.Downloads,
+                };
+                picker.FileTypeFilter.Add("*");
+                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                sourcePath = (await picker.PickSingleFolderAsync())?.Path;
+            }
+            else
+            {
+                return false;
+            }
+            if (string.IsNullOrEmpty(sourcePath)) return false;
+            var error = await dfc.ImportAsync(sourcePath);
             if (error != null)
             {
                 await ShowDlss5MessageAsync("Deep Fried Chicken import failed", error);

@@ -377,6 +377,42 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public async Task DeepFriedChickenImport_FromExtractedFolder_DerivesVersionFromChecksumHeader()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-folder-import");
+        var cache = Path.Combine(root, "cache");
+        // A folder whose name carries no dotted version, mirroring a .7z extracted to e.g. "Deepfried174".
+        var source = Path.Combine(root, "Deepfried174");
+        Directory.CreateDirectory(source);
+        WriteSource(source, DeepFriedChickenService.AddonFileName, "verified addon");
+        WriteSource(source, DeepFriedChickenService.NvngxShim, "verified shim");
+        WriteSource(source, DeepFriedChickenService.ConfigFileName, "verified config");
+        WriteSource(source, DeepFriedChickenService.NativeD3d11Addon, "native ingress");
+        WriteSource(source, DeepFriedChickenService.NativeD3d11Config, "native config");
+        WriteSource(source, "SHA256SUMS.txt",
+            "Deep Fried Chicken 1.7.4\n" +
+            $"{Sha256("verified addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+            $"{Sha256("verified shim")}  {DeepFriedChickenService.NvngxShim}\n" +
+            $"{Sha256("native ingress")}  {DeepFriedChickenService.NativeD3d11Addon}\n");
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var error = await dfc.ImportAsync(source);
+
+            Assert.Null(error);
+            Assert.True(dfc.IsImported);
+            Assert.True(dfc.HasNativeD3d11);
+            Assert.Equal("1.7.4", dfc.ImportedVersion);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RelocateLegacyReShadeProxy_MovesDx9ReShadeToDxgiAndFreesTranslatorSlot()
     {
         var root = CreateTemporaryDirectory("adas-dx9-reshade-relocation");

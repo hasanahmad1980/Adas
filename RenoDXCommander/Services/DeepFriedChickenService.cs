@@ -200,7 +200,7 @@ public sealed class DeepFriedChickenService
                     await File.WriteAllBytesAsync(Path.Combine(stagingDirectory, name), found[name]).ConfigureAwait(false);
             await File.WriteAllTextAsync(
                 Path.Combine(stagingDirectory, Path.GetFileName(_versionFile)),
-                DeriveVersion(sourcePath)).ConfigureAwait(false);
+                DeriveVersion(sourcePath, checksumBytes)).ConfigureAwait(false);
             ReplaceCacheDirectory(stagingDirectory, cacheParent);
             stagingDirectory = null;
             _crashReporter.Log($"[DeepFriedChicken.Import] Verified and imported {RequiredFiles.Length} core file(s) from {sourcePath}");
@@ -278,11 +278,25 @@ public sealed class DeepFriedChickenService
         catch { }
     }
 
-    private static string DeriveVersion(string sourcePath)
+    private static string DeriveVersion(string sourcePath, byte[]? checksumBytes = null)
     {
         var name = Path.GetFileNameWithoutExtension(sourcePath);
         var match = Regex.Match(name, @"v?\d+\.\d+(?:\.\d+)?[-.\w]*", RegexOptions.IgnoreCase);
-        return match.Success ? match.Value : (string.IsNullOrWhiteSpace(name) ? "imported" : name);
+        if (match.Success) return match.Value;
+        // A folder import (or an oddly named archive) may carry no dotted version in its path — the
+        // SHA256SUMS header names the release authoritatively (e.g. "Deep Fried Chicken 1.7.4").
+        var fromChecksum = checksumBytes == null ? null : DeriveVersionFromChecksum(checksumBytes);
+        return fromChecksum ?? (string.IsNullOrWhiteSpace(name) ? "imported" : name);
+    }
+
+    private static string? DeriveVersionFromChecksum(byte[] checksumBytes)
+    {
+        foreach (var line in Encoding.UTF8.GetString(checksumBytes).Split('\n').Take(5))
+        {
+            var match = Regex.Match(line, @"\d+\.\d+(?:\.\d+)?[-.\w]*", RegexOptions.IgnoreCase);
+            if (match.Success) return match.Value;
+        }
+        return null;
     }
 
     private static bool IsNonEmptyFile(string path)

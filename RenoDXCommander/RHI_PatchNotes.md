@@ -1,3 +1,8 @@
+## v2.6.43 — Deep Fried Chicken folder import (2026-09-10)
+
+- The **Deep Fried Chicken import** flow now accepts an **extracted folder** as well as a `.zip`. DFC releases ship as password-protected `.7z` archives, so after extracting one (password `chicken`) you can point Adas straight at the folder instead of re-zipping it. Import first asks whether to pick a `.zip` or a folder; both are verified against `SHA256SUMS.txt` exactly as before.
+- When a source's name carries no dotted version (e.g. an extracted folder called `Deepfried174`), Adas now reads the release version from the `SHA256SUMS.txt` header ("Deep Fried Chicken 1.7.4"), so the imported-version label stays correct instead of showing the folder name.
+
 ## v2.6.42 — Deep Fried Chicken native D3D11 ingress (2026-09-10)
 
 - **Deep Fried Chicken 1.7.4** adds a native **D3D11 ingress** add-on (`dfc-native-d3d11.addon64` + `.cfg`), and Adas now inducts it. Deep Fried Chicken is still never bundled — the user imports the author's official archive — but when that archive carries the native pair, Adas verifies it against `SHA256SUMS.txt`, caches the unmodified files, and on an **x64 D3D11 game with native DLSS** deploys them beside the core add-on for normal ReShade add-on discovery ("Native DFC plus D3D11 ingress"). Native **D3D12** games keep using the core add-on directly and never receive the native pair. Switching a game to another neural consumer retires the native files alongside the core ones, so the two never stack.
