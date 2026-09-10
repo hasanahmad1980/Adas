@@ -72,6 +72,8 @@ Copyright (c) 2026 Alexander. "Deep Fried Chicken Binary Use Licence" — a limi
 
 Adas therefore never bundles Deep Fried Chicken. The neural-consumer option imports the author's official archive that the user supplies, caches the **unmodified** binaries locally, and deploys them (in place of the RenoDX consumer) into the folder Adas already resolved for the game — beside the game executable, or inside the Feeder host folder for 32-bit games. No NVIDIA runtime files are included; the user supplies a trusted `nvngx_dlssnr.dll`. RenoDX-derived colour/tone portions within Deep Fried Chicken are MIT (see the release's `LICENSE-RenoDX.md`).
 
+Release 1.7.4 adds a native D3D11 ingress add-on (`dfc-native-d3d11.addon64` and its `.cfg`). When the user imports a release that carries it, Adas caches the unmodified pair and, on an x64 D3D11 game that already has native DLSS, deploys it beside the core Deep Fried Chicken add-on for normal ReShade add-on discovery ("Native DFC plus D3D11 ingress"). Native D3D12 games use the core add-on directly and never receive the native pair.
+
 ## DLSSNR Standby Repair
 
 Source: <https://github.com/kayle2203/dlssnr-signature-repair>

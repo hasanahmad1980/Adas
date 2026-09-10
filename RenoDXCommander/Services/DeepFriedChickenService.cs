@@ -21,6 +21,12 @@ public sealed class DeepFriedChickenService
     public const string NvngxShim = "deep-fried-chicken-nvngx.dll";
     public const string ConfigFileName = "deep-fried-chicken.cfg";
     public const string Dx11Bridge = "dlss5-dx11-bridge.addon64";
+    // The native D3D11 ingress add-on (release 1.7.4+). On an x64 D3D11-with-native-DLSS game it is
+    // deployed alongside the core DFC files ("Native DFC plus D3D11 ingress"); native D3D12 uses the
+    // core add-on directly and never receives these. Both files sit beside ReShade for normal add-on
+    // discovery — upstream does not early-load them.
+    public const string NativeD3d11Addon = "dfc-native-d3d11.addon64";
+    public const string NativeD3d11Config = "dfc-native-d3d11.cfg";
 
     /// <summary>
     /// The files a Deep Fried Chicken deploy places and owns — the three required files. These are
@@ -29,7 +35,7 @@ public sealed class DeepFriedChickenService
     /// bridge that is cleaned up separately, so it is not part of this set.)
     /// </summary>
     public static readonly string[] RequiredFiles = { AddonFileName, NvngxShim, ConfigFileName };
-    private static readonly string[] OptionalReleaseFiles = { Dx11Bridge };
+    private static readonly string[] OptionalReleaseFiles = { Dx11Bridge, NativeD3d11Addon, NativeD3d11Config };
     private const string ChecksumFileName = "SHA256SUMS.txt";
     private const long MaximumImportedFileBytes = 32 * 1024 * 1024;
 
@@ -71,6 +77,17 @@ public sealed class DeepFriedChickenService
 
     /// <summary>The core DFC files that a neural-consumer deploy should place into the target folder.</summary>
     public IReadOnlyList<string> DeployFiles() => RequiredFiles;
+
+    /// <summary>True when the imported release carried the native D3D11 ingress add-on and its config.</summary>
+    public bool HasNativeD3d11 =>
+        IsNonEmptyFile(CachedFile(NativeD3d11Addon)) && IsNonEmptyFile(CachedFile(NativeD3d11Config));
+
+    /// <summary>
+    /// The native D3D11 ingress files to place beside the core add-on on an x64 D3D11-native game,
+    /// or an empty set when the imported release did not include them.
+    /// </summary>
+    public IReadOnlyList<string> NativeD3d11DeployFiles =>
+        HasNativeD3d11 ? new[] { NativeD3d11Addon, NativeD3d11Config } : Array.Empty<string>();
 
     /// <summary>
     /// Reuses an existing verified cache, or imports the newest official-looking DFC archive from
@@ -176,6 +193,11 @@ public sealed class DeepFriedChickenService
             Directory.CreateDirectory(stagingDirectory);
             foreach (var name in RequiredFiles)
                 await File.WriteAllBytesAsync(Path.Combine(stagingDirectory, name), found[name]).ConfigureAwait(false);
+            // Cache the native D3D11 ingress pair only when the release carried both halves; the core
+            // deploy still works without them (native D3D12 and Feeder routes never use them).
+            if (found.ContainsKey(NativeD3d11Addon) && found.ContainsKey(NativeD3d11Config))
+                foreach (var name in new[] { NativeD3d11Addon, NativeD3d11Config })
+                    await File.WriteAllBytesAsync(Path.Combine(stagingDirectory, name), found[name]).ConfigureAwait(false);
             await File.WriteAllTextAsync(
                 Path.Combine(stagingDirectory, Path.GetFileName(_versionFile)),
                 DeriveVersion(sourcePath)).ConfigureAwait(false);
@@ -209,7 +231,8 @@ public sealed class DeepFriedChickenService
         }
 
         var integrityFiles = new[] { AddonFileName, NvngxShim }
-            .Concat(files.ContainsKey(Dx11Bridge) ? new[] { Dx11Bridge } : Array.Empty<string>());
+            .Concat(files.ContainsKey(Dx11Bridge) ? new[] { Dx11Bridge } : Array.Empty<string>())
+            .Concat(files.ContainsKey(NativeD3d11Addon) ? new[] { NativeD3d11Addon } : Array.Empty<string>());
         foreach (var name in integrityFiles)
         {
             if (!checksums.TryGetValue(name, out var expected))

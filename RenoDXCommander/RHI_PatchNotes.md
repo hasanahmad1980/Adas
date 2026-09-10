@@ -1,3 +1,8 @@
+## v2.6.42 — Deep Fried Chicken native D3D11 ingress (2026-09-10)
+
+- **Deep Fried Chicken 1.7.4** adds a native **D3D11 ingress** add-on (`dfc-native-d3d11.addon64` + `.cfg`), and Adas now inducts it. Deep Fried Chicken is still never bundled — the user imports the author's official archive — but when that archive carries the native pair, Adas verifies it against `SHA256SUMS.txt`, caches the unmodified files, and on an **x64 D3D11 game with native DLSS** deploys them beside the core add-on for normal ReShade add-on discovery ("Native DFC plus D3D11 ingress"). Native **D3D12** games keep using the core add-on directly and never receive the native pair. Switching a game to another neural consumer retires the native files alongside the core ones, so the two never stack.
+- No change to the classic Deep Fried Chicken route, and no version is pinned in Adas: releases without the native pair import and deploy exactly as before.
+
 ## v2.6.41 — DLSS 5 upstream refresh + NeuralScreen (2026-09-10)
 
 - Updated **Standalone AIO** to **2.2.1**. A maintenance release over 2.2.0's Optical Flow motion source that makes live resolution changes safer: it quiesces the detached presentation worker before ReShade recreates the primary backbuffers, cancels a stale proxy present prepared before a resize, fixes a null-pointer crash when an overlay such as Discord intercepts the detached `Present` during a D3D12 resolution change, and removes Frame Generation pacing while the ReShade menu is open (restoring it on close). All three reviewed 64-bit files moved again — the add-on, the caller-bridge `nvngx.dll`, and the feed shader.

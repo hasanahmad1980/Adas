@@ -543,6 +543,15 @@ public sealed partial class Dlss5ComponentService
                 InstallTrackedFile(_deepFriedChicken.CachedFile(name), dfcDestination, path, record);
                 installed.Add(dfcDestination);
             }
+            // Native D3D11 games get the extra "D3D11 ingress" pair beside the core add-on; native
+            // D3D12 uses the core add-on directly, so it is deployed only on the NativeDirectX11 route.
+            if (assessment.Mode == Dlss5DeploymentMode.NativeDirectX11)
+                foreach (var name in _deepFriedChicken.NativeD3d11DeployFiles)
+                {
+                    var nativeDestination = Path.Combine(addonDeployPath, name);
+                    InstallTrackedFile(_deepFriedChicken.CachedFile(name), nativeDestination, path, record);
+                    installed.Add(nativeDestination);
+                }
         }
         else if (assessment.Is64Bit && useNeuralUpstream)
         {
@@ -2523,10 +2532,15 @@ public sealed partial class Dlss5ComponentService
             OpenGlBridgeAddon,
             ObsoleteBridgeAddon,
         };
-        // Deep Fried Chicken files are managed only when RenoDX is taking over as the consumer.
+        // Deep Fried Chicken files are managed only when RenoDX is taking over as the consumer. The
+        // native D3D11 ingress pair is retired alongside the core files so a prior DFC install never
+        // leaves a stray native add-on beside another consumer.
         var deepFriedChickenNames = useDeepFriedChicken
             ? Array.Empty<string>()
-            : DeepFriedChickenService.RequiredFiles;
+            : DeepFriedChickenService.RequiredFiles
+                .Append(DeepFriedChickenService.NativeD3d11Addon)
+                .Append(DeepFriedChickenService.NativeD3d11Config)
+                .ToArray();
         var paths = managedNames.Concat(deepFriedChickenNames)
             .Where(name => !keep.Contains(name))
             .SelectMany(name => new[] { Path.Combine(addonDeployPath, name), Path.Combine(root, name) })

@@ -301,6 +301,82 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public async Task DeepFriedChickenImport_CachesNativeD3d11IngressWhenPresent()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-native-import");
+        var cache = Path.Combine(root, "cache");
+        var archive = Path.Combine(root, "Deep-Fried-Chicken-v1.7.4.zip");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            // Mirror the real release layout: the native pair sits in a nested payload folder while
+            // the core files sit at the root. Import matches by basename across all entries.
+            WriteArchiveEntry(zip, DeepFriedChickenService.AddonFileName, "verified addon");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NvngxShim, "verified shim");
+            WriteArchiveEntry(zip, DeepFriedChickenService.ConfigFileName, "verified config");
+            WriteArchiveEntry(zip, "payload/x64-native-d3d11-core/" + DeepFriedChickenService.NativeD3d11Addon, "native ingress");
+            WriteArchiveEntry(zip, "payload/x64-native-d3d11-core/" + DeepFriedChickenService.NativeD3d11Config, "native config");
+            WriteArchiveEntry(zip, "SHA256SUMS.txt",
+                $"{Sha256("verified addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+                $"{Sha256("verified shim")}  {DeepFriedChickenService.NvngxShim}\n" +
+                $"{Sha256("native ingress")}  {DeepFriedChickenService.NativeD3d11Addon}\n");
+        }
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var error = await dfc.ImportAsync(archive);
+
+            Assert.Null(error);
+            Assert.True(dfc.IsImported);
+            Assert.True(dfc.HasNativeD3d11);
+            Assert.Equal(
+                new[] { DeepFriedChickenService.NativeD3d11Addon, DeepFriedChickenService.NativeD3d11Config },
+                dfc.NativeD3d11DeployFiles);
+            Assert.Equal("native ingress", File.ReadAllText(dfc.CachedFile(DeepFriedChickenService.NativeD3d11Addon)));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeepFriedChickenImport_RejectsTamperedNativeD3d11Ingress()
+    {
+        var root = CreateTemporaryDirectory("adas-dfc-native-tamper");
+        var cache = Path.Combine(root, "cache");
+        var archive = Path.Combine(root, "Deep-Fried-Chicken-v1.7.4.zip");
+        using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
+        {
+            WriteArchiveEntry(zip, DeepFriedChickenService.AddonFileName, "verified addon");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NvngxShim, "verified shim");
+            WriteArchiveEntry(zip, DeepFriedChickenService.ConfigFileName, "verified config");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NativeD3d11Addon, "tampered ingress");
+            WriteArchiveEntry(zip, DeepFriedChickenService.NativeD3d11Config, "native config");
+            WriteArchiveEntry(zip, "SHA256SUMS.txt",
+                $"{Sha256("verified addon")}  {DeepFriedChickenService.AddonFileName}\n" +
+                $"{Sha256("verified shim")}  {DeepFriedChickenService.NvngxShim}\n" +
+                $"{Sha256("expected ingress")}  {DeepFriedChickenService.NativeD3d11Addon}\n");
+        }
+
+        try
+        {
+            var dfc = new DeepFriedChickenService(new NoopCrashReporter(), cache);
+
+            var error = await dfc.ImportAsync(archive);
+
+            Assert.NotNull(error);
+            Assert.False(dfc.IsImported);
+            Assert.False(dfc.HasNativeD3d11);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void RelocateLegacyReShadeProxy_MovesDx9ReShadeToDxgiAndFreesTranslatorSlot()
     {
         var root = CreateTemporaryDirectory("adas-dx9-reshade-relocation");
