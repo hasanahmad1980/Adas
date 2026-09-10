@@ -4,11 +4,11 @@ Adas is based on **RHI** by RankFTW and is distributed under the repository's GN
 
 ## Experimental OptiScaler Neural Rendering packages
 
-The standard OptiScaler NR 0.2.0, NR-before-SR English 0.1.2, and pre-SR multipass 0.7.5-nr-fixes release archives are included in this private local package. Their sources are GPL-3.0; dependency notices and licenses (including the RenoDX attribution, FidelityFX, XeSS and DirectX notices carried in the pre-SR multipass archive) remain in the original archives and are copied alongside installed dependencies.
+The standard OptiScaler NR 0.2.0, NR-before-SR English 0.1.2, and pre-SR multipass 0.7.6 release archives are included in this private local package. Their sources are GPL-3.0; dependency notices and licenses (including the RenoDX attribution, FidelityFX, XeSS and DirectX notices carried in the pre-SR multipass archive) remain in the original archives and are copied alongside installed dependencies.
 
 - OptiScaler NR source at the packaged tag: <https://github.com/Dagherbou/OptiScaler_DLSSNR/tree/v0.2.0-dlssnr>
 - NR-before-SR source at the packaged tag: <https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/tree/v0.1.2-nr-before-sr-english>
-- Pre-SR multipass source at the packaged tag: <https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/tree/v0.7.5-nr-fixes>
+- Pre-SR multipass source at the packaged tag: <https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/tree/v0.7.6>
 - Original OptiScaler project: <https://github.com/optiscaler/OptiScaler>
 
 NVIDIA, Intel and AMD dependency binaries retain their own terms. Inclusion in this private package does not establish permission for public redistribution; audit every dependency and corresponding-source obligation before publishing an installer. The local Adas installer includes hash-pinned AIO release files for offline use; the upstream repository did not expose redistribution terms when reviewed.
@@ -57,6 +57,14 @@ Adas bundles the upstream `ReShade.fxh`, `ReShadeUI.fxh`, and `DrawText.fxh` fra
 Source and official download: <https://github.com/dege-diosg/dgVoodoo2>
 
 Adas does not redistribute dgVoodoo2. For a DirectX 9 Feeder route it downloads the current release from the author's official GitHub release, installs only the matching D3D9 wrapper and control panel, and records those files for exact uninstall and restoration.
+
+## DLSS5-NeuralScreen
+
+Source: <https://github.com/perseval-BLR/DLSS5-NeuralScreen>
+
+Copyright (c) 2026 perseval-BLR. The application's own code is licensed under the MIT License (see the MIT text below). NeuralScreen is a standalone whole-desktop Neural Rendering overlay — not a per-game route — and processes the whole screen or one selected window on RTX 30/40/50 GPUs (RTX 40/30 via an architecture spoof to `0x1B0`).
+
+Adas does not bundle or redistribute NeuralScreen. The optional "Launch NeuralScreen" tool downloads the author's pinned `neuralscreen-v1.5.1-full.zip` release archive from the official GitHub release at run time (verified by SHA-256), extracts it into the per-user tool cache, and starts `NeuralScreen.exe`. The 226 MB archive carries its own bundled Python runtime and NVIDIA's leaked pre-release `nvngx_dlssnr.dll` (310.8.0); that NVIDIA runtime is NVIDIA's property, is not covered by the MIT licence, and is never redistributed by Adas — it reaches the user only through the author's official release. Do not run NeuralScreen in competitive online games: a process named `nvngx.dll` plus a fullscreen overlay is exactly what anti-cheat systems look for.
 
 ## Deep Fried Chicken
 
@@ -109,9 +117,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 # Standalone AIO integration
 
 Adas packages the three unmodified author-published assets from
-[DLSS5-Reshade-AIO v2.0.3](https://github.com/kibblerz/DLSS5-Reshade-AIO/releases/tag/v2.0.3)
+[DLSS5-Reshade-AIO v2.2.1](https://github.com/kibblerz/DLSS5-Reshade-AIO/releases/tag/v2.2.1)
 for local offline installation. SHA-256 values are pinned.
-The repository did not expose a redistribution licence when checked on 2026-09-02;
+The repository did not expose a redistribution licence when checked on 2026-09-10;
 do not publicly redistribute this private installer without resolving that permission.
 The optional VORT provider comes from [vort_Shaders](https://github.com/vortigern11/vort_Shaders),
 under its MIT licence; downloaded shader copyright/permission headers remain intact.

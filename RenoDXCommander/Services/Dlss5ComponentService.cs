@@ -53,7 +53,7 @@ public sealed partial class Dlss5ComponentService
     internal const string NeuralUpstreamVersion = "0.3.0";
     internal const string NeuralUpstreamAddon = "nvngx.dll.addon64";
     internal const string NeuralUpstreamSha256 = "43C00412EB07339FBBEECEA62C5D0C96595F7A7B5E41C4CC4A948618C2A100EC";
-    internal const string OneClickVersion = "0.13.10";
+    internal const string OneClickVersion = "0.13.11";
     private const string BundledStableReShadeVersion = "6.8.0";
     private const string BundledLegacyReShadeVersion = "6.3.3";
     private const string DgVoodooRepo = "dege-diosg/dgVoodoo2";

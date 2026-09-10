@@ -6,6 +6,8 @@
 
 It integrates the [MFGAdaUnlock-RenoDx](https://github.com/mavismmg/MFGAdaUnlock-RenoDx) ReShade add-on (`renodx-mfgunlock.addon64`, MIT, a fork of Dreamt's original). The add-on is **in-memory only**: it patches the running game at runtime, modifies no files on disk, redistributes no NVIDIA runtime files, and reverts on unload.
 
+Adas always deploys the **latest** release (it queries the GitHub API at install time rather than pinning a version). As of release 0.8 that adds a guarded Streamline UI/HUD composition path (now the default) with conservative HDR fallback and transition-safe temporal resets, a validated Blackwell framework-kernel path for improved 3x/4x moving-detail stability (with the 0.7 midpoint correction as a safe fallback), and NVIDIA Dynamic MFG integration for the validated DLSS-G 310.9.1 + Streamline pairing. Adas's own `[RenoDX.MFGUnlock]` defaults are written only when absent, so upstream's newer defaults apply for keys Adas does not set.
+
 ## Requirements & gating
 
 - **GeForce RTX 40-series** GPU. The row is **hidden on all other GPUs** — RTX 30-series lacks the required machine code and RTX 50-series already ships MFG natively. Detection extends `Dlss5CompatibilityService` with an Ada classifier (`IsAdaGpu`).
