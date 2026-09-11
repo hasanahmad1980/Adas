@@ -12,26 +12,26 @@ The existing game-library and component services remain underneath Adas for dete
 
 ![Adas simplified DLSS 5 interface](screenshots/adas-simple-ui.png)
 
-> **⚠ Single-player only.** RHI installs ReShade with addon support, which may trigger anti-cheat in online games. Uninstall before playing multiplayer.
+> **⚠ Single-player only.** Adas installs ReShade with addon support, which may trigger anti-cheat in online games. Uninstall before playing multiplayer.
 
 ---
 
-## Why RHI?
+## Why Adas?
 
 - **8-store detection** — Steam, GOG, Epic, EA App, Ubisoft Connect, Xbox/Game Pass, Battle.net, Rockstar. No manual setup.
 - **10 managed components** — ReShade, RenoDX, RenoDX Upgrade, ReLimiter, Display Commander, OptiScaler, RE Framework, Luma Framework, DXVK, DOF Fix. One-click install, update, and removal for each.
-- **46 shader packs** — RHI Managed (built-in packs), Custom (your own shaders), or Off (no shader deployment). Global or per-game. Per-file selection lets you tick only the individual shaders you want. Save, load, and share named shader profiles — export to a zip and paste into Discord.
+- **46 shader packs** — Adas Managed (built-in packs), Custom (your own shaders), or Off (no shader deployment). Global or per-game. Per-file selection lets you tick only the individual shaders you want. Save, load, and share named shader profiles — export to a zip and paste into Discord.
 - **Generic Luma for all DX11 UE games** — every DX11 Unreal Engine game in your library gets a Luma row. Game-specific Engine.ini tweaks and launch args are applied automatically on install.
 - **DLSS & Streamline management** — swap SR, Ray Reconstruction, and Frame Generation independently. Update or downgrade Streamline as a set. Per-game DLSS presets without NVIDIA Profile Inspector.
 - **Nvidia Profile Overrides** — VSync, Low Latency, Smooth Motion, Power Mode, ReBAR, Multi Frame Generation, DLSS render scale (33–100%). All per-game, written directly to NVIDIA driver profiles.
 - **Batch deploy** — update DLSS/Streamline versions and presets across multiple games at once.
 - **DLSS & Streamline Defaults** — configure preferred versions, presets, and render scales. One-click Quick Apply per game.
 - **Profile Export/Import** — back up all per-game NVIDIA profile settings to JSON. Restore after driver updates.
-- **Drag-and-drop** — drop an exe, addon, preset, Luma archive, or URL. RHI figures out what to do.
+- **Drag-and-drop** — drop an exe, addon, preset, Luma archive, or URL. Adas figures out what to do.
 - **Two view modes** — Detail and Compact. Toggle between them in one click.
 - **Game Launch** — Steam uses `-applaunch` (with overlay and playtime tracking), Epic uses its protocol, everything else launches directly. Custom exe and arguments per game.
 - **HDR Auto-Toggle** — automatically enables Windows HDR on game launch and disables on exit. Global or per-game. No more manual toggling in Windows Settings.
-- **Running game indicator** — sidebar highlights green when a game launched through RHI is running.
+- **Running game indicator** — sidebar highlights green when a game launched through Adas is running.
 - **System Tray & Jump List** — minimize to the system tray on close. Right-click the tray or taskbar icon to launch recent games instantly.
 - **Automatic background updates** — all mod and app updates re-checked every 4 hours while running.
 - **Custom Addons** — drop `.addon64`/`.addon32` files in the Custom folder. They appear in the Addon Manager with on/off toggles.
@@ -62,7 +62,7 @@ The existing game-library and component services remain underneath Adas for dete
 | [Display Commander](https://github.com/pmnoxx/display-commander) | Alternative frame rate limiter. Mutually exclusive with ReLimiter. |
 | [OptiScaler](https://github.com/optiscaler/OptiScaler) | Upscaler redirection (DLSS ↔ FSR ↔ XeSS) and frame generation on any GPU. Stable and Nightly channels. Per-game FG settings, presets, and DLSS SR/RR/Render Scale controls via the ⚙ cog. |
 | [RE Framework](https://github.com/praydog/REFramework-nightly) | Required for ReShade on RE Engine games (Monster Hunter Wilds, Resident Evil, DMC5, SF6, etc.). |
-| [Luma Framework](https://github.com/Filoppi/Luma-Framework) | HDR modding framework for DX11 games. Supported for named mods and all DX11 Unreal Engine games (generic). ReShade and DLSS managed by RHI on all Luma games. |
+| [Luma Framework](https://github.com/Filoppi/Luma-Framework) | HDR modding framework for DX11 games. Supported for named mods and all DX11 Unreal Engine games (generic). ReShade and DLSS managed by Adas on all Luma games. |
 | [DXVK](https://github.com/doitsujin/dxvk) | DirectX-to-Vulkan translation for DX8–DX10 games. Variants: Development, Stable, Lilium HDR (scRGB output). Per-game selection. |
 | [DOF Fix](https://github.com/RankFTW/rhi-repo/releases) | Fixes depth-of-field stepping/tiling artifacts in Unreal Engine 5.0–5.6 games. One-click install, participates in Update All. |
 | [RenoDX Upgrade](https://github.com/OopyDoopy/renodx) | Inverse tone mapping and resource upgrades for HDR in DX9+ games. Use with RenoFX shader for full HDR conversion. Not needed with RenoDX/Luma mods. |
@@ -112,7 +112,7 @@ All per-game via NVIDIA driver profiles. Requires admin (Task Scheduler-based pe
 
 ### Admin Mode
 
-Task Scheduler-based persistent elevation. Toggle Off/On in Settings. When enabled, RHI silently relaunches elevated on startup — no per-operation UAC prompts. Required for ReBAR, Low Latency (ULL), Smooth Motion writes. Drop Helper provides Discord drag-and-drop in admin mode.
+Task Scheduler-based persistent elevation. Toggle Off/On in Settings. When enabled, Adas silently relaunches elevated on startup — no per-operation UAC prompts. Required for ReBAR, Low Latency (ULL), Smooth Motion writes.
 
 ### Per-Game Overrides
 
@@ -138,7 +138,7 @@ Quick links to ultrawide fixes (Lyall, RoseTheFlower, p1xel8ted) and Ultra+ mods
 
 ## Quick Start
 
-1. **Download and run RHI** — your game library appears automatically.
+1. **Download and run Adas** — your game library appears automatically.
 2. **Pick a game** from the sidebar. Search or use filter chips to narrow the list.
 3. **Click Install** on the components you want — ReShade, RenoDX, a frame limiter.
 4. **Launch the game**, press **Home** to open ReShade, go to **Add-ons**, and configure RenoDX.
@@ -148,7 +148,7 @@ Quick links to ultrawide fixes (Lyall, RoseTheFlower, p1xel8ted) and Ultra+ mods
 
 ## Download
 
-Grab the latest release from the [GitHub Releases page](https://github.com/RankFTW/RHI/releases).
+Grab the latest release from the [GitHub Releases page](https://github.com/hasanahmad1980/Adas/releases).
 
 **Requirements:**
 - Windows 10/11 (x64)
@@ -167,7 +167,7 @@ Grab the latest release from the [GitHub Releases page](https://github.com/RankF
 | Black screen (Unreal) | ReShade → Add-ons → RenoDX → set `R10G10B10A2_UNORM` to `output size` |
 | UE-Extended not working | Enable HDR in the game's display settings first |
 | Downloads failing | Click **Refresh**, or clear cache from Settings → Open Downloads Cache |
-| DLSS presets not applying | Enable Admin Mode in Settings, or run RHI as administrator |
+| DLSS presets not applying | Enable Admin Mode in Settings, or run Adas as administrator |
 | Everything out of sync | Settings → **Full Refresh** clears all caches and re-scans |
 
 For the full reference covering every feature, see the [Detailed Guide](docs/DETAILED_GUIDE.md).
@@ -190,13 +190,13 @@ For the full reference covering every feature, see the [Detailed Guide](docs/DET
 | [DOF Fix](https://github.com/RankFTW/rhi-repo/releases) | Lazorr | Source-available |
 | [7-Zip](https://www.7-zip.org/) | Igor Pavlov | [LGPL-2.1 / BSD-3-Clause](https://www.7-zip.org/license.txt) |
 
-> RHI is an unofficial third-party tool, not affiliated with or endorsed by the RenoDX project, Crosire, or the Luma Framework. All mod files are downloaded from their official sources at runtime and are not redistributed.
+> Adas is an unofficial third-party tool, not affiliated with or endorsed by the RenoDX project, Crosire, or the Luma Framework. All mod files are downloaded from their official sources at runtime and are not redistributed.
 
 ---
 
 ## Acknowledgements
 
-RHI would not be possible without the hard work of the entire RenoDX team and [Crosire](https://reshade.me), the creator of ReShade. Thank you to every mod author, contributor, and tester who keeps pushing PC HDR forward.
+Adas would not be possible without the hard work of the entire RenoDX team and [Crosire](https://reshade.me), the creator of ReShade. It builds on **RHI** by RankFTW (GPL-3.0). Thank you to every mod author, contributor, and tester who keeps pushing PC HDR forward.
 
 ---
 

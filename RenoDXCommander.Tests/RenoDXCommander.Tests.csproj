@@ -10,9 +10,7 @@
     <IsTestProject>true</IsTestProject>
     <Platforms>x86;x64;arm64</Platforms>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
-    <WindowsPackageType>None</WindowsPackageType>
     <EnableMsixTooling>false</EnableMsixTooling>
-    <UseWinUI>true</UseWinUI>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,11 +19,6 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <!-- Add Windows App SDK directly to control build asset flow and prevent
-         the transitive buildTransitive targets (MrtCore.PriGen) from being imported
-         via the project reference. Using build instead of buildTransitive avoids
-         the PRI generation tasks that require Visual Studio. -->
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250108002" ExcludeAssets="buildTransitive" />
   </ItemGroup>
 
   <ItemGroup>
