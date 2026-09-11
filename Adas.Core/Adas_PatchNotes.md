@@ -1,3 +1,9 @@
+## v2.6.55 — Upstream refresh: OneClick 0.13.14, NeuralScreen 1.6.1 (2026-09-11)
+
+- **OneClick** re-pinned **0.13.13 → 0.13.14** (runtime-fetched, SHA-256 re-verified against the author's official release). Upstream documents a working DLSS 5 recipe under Proton (Elden Ring), plus fixes to three misleading status messages.
+- **NeuralScreen** re-pinned **1.6.0 → 1.6.1** (runtime-fetched, SHA-256 re-verified). Upstream fixes second-monitor capture/overlay placement and stops the idle screen from burning the GPU.
+- Everything else remains current (AIO 2.2.4, multipass 0.7.7, Feeder 0.15.1, OptiScaler NR 0.2.0 / NR-before-SR 0.1.2, DLSS5 Bridge 1.4.12, Neural Upstream 0.3.0, ShortFuse SF-2026-09-11); MFG Ada Unlock / RTXMFG / OptiScaler mainline / DXVK / dgVoodoo2 fetch the latest release at run time.
+
 ## v2.6.54 — ShortFuse unified refresh + DLSS 5 status fix (2026-09-11)
 
 - **ShortFuse unified add-on** refreshed to the supplied **2026-09-11** build (`SF-2026-09-11`), deployed as `renodx-dlss.addon64` with no download suffix (x64 ReShade add-on, verified). Stable RenoDX 4.55/4.70 remain separate; the payload manifest hash was updated to match.

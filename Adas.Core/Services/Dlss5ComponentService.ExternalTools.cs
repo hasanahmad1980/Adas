@@ -5,11 +5,11 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    internal const string NeuralScreenVersion = "1.6.0";
+    internal const string NeuralScreenVersion = "1.6.1";
     private const string NeuralScreenUrl =
-        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.6.0/neuralscreen-v1.6.0-full.zip";
+        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.6.1/neuralscreen-v1.6.1-full.zip";
     private const string NeuralScreenSha256 =
-        "0E36F9BCB863044EC8E3740469A430DF5B24D8ADF9271C77C9C8DCF5B2D70FE8";
+        "0214FE5EE2BB7E7E966768C26612D3A376C1969EBC49D2BB114EA6E06A945D78";
     private static readonly SemaphoreSlim NeuralScreenCacheLock = new(1, 1);
 
     /// <summary>
@@ -40,7 +40,7 @@ public sealed partial class Dlss5ComponentService
                 {
                     await DownloadFileAsync(NeuralScreenUrl, archive, cancellationToken).ConfigureAwait(false);
                     if (!FileHelper.ComputeSha256(archive).Equals(NeuralScreenSha256, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("NeuralScreen download did not match the official v1.6.0 SHA-256. Nothing was launched.");
+                        throw new InvalidDataException("NeuralScreen download did not match the official v1.6.1 SHA-256. Nothing was launched.");
                     ZipFile.ExtractToDirectory(archive, toolDirectory, overwriteFiles: true);
                     if (!File.Exists(executable))
                         throw new FileNotFoundException("NeuralScreen.exe was not found in the extracted archive.");
@@ -59,9 +59,9 @@ public sealed partial class Dlss5ComponentService
     }
 
     private const string OneClickUrl =
-        "https://github.com/faisalkindi/DLSS5oneclick/releases/download/v0.13.13/dlss5oneclick.exe";
+        "https://github.com/faisalkindi/DLSS5oneclick/releases/download/v0.13.14/dlss5oneclick.exe";
     private const string OneClickSha256 =
-        "EDB21847F66CA0CC4B8EF48AAA088E9F96CB20758AD31A304A3E9FEF0D7A2AA1";
+        "A53159C004CD06F0FB506772EB7319A834067CA3D1D119A399843D22E212BCD6";
 
     public async Task LaunchOneClickAsync(string gameFolder, CancellationToken cancellationToken = default)
     {
@@ -83,7 +83,7 @@ public sealed partial class Dlss5ComponentService
                 await DownloadFileAsync(OneClickUrl, temporary, cancellationToken).ConfigureAwait(false);
                 ValidatePortableExecutable(temporary, 1024 * 1024, "dlss5oneclick.exe", expectedMachine: 0x8664);
                 if (!FileHelper.ComputeSha256(temporary).Equals(OneClickSha256, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("OneClick download did not match the official v0.13.13 SHA-256. Nothing was launched.");
+                    throw new InvalidDataException("OneClick download did not match the official v0.13.14 SHA-256. Nothing was launched.");
                 File.Move(temporary, executable, overwrite: true);
             }
             finally { DeleteIfExists(temporary); }
