@@ -77,17 +77,34 @@ $expectedDlss5Hashes = @{
     'ReShade-6.3.3-64.dll'                 = '8B38372587AAB7289954ED9CA1BDB298ADC9435292E0C0111632832B75DDC49A'
 }
 
+# Phase 4 runtime-fetch: these OptiScaler NR archives are no longer bundled into the
+# publish output. Their install path downloads them on demand from pinned public GitHub
+# release URLs, validates the reviewed SHA-256, and caches them under
+# %LOCALAPPDATA%\RHI\Adas\DLSS5\OptiScalerNR. They still live in the source tree (that is
+# where their reviewed SHA-256 hashes are pinned), so the source-tree guard checks them but
+# the publish-output guard does not.
+$runtimeFetchedPayload = @(
+    'optiscaler-nr.zip',
+    'optiscaler-split.zip',
+    'optiscaler-multipass.zip'
+)
+
 function Assert-Dlss5Payload {
     param(
         [Parameter(Mandatory)]
         [string]$Directory,
 
         [Parameter(Mandatory)]
-        [string]$Description
+        [string]$Description,
+
+        # Names to skip (e.g. runtime-fetched archives absent from the publish output).
+        [string[]]$ExcludeNames = @()
     )
 
+    $names = $requiredDlss5Payload | Where-Object { $ExcludeNames -notcontains $_ }
+
     $missing = @(
-        $requiredDlss5Payload | Where-Object {
+        $names | Where-Object {
             -not (Test-Path (Join-Path $Directory $_) -PathType Leaf)
         }
     )
@@ -96,7 +113,7 @@ function Assert-Dlss5Payload {
     }
 
     $empty = @(
-        $requiredDlss5Payload | Where-Object {
+        $names | Where-Object {
             (Get-Item (Join-Path $Directory $_)).Length -eq 0
         }
     )
@@ -105,7 +122,7 @@ function Assert-Dlss5Payload {
     }
 
     $changed = @(
-        $expectedDlss5Hashes.GetEnumerator() | ForEach-Object {
+        $expectedDlss5Hashes.GetEnumerator() | Where-Object { $ExcludeNames -notcontains $_.Key } | ForEach-Object {
             $path = Join-Path $Directory $_.Key
             if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $_.Value) { $_.Key }
         }
@@ -115,6 +132,8 @@ function Assert-Dlss5Payload {
     }
 }
 
+# The source tree is the source of truth for every reviewed payload, including the
+# runtime-fetched OptiScaler archives (their pinned SHA-256 lives here).
 Assert-Dlss5Payload `
     -Directory (Join-Path $repositoryRoot 'RenoDXCommander\Assets\DLSS5') `
     -Description 'Source tree'
@@ -141,7 +160,12 @@ New-Item -ItemType Directory -Path $publishFullPath -Force | Out-Null
 
 & $dotnet restore (Join-Path $repositoryRoot 'RenoDXCommander.Tests\RenoDXCommander.Tests.csproj') `
     --configfile (Join-Path $repositoryRoot 'NuGet.Config') -p:Platform=x64
-if ($LASTEXITCODE -ne 0) { throw 'Restore failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Test restore failed.' }
+
+# Restore the app for its own RID so the trimmed self-contained publish can run --no-restore.
+& $dotnet restore (Join-Path $repositoryRoot 'Adas.App\Adas.App.csproj') `
+    --configfile (Join-Path $repositoryRoot 'NuGet.Config') -r win-x64
+if ($LASTEXITCODE -ne 0) { throw 'App restore failed.' }
 
 if (-not $SkipTests) {
     & $dotnet test (Join-Path $repositoryRoot 'RenoDXCommander.Tests\RenoDXCommander.Tests.csproj') `
@@ -149,14 +173,18 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 }
 
-& $dotnet publish (Join-Path $repositoryRoot 'RenoDXCommander\RenoDXCommander.csproj') `
-    -c Release -r win-x64 -p:Platform=x64 -p:PublishSingleFile=true `
-    --self-contained true --no-restore -o $publish
+# Publish the lean Avalonia app (Adas.exe), self-contained + trimmed (TrimMode=partial is set
+# in Adas.App.csproj). No PublishSingleFile: the DLSS 5 payloads and the runtime must stay as
+# loose files (the engine resolves Assets\DLSS5 relative to AppContext.BaseDirectory).
+& $dotnet publish (Join-Path $repositoryRoot 'Adas.App\Adas.App.csproj') `
+    -c Release -r win-x64 --self-contained true --no-restore -o $publish
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 
+# The publish output does NOT carry the runtime-fetched OptiScaler archives (see above).
 Assert-Dlss5Payload `
     -Directory (Join-Path $publish 'Assets\DLSS5') `
-    -Description 'Publish output'
+    -Description 'Publish output' `
+    -ExcludeNames $runtimeFetchedPayload
 
 if ($BuildInstaller) {
     $compiler = Get-Command ISCC.exe -ErrorAction SilentlyContinue

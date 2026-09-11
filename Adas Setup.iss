@@ -1,11 +1,14 @@
+; Adas — Avalonia app installer (Phase 5).
+; Targets the new lean Adas.exe (Avalonia, self-contained + trimmed), replacing the retired
+; WinUI RHI.exe. New AppId so it installs side-by-side rather than upgrading an RHI install.
 #define MyAppName "Adas"
 #define MyAppVersion "2.6.52"
 #define MyAppPublisher "Adas"
-#define MyAppURL "https://github.com/RankFTW/RHI"
-#define MyAppExeName "RHI.exe"
+#define MyAppURL "https://github.com/hasanahmad1980/Adas"
+#define MyAppExeName "Adas.exe"
 
 [Setup]
-AppId={{E90B7C80-3C2A-4AA4-A18B-40E21D3F81C2}
+AppId={{BD64CDEA-920C-46B2-AFE9-5F277886DF2C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 VersionInfoVersion={#MyAppVersion}
@@ -21,11 +24,12 @@ ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 OutputDir=artifacts\installer
 OutputBaseFilename=Adas-Setup
-SetupIconFile=RenoDXCommander\icon.ico
+SetupIconFile=Adas.App\icon.ico
 LicenseFile=LICENSE
 InfoAfterFile=THIRD_PARTY_NOTICES.md
 SolidCompression=yes
 WizardStyle=modern dynamic
+; Ask the Windows restart manager to close a running Adas.exe before we overwrite files.
 CloseApplications=yes
 RestartApplications=no
 
@@ -55,7 +59,7 @@ begin
   try
     WMI := CreateOleObject('WbemScripting.SWbemLocator');
     WMI := WMI.ConnectServer('.', 'root\cimv2');
-    Procs := WMI.ExecQuery('SELECT * FROM Win32_Process WHERE Name="RHI.exe"');
+    Procs := WMI.ExecQuery('SELECT * FROM Win32_Process WHERE Name="Adas.exe"');
     Result := (Procs.Count > 0);
   except
   end;
@@ -63,17 +67,12 @@ end;
 
 function InitializeSetup(): Boolean;
 var
-  SignalDir, SignalPath: String;
   WaitCount: Integer;
 begin
   Result := True;
-  if not IsAdasRunning() then Exit;
-
-  SignalDir := ExpandConstant('{localappdata}\RHI');
-  if not DirExists(SignalDir) then ForceDirectories(SignalDir);
-  SignalPath := SignalDir + '\rhi_shutdown_requested';
-  SaveStringToFile(SignalPath, 'update', False);
-
+  // The restart manager (CloseApplications=yes) asks Adas.exe to close; give a graceful
+  // window for it to exit before the file copy begins. Nothing consumes a signal file in
+  // the new Avalonia app, so we simply poll for the process to clear.
   WaitCount := 0;
   while (WaitCount < 20) and IsAdasRunning() do
   begin

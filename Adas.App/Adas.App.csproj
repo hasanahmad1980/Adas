@@ -11,6 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <NoWarn>NU1902;NU1903</NoWarn>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -39,6 +40,11 @@
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.3" />
     <!-- Diagnostics build tooling (harmless in Release, useful in Debug). -->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.2.3" Condition="'$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- App/window icon (also the exe icon via ApplicationIcon above). -->
+    <AvaloniaResource Include="icon.ico" />
   </ItemGroup>
 
   <ItemGroup>
