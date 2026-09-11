@@ -32,6 +32,8 @@ public partial class GameSetupView : UserControl
         InitializeComponent();
 
         InstallButton.Click += OnInstall;
+        RepairButton.Click += OnRepair;
+        RemoveButton.Click += OnRemove;
         DiagnoseButton.Click += OnDiagnose;
         OptiScalerButton.Click += OnOptiScaler;
         DisplayCommanderButton.Click += OnDisplayCommander;
@@ -187,6 +189,57 @@ public partial class GameSetupView : UserControl
         {
             InstallProgress.IsVisible = false;
             InstallButton.IsEnabled = true;
+        }
+    }
+
+    private void OnRepair(object? sender, RoutedEventArgs e) =>
+        _ = RunMaintenanceAsync((main, owner, card, progress) => Dlss5Installer.RepairAsync(main, owner, card, progress));
+
+    private void OnRemove(object? sender, RoutedEventArgs e) =>
+        _ = RunMaintenanceAsync((main, owner, card, progress) => Dlss5Installer.RemoveAsync(main, owner, card, progress));
+
+    /// <summary>
+    /// Shared runner for the Remove/Repair maintenance actions: disables the route buttons, drives the
+    /// install progress bar, then refreshes the library card and this pane so the badge/label update.
+    /// </summary>
+    private async Task RunMaintenanceAsync(
+        Func<MainViewModel, Window, GameCardViewModel, IProgress<(string message, double percent)>, Task<Dlss5Installer.Outcome>> action)
+    {
+        var card = Card;
+        if (Main is null || card is null) return;
+        var owner = this.FindAncestorOfType<Window>();
+        if (owner is null) return;
+
+        InstallButton.IsEnabled = false;
+        RepairButton.IsEnabled = false;
+        RemoveButton.IsEnabled = false;
+        InstallProgress.IsVisible = true;
+        InstallProgress.Value = 0;
+        InstallResult.IsVisible = false;
+
+        var progress = new Progress<(string message, double percent)>(u =>
+        {
+            InstallProgress.Value = u.percent;
+            RouteSummary.Text = u.message;
+        });
+
+        try
+        {
+            var outcome = await action(Main, owner, card, progress);
+            InstallResult.Text = outcome.Message;
+            InstallResult.IsVisible = true;
+            if (outcome.Ran)
+            {
+                try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
+                await RefreshAssessmentAsync();
+            }
+        }
+        finally
+        {
+            InstallProgress.IsVisible = false;
+            InstallButton.IsEnabled = true;
+            RepairButton.IsEnabled = true;
+            RemoveButton.IsEnabled = true;
         }
     }
 

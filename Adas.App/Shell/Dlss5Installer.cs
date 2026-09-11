@@ -69,19 +69,8 @@ public static class Dlss5Installer
         }
 
         // ── Close a running game so its add-on files unlock ──────────────────
-        var running = await Task.Run(() => GameProcessService.FindRunningProcesses(card.InstallPath));
-        if (running.Count > 0)
-        {
-            if (!await DialogHost.ConfirmAsync(owner, $"Close {card.GameName} and continue?",
-                    "Windows keeps active ReShade and DLSS add-ons locked while the game is running. Adas will close the game, wait for the files to release, then continue.",
-                    "Close game and continue", "Cancel"))
-                return new Outcome(false, "Cancelled.");
-
-            var stopErrors = await GameProcessService.StopProcessesAsync(running);
-            if (stopErrors.Count > 0)
-                return new Outcome(false, $"Could not close {card.GameName}:\n• " + string.Join("\n• ", stopErrors));
-            await Task.Delay(250);
-        }
+        if (await EnsureGameClosedAsync(owner, card) is { } blocked)
+            return blocked;
 
         // ── Install ──────────────────────────────────────────────────────────
         try
@@ -113,5 +102,121 @@ public static class Dlss5Installer
         {
             return new Outcome(false, $"Installation failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Removes the DLSS 5 install for this game: closes a running game if needed, then runs the engine's
+    /// <see cref="Dlss5ComponentService.Uninstall"/>, which restores tracked originals and clears the record.
+    /// </summary>
+    public static async Task<Outcome> RemoveAsync(MainViewModel main, Window owner, GameCardViewModel card,
+        IProgress<(string message, double percent)> progress)
+    {
+        var services = AppServices.Services;
+        var compat = services.GetService<Dlss5CompatibilityService>();
+        var components = services.GetService<Dlss5ComponentService>();
+        if (compat is null || components is null)
+            return new Outcome(false, "Engine services are unavailable.");
+
+        // Resolve the folder that actually holds the install record (install root or addon deploy path).
+        var root = await Task.Run(() => ResolveInstalledRoot(compat, card));
+        if (root is null)
+            return new Outcome(false, "No DLSS 5 install was found for this game.");
+
+        if (!await DialogHost.ConfirmAsync(owner, $"Remove DLSS 5 from {card.GameName}?",
+                "Adas will restore the game's original files from its recovery copies and remove the DLSS 5 components it installed. Your saved routes and settings are unaffected.",
+                "Remove and restore", "Cancel"))
+            return new Outcome(false, "Cancelled.");
+
+        if (await EnsureGameClosedAsync(owner, card) is { } blocked)
+            return blocked;
+
+        try
+        {
+            progress.Report(("Removing…", 10));
+            var errors = await Task.Run(() => components.Uninstall(root));
+            progress.Report(("Done.", 100));
+            if (errors.Count > 0)
+                return new Outcome(true, "Removed with some issues:\n• "
+                    + string.Join("\n• ", errors.Distinct(StringComparer.OrdinalIgnoreCase)));
+            return new Outcome(true, $"DLSS 5 removed from {card.GameName}; original files restored.");
+        }
+        catch (Exception ex)
+        {
+            return new Outcome(false, $"Removal failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Repairs a DLSS 5 install: re-normalises the ReShade search paths and prunes stale/disabled DLSS
+    /// add-on entries a crash can leave behind, via <see cref="Dlss5ComponentService.RepairReShadeConfiguration"/>.
+    /// </summary>
+    public static async Task<Outcome> RepairAsync(MainViewModel main, Window owner, GameCardViewModel card,
+        IProgress<(string message, double percent)> progress)
+    {
+        var services = AppServices.Services;
+        var compat = services.GetService<Dlss5CompatibilityService>();
+        if (compat is null)
+            return new Outcome(false, "Engine services are unavailable.");
+
+        var root = await Task.Run(() => ResolveInstalledRoot(compat, card));
+        if (root is null)
+            return new Outcome(false, "No DLSS 5 install was found for this game.");
+
+        var record = await Task.Run(() => Dlss5ComponentService.LoadRecord(root));
+        if (record is null)
+            return new Outcome(false, "No DLSS 5 install record was found to repair.");
+
+        if (await EnsureGameClosedAsync(owner, card) is { } blocked)
+            return blocked;
+
+        try
+        {
+            progress.Report(("Repairing…", 20));
+            await Task.Run(() => Dlss5ComponentService.RepairReShadeConfiguration(root, record));
+            progress.Report(("Done.", 100));
+            return new Outcome(true, $"Repaired the ReShade/DLSS 5 configuration for {card.GameName}.");
+        }
+        catch (Exception ex)
+        {
+            return new Outcome(false, $"Repair failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>Resolves the folder that holds this game's DLSS 5 install record, or null if none.</summary>
+    private static string? ResolveInstalledRoot(Dlss5CompatibilityService compat, GameCardViewModel card)
+    {
+        var assessment = Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true);
+        foreach (var candidate in new[]
+                 {
+                     assessment.DeploymentPath,
+                     card.InstallPath,
+                     string.IsNullOrWhiteSpace(card.InstallPath) ? null : ModInstallService.GetAddonDeployPath(card.InstallPath),
+                 })
+        {
+            if (!string.IsNullOrWhiteSpace(candidate) && Dlss5ComponentService.LoadRecord(candidate) is not null)
+                return candidate;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Ensures the game is not running before touching its locked add-on files. Returns a cancel/failure
+    /// <see cref="Outcome"/> to bubble up, or null when it is safe to proceed. Shared by install/remove/repair.
+    /// </summary>
+    private static async Task<Outcome?> EnsureGameClosedAsync(Window owner, GameCardViewModel card)
+    {
+        var running = await Task.Run(() => GameProcessService.FindRunningProcesses(card.InstallPath));
+        if (running.Count == 0) return null;
+
+        if (!await DialogHost.ConfirmAsync(owner, $"Close {card.GameName} and continue?",
+                "Windows keeps active ReShade and DLSS add-ons locked while the game is running. Adas will close the game, wait for the files to release, then continue.",
+                "Close game and continue", "Cancel"))
+            return new Outcome(false, "Cancelled.");
+
+        var stopErrors = await GameProcessService.StopProcessesAsync(running);
+        if (stopErrors.Count > 0)
+            return new Outcome(false, $"Could not close {card.GameName}:\n• " + string.Join("\n• ", stopErrors));
+        await Task.Delay(250);
+        return null;
     }
 }

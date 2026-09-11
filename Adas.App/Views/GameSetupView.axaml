@@ -56,8 +56,14 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <Button x:Name="InstallButton" Classes="accent"
-                                Content="Install selected route" HorizontalAlignment="Left" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="InstallButton" Classes="accent"
+                                    Content="Install selected route" />
+                            <Button x:Name="RepairButton" Classes="subtle"
+                                    Content="Repair" IsVisible="{Binding IsDlss5Installed}" />
+                            <Button x:Name="RemoveButton" Classes="subtle"
+                                    Content="Remove" IsVisible="{Binding IsDlss5Installed}" />
+                        </StackPanel>
 
                         <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100" />
                         <SelectableTextBlock x:Name="InstallResult" Classes="muted" TextWrapping="Wrap"
