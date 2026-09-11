@@ -1,3 +1,11 @@
+## v2.6.53 — Upstream refresh: AIO 2.2.4, OneClick 0.13.13, multipass 0.7.7, NeuralScreen 1.6.0 (2026-09-11)
+
+- **DLSS5-ReShade-AIO** bundled binaries updated **2.2.3 → 2.2.4** — the add-on and the AIO caller-bridge `nvngx.dll` changed (the feed shader `DLSS5_AIO_Feed.fx` is byte-identical to v2.2.1); all three files re-verified against the author's v2.2.4 64-bit release (archive SHA-256 matches the author's published `DLSS5-ReShade-AIO-v2.2.4-SHA256.txt`). Upstream adds live 32-bit Optical Flow enable/disable and working-resolution changes from the ReShade menu.
+- **OneClick** re-pinned **0.13.12 → 0.13.13** (SHA-256 verified). Upstream adds an RTX 40 multi-frame-generation option to its Setup page via the mavismmg MFGAdaUnlock-RenoDx add-on.
+- **OptiScaler pre-SR multipass** (wilsjo2) updated **0.7.6 → 0.7.7** (runtime-fetched; the source-tree pin was re-verified against the author's published `.sha256`). Upstream adds an **Apply NR to the finished picture** option that moves the effect after the game's lighting to reduce green-noise artifacts (e.g. Kingdom Come: Deliverance II); native DX12 only, off by default. The `RunBeforeSR` / `Passes` / `Precision` keys Adas writes are unchanged.
+- **NeuralScreen** re-pinned **1.5.6 → 1.6.0** (SHA-256 verified, `NeuralScreen.exe` at archive root). Upstream adds a Spout2/OBS recording toggle, an experimental multi-GPU picker, and confirmed Windows 10 support.
+- Other upstream components were already current (Feeder 0.15.1, DLSS5 Bridge 1.4.12, Neural Upstream 0.3.0, OptiScaler NR 0.2.0 / NR-before-SR 0.1.2 forks), and MFG Ada Unlock / RTXMFG / OptiScaler mainline / DXVK / dgVoodoo2 fetch the latest release at run time.
+
 ## v2.6.52 — Hybrid-GPU fix, driver pre-flight, GitHub rate-limit hardening (2026-09-11)
 
 Three engine improvements borrowed from the leading community tools — pure install-engine work, so they apply to every route:

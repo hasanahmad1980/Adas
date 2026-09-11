@@ -5,7 +5,7 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    public const string AioVersion = "2.2.3";
+    public const string AioVersion = "2.2.4";
     public const string AioAddon = "standalone-dlssnr.addon64";
     public const string AioShader = "DLSS5_AIO_Feed.fx";
     public const string AioVortBundle = "vort-shaders.zip";
@@ -16,13 +16,14 @@ public sealed partial class Dlss5ComponentService
     // Pin the author-published release rather than a mutable latest URL.
     internal static readonly IReadOnlyDictionary<string, string> AioAssetHashes = new Dictionary<string, string>
     {
-        // v2.2.3 — maintenance release over v2.2.1. The add-on and the AIO caller-bridge
-        // nvngx.dll changed; the feed shader (DLSS5_AIO_Feed.fx) is byte-identical to v2.2.1.
-        // Verified against the author's DLSS5-ReShade-AIO-v2.2.3-64-bit.zip
-        // (SHA-256 60f81ae0accd2e59654427ea78a2b87113bccfdc431ffd9d656c1f79a21210bb).
+        // v2.2.4 — maintenance release over v2.2.3. The add-on and the AIO caller-bridge
+        // nvngx.dll changed again; the feed shader (DLSS5_AIO_Feed.fx) is still byte-identical
+        // to v2.2.1. Verified against the author's DLSS5-ReShade-AIO-v2.2.4-64-bit.zip
+        // (SHA-256 38493d801646fce46c6caa5f0d9869c5079d09247c94368e163a7c5fb8fd38ee, which matches
+        // the author's published DLSS5-ReShade-AIO-v2.2.4-SHA256.txt).
         // The redundant StandaloneBoundary.fx Vulkan fallback is still not bundled.
-        [AioAddon] = "5DB8CA5E44B3AB248742303E6D37591ADE2FAD76BCEF5EA20C2111F91E11ECF4",
-        ["nvngx.dll"] = "6165E5B4FD7B35D3F4AC3BBA38AEFF32C9403D68CC129837EDC4C7F7AF17E604",
+        [AioAddon] = "174C30913E3A974CC701340E65F2E16ECA9569423A3DDBC482B68682F9D302BC",
+        ["nvngx.dll"] = "540247E4AE8C68BCF4ED3B70393D8904A522C75CD46A3B801BFBD8800EF106E4",
         [AioShader] = "0710E17EEAFA1933AF18489BFB7D7A1D71BD6204D65D337474F835749FD6DE58",
     };
     internal static readonly IReadOnlyDictionary<string, string> AioDefaults = new Dictionary<string, string>
