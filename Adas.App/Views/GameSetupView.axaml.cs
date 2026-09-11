@@ -34,6 +34,7 @@ public partial class GameSetupView : UserControl
         InstallButton.Click += OnInstall;
         DiagnoseButton.Click += OnDiagnose;
         OptiScalerButton.Click += OnOptiScaler;
+        DisplayCommanderButton.Click += OnDisplayCommander;
         DxvkButton.Click += OnDxvk;
         ReShadeButton.Click += OnReShade;
         OpenFolderButton.Click += OnOpenFolder;
@@ -368,6 +369,46 @@ public partial class GameSetupView : UserControl
             ExtrasProgress.IsVisible = false;
             OptiScalerButton.IsEnabled = true;
         }
+    }
+
+    /// <summary>
+    /// Display Commander (the RenoDX HDR / display-control addon) toggle — installs if not present,
+    /// uninstalls if it is. Uses the engine's InstallDcAsync / UninstallDc commands.
+    /// </summary>
+    private async void OnDisplayCommander(object? sender, RoutedEventArgs e)
+    {
+        if (Main is null || Card is not { } card) return;
+        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
+        {
+            ExtrasResult.Text = "No install path resolved for this game yet.";
+            ExtrasResult.IsVisible = true;
+            return;
+        }
+
+        DisplayCommanderButton.IsEnabled = false;
+        try
+        {
+            if (card.DcStatus == GameStatus.Installed)
+            {
+                Main.UninstallDc(card);
+                ExtrasResult.Text = "Display Commander removed.";
+            }
+            else
+            {
+                await Main.InstallDcAsync(card);
+                ExtrasResult.Text = card.DcStatus == GameStatus.Installed
+                    ? "Display Commander installed."
+                    : card.DcActionMessage ?? "Display Commander install did not complete.";
+            }
+            ExtrasResult.IsVisible = true;
+            card.NotifyAll();
+        }
+        catch (Exception ex)
+        {
+            ExtrasResult.Text = $"Display Commander failed: {ex.Message}";
+            ExtrasResult.IsVisible = true;
+        }
+        finally { DisplayCommanderButton.IsEnabled = true; }
     }
 
     private async void OnDxvk(object? sender, RoutedEventArgs e)

@@ -39,6 +39,8 @@
                     <CheckBox Content="Use a custom shader selection" IsChecked="{Binding UseCustomShaders, Mode=TwoWay}" />
                     <CheckBox Content="Disable global shaders" IsChecked="{Binding GlobalShadersOff, Mode=TwoWay}" />
                     <CheckBox Content="Cache all shaders locally" IsChecked="{Binding CacheAllShaders, Mode=TwoWay}" />
+                    <Button x:Name="AddonsButton" Classes="subtle" Content="RenoDX add-ons…" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="AddonsHint" Classes="muted" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 

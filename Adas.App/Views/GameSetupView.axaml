@@ -123,6 +123,8 @@
                         <WrapPanel>
                             <Button x:Name="OptiScalerButton" Classes="subtle" Margin="0,0,8,8"
                                     Content="OptiScaler" />
+                            <Button x:Name="DisplayCommanderButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="Display Commander (HDR)" />
                             <Button x:Name="DxvkButton" Classes="subtle" Margin="0,0,8,8"
                                     Content="DXVK" />
                             <Button x:Name="ReShadeButton" Classes="subtle" Margin="0,0,8,8"
