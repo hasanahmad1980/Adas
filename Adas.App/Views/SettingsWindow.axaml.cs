@@ -37,6 +37,14 @@ public partial class SettingsWindow : Window
         Closed += (_, _) => _main?.SaveSettingsPublic();
 
         UpdateAddonsHint();
+
+        if (main is not null)
+        {
+            var s = main.Settings;
+            NexusStatus.Text = string.IsNullOrWhiteSpace(s.NexusUsername)
+                ? "Not signed in."
+                : $"Signed in as {s.NexusUsername}{(s.NexusIsPremium ? " (Premium)" : "")}.";
+        }
     }
 
     private void OnClose(object? sender, RoutedEventArgs e) => Close();

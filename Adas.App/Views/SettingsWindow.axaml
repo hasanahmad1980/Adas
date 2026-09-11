@@ -78,6 +78,44 @@
 
             <Border Classes="card">
                 <StackPanel Spacing="10">
+                    <TextBlock Text="Skip updates per component" Classes="h2" />
+                    <CheckBox Content="RenoDX" IsChecked="{Binding GlobalSkipRdxUpdates, Mode=TwoWay}" />
+                    <CheckBox Content="ReShade" IsChecked="{Binding GlobalSkipRsUpdates, Mode=TwoWay}" />
+                    <CheckBox Content="ReLimiter" IsChecked="{Binding GlobalSkipUlUpdates, Mode=TwoWay}" />
+                    <CheckBox Content="Display Commander" IsChecked="{Binding GlobalSkipDcUpdates, Mode=TwoWay}" />
+                    <CheckBox Content="OptiScaler" IsChecked="{Binding GlobalSkipOsUpdates, Mode=TwoWay}" />
+                    <CheckBox Content="REFramework" IsChecked="{Binding GlobalSkipRefUpdates, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="HDR &amp; resolution" Classes="h2" />
+                    <CheckBox Content="Auto-toggle Windows HDR when launching a game" IsChecked="{Binding HdrAutoToggle, Mode=TwoWay}" />
+                    <CheckBox Content="Auto-switch display resolution when launching a game" IsChecked="{Binding ResolutionAutoToggle, Mode=TwoWay}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Target resolution (e.g. 3840x2160)" Classes="muted" />
+                        <TextBox Text="{Binding ResolutionTarget, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Nexus Mods" Classes="h2" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                               Text="Your personal Nexus API key, stored locally in Adas settings and used only to download mods you have access to." />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="API key" Classes="muted" />
+                        <TextBox x:Name="NexusKeyBox" Text="{Binding NexusApiKey, Mode=TwoWay}" PasswordChar="•"
+                                 Watermark="Paste your Nexus API key" />
+                    </StackPanel>
+                    <TextBlock x:Name="NexusStatus" Classes="muted" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
                     <TextBlock Text="Diagnostics" Classes="h2" />
                     <CheckBox Content="Verbose logging" IsChecked="{Binding VerboseLogging, Mode=TwoWay}" />
                 </StackPanel>
