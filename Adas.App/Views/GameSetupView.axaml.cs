@@ -42,6 +42,10 @@ public partial class GameSetupView : UserControl
 
     private GameCardViewModel? Card => DataContext as GameCardViewModel;
 
+    /// <summary>Re-runs the route assessment for the current card. Used by the shell's
+    /// RequestCardRebuild / RequestOverridesPanelRebuild seams after engine-side state changes.</summary>
+    public Task RefreshAsync() => RefreshAssessmentAsync();
+
     /// <summary>
     /// Probes/assesses the selected game off the UI thread and populates the route list — every route
     /// shown, recommended preselected, incompatible flagged with a reason. Avalonia rebuild of the WinUI
