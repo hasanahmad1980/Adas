@@ -11,7 +11,8 @@ public sealed record RouteOption(
     string Description,
     bool Supported,
     bool Recommended,
-    string StatusText);
+    string StatusText,
+    bool Installed = false);
 
 /// <summary>
 /// Builds the per-game route list — every route shown, recommended marked, incompatible flagged with
@@ -20,7 +21,8 @@ public sealed record RouteOption(
 /// </summary>
 public static class Dlss5RouteCatalog
 {
-    public static IReadOnlyList<RouteOption> Build(Dlss5Assessment assessment, Dlss5InstallProfile recommended)
+    public static IReadOnlyList<RouteOption> Build(Dlss5Assessment assessment, Dlss5InstallProfile recommended,
+        Dlss5InstallProfile? installedProfile = null)
     {
         var mode = assessment.Mode;
         var is64 = assessment.Is64Bit;
@@ -42,13 +44,16 @@ public static class Dlss5RouteCatalog
 
         void Add(Dlss5InstallProfile profile, string label, string description, bool supported, string unsupportedReason)
         {
+            bool isInstalled = installedProfile == profile;
             bool isRecommended = supported && profile == recommended;
-            string status = supported
-                ? isRecommended
-                    ? "✓ Recommended for this game's detected renderer and architecture."
-                    : "Available — experimental; use only when you specifically need this route."
-                : $"✕ Not recommended — {unsupportedReason}";
-            list.Add(new RouteOption(profile, label, description, supported, isRecommended, status));
+            string status = isInstalled
+                ? "✓ Installed — currently active for this game."
+                : supported
+                    ? isRecommended
+                        ? "✓ Recommended for this game's detected renderer and architecture."
+                        : "Available — experimental; use only when you specifically need this route."
+                    : $"✕ Not recommended — {unsupportedReason}";
+            list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled));
         }
 
         Add(Dlss5InstallProfile.MaximumQuality,

@@ -24,11 +24,13 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="{Binding Source}" Classes="muted" VerticalAlignment="Center" />
                         <Border CornerRadius="5" Padding="8,3"
-                                Background="{Binding Status, Converter={StaticResource GameStatusColorConverter}}">
-                            <TextBlock Text="{Binding Status, Converter={StaticResource GameStatusTextConverter}}"
+                                Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
+                            <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
                                        Foreground="White" FontSize="12" FontWeight="SemiBold" />
                         </Border>
                     </StackPanel>
+                    <TextBlock Text="{Binding Dlss5InstalledLabel}" Classes="muted"
+                               IsVisible="{Binding Dlss5InstalledLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     <TextBlock Text="{Binding WikiStatusLabel}" Classes="muted" />
                     <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
                 </StackPanel>

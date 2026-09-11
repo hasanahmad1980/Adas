@@ -97,6 +97,17 @@ public partial class GameCardViewModel : ObservableObject
     [ObservableProperty] private string     _refActionMessage = "";
     [ObservableProperty] private string?    _refInstalledVersion;
 
+    // ── DLSS 5 state ──────────────────────────────────────────────────────────────
+    // DLSS 5 keeps its own on-disk install record (Dlss5InstallRecord) and is NOT part of the
+    // primary RenoDX `Status`. This dedicated status lets the DLSS 5 setup page and the library
+    // card show a DLSS 5 install instead of the (RenoDX-only) `Status` badge, which a DLSS 5
+    // install never touches.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDlss5Installed))]
+    private GameStatus _dlss5Status = GameStatus.NotInstalled;
+    [ObservableProperty] private string? _dlss5InstalledLabel;
+    public bool IsDlss5Installed => Dlss5Status == GameStatus.Installed;
+
     // ── DLL Naming Override ─────────────────────────────────────────────────────
     [ObservableProperty] private bool _dllOverrideEnabled = false;
 

@@ -1153,6 +1153,30 @@ public partial class MainViewModel
                 newCard.MfgUnlockInstalledVersion = _mfgUnlockService.StagedVersion;
             }
 
+            // ── DLSS 5 detection ─────────────────────────────────────────────────
+            // DLSS 5 keeps its own on-disk record (.adas/dlss5-install.json) and is NOT part of the
+            // RenoDX-only `Status`. Surface it on its own card status so the library chip and setup
+            // page reflect a completed install. Records live under the install root or the addon
+            // deploy path, depending on the route.
+            if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
+            {
+                try
+                {
+                    var dlss5Rec = Dlss5ComponentService.LoadRecord(installPath)
+                        ?? Dlss5ComponentService.LoadRecord(ModInstallService.GetAddonDeployPath(installPath));
+                    if (dlss5Rec != null)
+                    {
+                        newCard.Dlss5Status = GameStatus.Installed;
+                        newCard.Dlss5InstalledLabel = "Active route: " + dlss5Rec.Profile
+                            + (string.IsNullOrWhiteSpace(dlss5Rec.ComponentVersion) ? "" : $" ({dlss5Rec.ComponentVersion})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _crashReporter.Log($"[BuildCards] DLSS 5 record scan for '{game.Name}' failed — {ex.Message}");
+                }
+            }
+
             // ── DLSS / Streamline detection ──────────────────────────────────────
             LogPhase("DofFix+CardInit");
             bool dlssSkipped = _manifest?.DlssSkipGames?.Contains(game.Name, StringComparer.OrdinalIgnoreCase) == true

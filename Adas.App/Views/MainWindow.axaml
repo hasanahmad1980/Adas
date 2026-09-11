@@ -81,11 +81,18 @@
                                         <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
-                                    <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="5" Padding="9,4"
-                                            Background="{Binding Status, Converter={StaticResource GameStatusColorConverter}}">
-                                        <TextBlock Text="{Binding Status, Converter={StaticResource GameStatusTextConverter}}"
-                                                   Foreground="White" FontSize="12" FontWeight="SemiBold" />
-                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"
+                                                HorizontalAlignment="Right">
+                                        <Border CornerRadius="5" Padding="9,4"
+                                                Background="{Binding Status, Converter={StaticResource GameStatusColorConverter}}">
+                                            <TextBlock Text="{Binding Status, Converter={StaticResource GameStatusTextConverter}}"
+                                                       Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                        <Border CornerRadius="5" Padding="9,4" Background="#3FB950"
+                                                IsVisible="{Binding IsDlss5Installed}">
+                                            <TextBlock Text="DLSS 5" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

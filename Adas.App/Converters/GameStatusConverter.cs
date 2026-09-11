@@ -22,12 +22,12 @@ public sealed class GameStatusTextConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Colours a route row: green = recommended, amber = available/experimental, red = unsupported.</summary>
+/// <summary>Colours a route row: green = installed/recommended, amber = available/experimental, red = unsupported.</summary>
 public sealed class RouteStatusBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is RouteOption r
-            ? new SolidColorBrush(Color.Parse(r.Recommended ? "#3FB950" : r.Supported ? "#E3B341" : "#F85149"))
+            ? new SolidColorBrush(Color.Parse(r.Installed || r.Recommended ? "#3FB950" : r.Supported ? "#E3B341" : "#F85149"))
             : new SolidColorBrush(Color.Parse("#9BA6B4"));
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

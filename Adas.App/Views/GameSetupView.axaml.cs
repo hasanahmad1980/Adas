@@ -86,6 +86,8 @@ public partial class GameSetupView : UserControl
         string summary = "";
         IReadOnlyList<RouteOption> routes = Array.Empty<RouteOption>();
         RouteOption? recommended = null;
+        GameStatus dlss5Status = GameStatus.NotInstalled;
+        string? dlss5Label = null;
 
         await Task.Run(() =>
         {
@@ -101,9 +103,25 @@ public partial class GameSetupView : UserControl
                 var seed = installed?.Mode == assessment.Mode ? installed.Profile : Dlss5InstallProfile.MaximumQuality;
                 var pick = Dlss5RouteCatalog.Recommend(assessment, seed);
 
-                routes = Dlss5RouteCatalog.Build(assessment, pick);
-                recommended = routes.FirstOrDefault(r => r.Profile == pick && r.Supported)
+                routes = Dlss5RouteCatalog.Build(assessment, pick, installed?.Profile);
+                recommended = routes.FirstOrDefault(r => r.Installed)
+                              ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported)
                               ?? routes.FirstOrDefault(r => r.Recommended);
+
+                // DLSS 5 has its own on-disk record and is NOT part of the RenoDX-only `Status`; drive the
+                // badge from the record so a successful install flips it off "Available".
+                if (installed is not null)
+                {
+                    dlss5Status = GameStatus.Installed;
+                    var active = routes.FirstOrDefault(r => r.Installed);
+                    dlss5Label = "Active route: "
+                        + (active?.Label ?? installed.Profile.ToString())
+                        + (string.IsNullOrWhiteSpace(installed.ComponentVersion) ? "" : $" ({installed.ComponentVersion})");
+                }
+                else
+                {
+                    dlss5Status = assessment.CanInstall ? GameStatus.Available : GameStatus.NotInstalled;
+                }
 
                 summary = assessment.CanInstall
                     ? $"Detected: {assessment.ModeLabel} ({(assessment.Is64Bit ? "64-bit" : "32-bit")}). Recommended route is preselected."
@@ -120,6 +138,8 @@ public partial class GameSetupView : UserControl
             RouteSummary.Text = summary;
             RoutesList.ItemsSource = routes;
             RoutesList.SelectedItem = recommended;
+            card.Dlss5Status = dlss5Status;
+            card.Dlss5InstalledLabel = dlss5Label;
             PopulateOverrides(card);
         }
 
