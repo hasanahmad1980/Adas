@@ -24,6 +24,14 @@
          build MUST be functionally smoke-tested (launch → scan → install) before release. -->
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
+    <!-- PublishTrimmed otherwise flips the feature switch
+         System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault to false, which makes every
+         reflection-based JsonSerializer.Serialize/Deserialize call throw at runtime
+         ("Reflection-based serialization has been disabled for this application"). The engine
+         (Adas.Core) serializes with reflection throughout and has no JsonSerializerContext, so we
+         re-enable the switch. This is safe here because Adas.Core is a TrimmerRootAssembly (preserved
+         whole, below), so its serialized model types keep all the metadata reflection needs. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
