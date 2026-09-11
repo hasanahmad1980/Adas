@@ -23,6 +23,7 @@ public partial class MainWindow : Window
         RescanButton.Click += OnRescan;
         ToolsButton.Click += OnTools;
         SettingsButton.Click += OnSettings;
+        HistoryButton.Click += OnHistory;
 
         DataContextChanged += (_, _) =>
         {
@@ -78,6 +79,12 @@ public partial class MainWindow : Window
     {
         var settings = new SettingsWindow(Vm);
         settings.Show(this);
+    }
+
+    private void OnHistory(object? sender, RoutedEventArgs e)
+    {
+        var history = new HistoryWindow(Vm);
+        history.Show(this);
     }
 
     /// <summary>

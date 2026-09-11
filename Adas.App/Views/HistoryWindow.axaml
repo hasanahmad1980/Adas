@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="using:Adas.App.Shell"
+        x:Class="Adas.App.Views.HistoryWindow"
+        Width="620" Height="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AdasBackgroundBrush}"
+        Title="Adas — Installed overview">
+
+    <Grid RowDefinitions="Auto,*" Margin="22">
+        <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+            <TextBlock Text="Installed overview" Classes="h1" />
+            <TextBlock x:Name="Subtitle" Classes="muted"
+                       Text="Every game with Adas components currently deployed." />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="10">
+                <TextBlock x:Name="EmptyHint" Classes="muted" IsVisible="False"
+                           Text="Nothing installed yet. Set up a game from the library to see it here." />
+                <ItemsControl x:Name="EntriesList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="shell:InstalledEntry">
+                            <Border Classes="card" Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="{Binding GameName}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Source}" Classes="muted" />
+                                        <TextBlock Text="{Binding Summary}" Classes="muted" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="subtle" Content="Open folder"
+                                            Tag="{Binding InstallPath}" Click="OnOpenFolder"
+                                            VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

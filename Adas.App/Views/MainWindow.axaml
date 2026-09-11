@@ -32,6 +32,7 @@
                              VerticalAlignment="Center" />
                     <Button x:Name="SettingsButton" Content="Settings" Classes="subtle" />
                     <Button x:Name="ToolsButton" Content="Tools" Classes="subtle" />
+                    <Button x:Name="HistoryButton" Content="History" Classes="subtle" />
                     <Button x:Name="RefreshButton" Content="↻ Refresh" Classes="subtle" />
                     <Button x:Name="RescanButton" Content="Full rescan" Classes="accent" />
                 </StackPanel>
