@@ -1,9 +1,14 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using RenoDXCommander.Abstractions;
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
@@ -29,11 +34,62 @@ public partial class GameSetupView : UserControl
         DxvkButton.Click += OnDxvk;
         ReShadeButton.Click += OnReShade;
         OpenFolderButton.Click += OnOpenFolder;
+
+        DataContextChanged += (_, _) => _ = RefreshAssessmentAsync();
     }
 
-    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
-
     private GameCardViewModel? Card => DataContext as GameCardViewModel;
+
+    /// <summary>
+    /// Runs the engine compatibility probe/assessment for the selected game off the UI thread and
+    /// surfaces the recommended route + any blocking reasons. This is the Avalonia rebuild of the
+    /// per-game route summary the WinUI detail panel showed.
+    /// </summary>
+    private async Task RefreshAssessmentAsync()
+    {
+        var card = Card;
+        if (card is null) return;
+
+        RouteText.Text = "Analysing…";
+        RouteReasons.IsVisible = false;
+
+        string route = "", reasons = "";
+        await Task.Run(() =>
+        {
+            try
+            {
+                var compat = AppServices.Services.GetService<Dlss5CompatibilityService>();
+                if (compat is null) { route = "Compatibility service unavailable."; return; }
+
+                var probe = compat.Probe(card);
+                var assessment = Dlss5CompatibilityService.Assess(probe);
+
+                route = assessment.CanInstall
+                    ? $"✓ {assessment.ModeLabel}"
+                    : $"✗ {assessment.ModeLabel} — not available for this game";
+
+                var lines = assessment.BlockingReasons
+                    .Concat(assessment.MissingRequirements)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Distinct()
+                    .ToArray();
+                if (lines.Length > 0)
+                    reasons = "• " + string.Join(Environment.NewLine + "• ", lines);
+            }
+            catch (Exception ex) { route = $"Assessment failed: {ex.Message}"; }
+        });
+
+        void Apply()
+        {
+            if (!ReferenceEquals(Card, card)) return; // selection changed while probing
+            RouteText.Text = route;
+            RouteReasons.Text = reasons;
+            RouteReasons.IsVisible = !string.IsNullOrEmpty(reasons);
+        }
+
+        if (Dispatcher.UIThread.CheckAccess()) Apply();
+        else await Dispatcher.UIThread.InvokeAsync(Apply);
+    }
 
     private void OnInstall(object? sender, RoutedEventArgs e)
     {

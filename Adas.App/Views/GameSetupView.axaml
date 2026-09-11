@@ -32,6 +32,16 @@
                     <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
                 </StackPanel>
 
+                <!-- Recommended route (engine assessment) -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Recommended route" Classes="h2" />
+                        <TextBlock x:Name="RouteText" Text="Analysing…" Classes="muted" TextWrapping="Wrap" />
+                        <SelectableTextBlock x:Name="RouteReasons" Classes="muted" TextWrapping="Wrap"
+                                             IsVisible="False" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Primary action: install / manage DLSS 5 -->
                 <Border Classes="card">
                     <StackPanel Spacing="12">

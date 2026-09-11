@@ -30,8 +30,6 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
     }
 
-    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
-
     private MainViewModel? Vm => DataContext as MainViewModel;
 
     private async void OnLoaded(object? sender, RoutedEventArgs e)
