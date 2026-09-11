@@ -15,7 +15,21 @@
     <NoWarn>NU1902;NU1903</NoWarn>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
+    <!-- Phase 4 trimming. Only takes effect on `publish` (build/run are untouched). TrimMode=partial
+         (copyused) trims ONLY assemblies annotated trimmable — the BCL and Avalonia, which trim
+         cleanly — and preserves every app/third-party assembly whole. This deliberately spares the
+         reflection/DI/System.Text.Json-heavy engine (Adas.Core) and its reflection-using deps
+         (NvAPIWrapper, SharpCompress, HtmlAgilityPack), the plan's named trimming risk. A trimmed
+         build MUST be functionally smoke-tested (launch → scan → install) before release. -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Belt-and-braces: never trim the engine or the app, even if a future TrimMode change would. -->
+    <TrimmerRootAssembly Include="Adas.Core" />
+    <TrimmerRootAssembly Include="Adas" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.3" />
