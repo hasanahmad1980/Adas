@@ -729,9 +729,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>When true, the next CheckForUpdatesAsync call bypasses the cooldown timer (e.g. Full Refresh).</summary>
     private bool _forceUpdateCheck;
 
-    // Dispatcher reference for cross-thread UI updates
-    private Microsoft.UI.Dispatching.DispatcherQueue? DispatcherQueue { get; set; }
-    public void SetDispatcher(Microsoft.UI.Dispatching.DispatcherQueue dq) => DispatcherQueue = dq;
+    // Dispatcher reference for cross-thread UI updates (framework-neutral; the shell supplies the concrete adapter)
+    private RenoDXCommander.Abstractions.IUiDispatcher? DispatcherQueue { get; set; }
+    public void SetDispatcher(RenoDXCommander.Abstractions.IUiDispatcher dq) => DispatcherQueue = dq;
 
     /// <summary>Store the background shader-pack download task so InitializeAsync can await it.</summary>
     public void SetShaderPackReadyTask(Task task) => _shaderPackReadyTask = task;

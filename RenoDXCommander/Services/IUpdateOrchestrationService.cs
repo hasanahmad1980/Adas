@@ -22,7 +22,7 @@ public interface IUpdateOrchestrationService
     Task UpdateAllRenoDxAsync(
         IReadOnlyList<GameCardViewModel> allCards,
         IDllOverrideService dllOverrideService,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action saveLibrary,
         Action notifyUpdateState);
 
@@ -32,7 +32,7 @@ public interface IUpdateOrchestrationService
     Task UpdateAllReShadeAsync(
         IReadOnlyList<GameCardViewModel> allCards,
         IDllOverrideService dllOverrideService,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState,
         Func<string, string, string?, IEnumerable<string>?>? shaderResolver = null,
         Func<string, ManifestDllNames?>? manifestDllResolver = null,
@@ -45,7 +45,7 @@ public interface IUpdateOrchestrationService
     /// </summary>
     Task UpdateAllREFrameworkAsync(
         IReadOnlyList<GameCardViewModel> allCards,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState);
 
     /// <summary>
@@ -54,7 +54,7 @@ public interface IUpdateOrchestrationService
     Task UpdateAllDofFixAsync(
         IReadOnlyList<GameCardViewModel> allCards,
         DofFixService dofFixService,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState);
 
     /// <summary>
@@ -64,7 +64,7 @@ public interface IUpdateOrchestrationService
         List<GameCardViewModel> cards,
         List<InstalledModRecord> records,
         List<AuxInstalledRecord> auxRecords,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState,
         bool skipRdx = false,
         bool skipRs = false,

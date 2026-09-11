@@ -20,7 +20,7 @@ public class AutoUpdateService
     // Lazily assigned by the wiring code in MainViewModel.BackgroundScan.cs
     // so that we don't create a circular DI dependency.
     private MainViewModel? _viewModel;
-    private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
+    private RenoDXCommander.Abstractions.IUiDispatcher? _dispatcher;
 
     // Cards whose update was deferred because the game was running.
     // Simple string key "GameName|Source|Component" so we know what to retry.
@@ -45,10 +45,10 @@ public class AutoUpdateService
     public void SetViewModel(MainViewModel viewModel)
     {
         _viewModel = viewModel;
-        // Capture the dispatcher at setup time via the public SetDispatcher pattern.
-        // We use Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread() since
-        // SetViewModel is called from MainViewModel's constructor which runs on the UI thread.
-        _dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        // Capture the dispatcher at setup time. SetViewModel is called from MainViewModel's
+        // constructor, which runs on the UI thread, so the current-thread queue is the UI queue.
+        // The concrete adapter (WinUI today, Avalonia later) is resolved from the shell.
+        _dispatcher = WinUiDispatcher.ForCurrentThread();
     }
 
     // ── Public entry point ────────────────────────────────────────────────────────
@@ -446,7 +446,7 @@ public class AutoUpdateService
     /// This ensures card property changes (ObservableProperty setters) fire PropertyChanged
     /// on the UI thread, preventing cross-thread WinUI exceptions.
     /// </summary>
-    private static Task DispatchAsync(Microsoft.UI.Dispatching.DispatcherQueue dispatcher, Func<Task> work)
+    private static Task DispatchAsync(RenoDXCommander.Abstractions.IUiDispatcher dispatcher, Func<Task> work)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         dispatcher.TryEnqueue(async () =>

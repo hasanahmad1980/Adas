@@ -252,15 +252,13 @@
   </ItemGroup>
 
   <Target Name="ValidateDlss5SourcePayload" BeforeTargets="PrepareForBuild">
-    <Error Condition="!Exists('%(_RequiredDlss5Payload.Identity)')"
-           Text="Required DLSS 5 payload is missing: %(_RequiredDlss5Payload.CanonicalName)" />
+    <Error Condition="!Exists('%(_RequiredDlss5Payload.Identity)')" Text="Required DLSS 5 payload is missing: %(_RequiredDlss5Payload.CanonicalName)" />
   </Target>
 
   <Target Name="CopyDlss5PayloadToPublish" AfterTargets="Publish">
     <MakeDir Directories="$(PublishDir)Assets\DLSS5" />
     <Copy SourceFiles="@(_RequiredDlss5Payload)" DestinationFolder="$(PublishDir)Assets\DLSS5" SkipUnchangedFiles="true" />
-    <Error Condition="!Exists('$(PublishDir)Assets\DLSS5\%(_RequiredDlss5Payload.CanonicalName)')"
-           Text="Published DLSS 5 payload is missing: %(_RequiredDlss5Payload.CanonicalName)" />
+    <Error Condition="!Exists('$(PublishDir)Assets\DLSS5\%(_RequiredDlss5Payload.CanonicalName)')" Text="Published DLSS 5 payload is missing: %(_RequiredDlss5Payload.CanonicalName)" />
   </Target>
 
   <ItemGroup>
@@ -301,5 +299,10 @@
     <PackageReference Include="CommunityToolkit.Labs.WinUI.Controls.MarkdownTextBlock" Version="0.1.251217-build.2433" />
     <PackageReference Include="NvAPIWrapper.Net" Version="0.8.1.101" />
     <PackageReference Include="SharpCompress" Version="0.37.2" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\Adas.Core\Adas.Core.csproj" />
   </ItemGroup>
 </Project>

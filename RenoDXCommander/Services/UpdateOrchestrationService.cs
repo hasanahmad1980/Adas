@@ -46,7 +46,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
     public async Task UpdateAllRenoDxAsync(
         IReadOnlyList<GameCardViewModel> allCards,
         IDllOverrideService dllOverrideService,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action saveLibrary,
         Action notifyUpdateState)
     {
@@ -148,7 +148,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
     public async Task UpdateAllReShadeAsync(
         IReadOnlyList<GameCardViewModel> allCards,
         IDllOverrideService dllOverrideService,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState,
         Func<string, string, string?, IEnumerable<string>?>? shaderResolver = null,
         Func<string, ManifestDllNames?>? manifestDllResolver = null,
@@ -426,7 +426,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
 
     public async Task UpdateAllREFrameworkAsync(
         IReadOnlyList<GameCardViewModel> allCards,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState)
     {
         var targets = UpdateAllEligible(allCards)
@@ -470,7 +470,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
     public async Task UpdateAllDofFixAsync(
         IReadOnlyList<GameCardViewModel> allCards,
         DofFixService dofFixService,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState)
     {
         var targets = UpdateAllEligible(allCards)
@@ -521,7 +521,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
         List<GameCardViewModel> cards,
         List<InstalledModRecord> records,
         List<AuxInstalledRecord> auxRecords,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue,
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue,
         Action notifyUpdateState,
         bool skipRdx = false,
         bool skipRs = false,
@@ -689,7 +689,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
     }
 
     private async Task CheckAuxUpdate(GameCardViewModel card, AuxInstalledRecord record, bool isRs,
-        Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue)
+        RenoDXCommander.Abstractions.IUiDispatcher? dispatcherQueue)
     {
         try
         {

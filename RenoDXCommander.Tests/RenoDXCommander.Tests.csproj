@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RenoDXCommander\RenoDXCommander.csproj" />
+    <ProjectReference Include="..\Adas.Core\Adas.Core.csproj" />
   </ItemGroup>
 
 </Project>

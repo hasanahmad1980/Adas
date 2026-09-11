@@ -195,7 +195,7 @@ public sealed partial class MainWindow : Window
         }
         // Restore window size & position after activation (ensure HWND is ready)
         this.Activated += MainWindow_Activated;
-        ViewModel.SetDispatcher(DispatcherQueue);
+        ViewModel.SetDispatcher(new Services.WinUiDispatcher(DispatcherQueue));
         ViewModel.ConfirmForeignDxgiOverwrite = _dialogService.ShowForeignDxgiConfirmDialogAsync;
         ViewModel.ShowVulkanAdminRequiredDialog = _dialogService.ShowVulkanAdminRequiredDialogAsync;
         ViewModel.RequestOverridesPanelRebuild = card =>
