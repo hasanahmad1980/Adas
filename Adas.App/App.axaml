@@ -1,0 +1,43 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="using:Adas.App.Converters"
+             x:Class="Adas.App.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <conv:UiVisibilityConverter x:Key="UiVisibilityConverter" />
+        <conv:BoolNegationConverter x:Key="BoolNegationConverter" />
+        <conv:GameStatusTextConverter x:Key="GameStatusTextConverter" />
+        <conv:GameStatusColorConverter x:Key="GameStatusColorConverter" />
+
+        <!-- Adas palette (dark-first, matches the neural / RTX identity) -->
+        <Color x:Key="AdasBackground">#0E1116</Color>
+        <Color x:Key="AdasSurface">#171B22</Color>
+        <Color x:Key="AdasSurfaceAlt">#1F2530</Color>
+        <Color x:Key="AdasBorder">#2A3140</Color>
+        <Color x:Key="AdasAccent">#4C8BF5</Color>
+        <Color x:Key="AdasAccentSoft">#2B5FB0</Color>
+        <Color x:Key="AdasGood">#3FB950</Color>
+        <Color x:Key="AdasWarn">#E3B341</Color>
+        <Color x:Key="AdasBad">#F85149</Color>
+        <Color x:Key="AdasTextPrimary">#F0F3F8</Color>
+        <Color x:Key="AdasTextSecondary">#9BA6B4</Color>
+
+        <SolidColorBrush x:Key="AdasBackgroundBrush" Color="{StaticResource AdasBackground}" />
+        <SolidColorBrush x:Key="AdasSurfaceBrush" Color="{StaticResource AdasSurface}" />
+        <SolidColorBrush x:Key="AdasSurfaceAltBrush" Color="{StaticResource AdasSurfaceAlt}" />
+        <SolidColorBrush x:Key="AdasBorderBrush" Color="{StaticResource AdasBorder}" />
+        <SolidColorBrush x:Key="AdasAccentBrush" Color="{StaticResource AdasAccent}" />
+        <SolidColorBrush x:Key="AdasGoodBrush" Color="{StaticResource AdasGood}" />
+        <SolidColorBrush x:Key="AdasWarnBrush" Color="{StaticResource AdasWarn}" />
+        <SolidColorBrush x:Key="AdasBadBrush" Color="{StaticResource AdasBad}" />
+        <SolidColorBrush x:Key="AdasTextPrimaryBrush" Color="{StaticResource AdasTextPrimary}" />
+        <SolidColorBrush x:Key="AdasTextSecondaryBrush" Color="{StaticResource AdasTextSecondary}" />
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+        <StyleInclude Source="avares://Adas/Styles/AdasStyles.axaml" />
+    </Application.Styles>
+</Application>

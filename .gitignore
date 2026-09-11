@@ -4,6 +4,10 @@ Logs
 Luma
 RenoDXCommander/bin
 RenoDXCommander/obj
+Adas.Core/bin
+Adas.Core/obj
+Adas.App/bin
+Adas.App/obj
 RenoDXCommander.Tests/bin
 RenoDXCommander.Tests/obj
 RHI.DropHelper/bin

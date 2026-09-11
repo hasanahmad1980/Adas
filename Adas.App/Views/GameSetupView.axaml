@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RenoDXCommander.ViewModels"
+             x:Class="Adas.App.Views.GameSetupView"
+             x:DataType="vm:GameCardViewModel">
+
+    <!-- Empty state when nothing is selected -->
+    <Panel>
+        <StackPanel IsVisible="{Binding $parent[UserControl].DataContext, Converter={x:Static ObjectConverters.IsNull}}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+            <TextBlock Text="Select a game" Classes="h2" HorizontalAlignment="Center" />
+            <TextBlock Text="Pick a title from the library to set up DLSS 5." Classes="muted"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <ScrollViewer IsVisible="{Binding $parent[UserControl].DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"
+                      Padding="22">
+            <StackPanel Spacing="18">
+
+                <!-- Title + status -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding GameName}" Classes="h1" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Source}" Classes="muted" VerticalAlignment="Center" />
+                        <Border CornerRadius="5" Padding="8,3"
+                                Background="{Binding Status, Converter={StaticResource GameStatusColorConverter}}">
+                            <TextBlock Text="{Binding Status, Converter={StaticResource GameStatusTextConverter}}"
+                                       Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding WikiStatusLabel}" Classes="muted" />
+                    <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Primary action: install / manage DLSS 5 -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="DLSS 5 neural rendering" Classes="h2" />
+                        <TextBlock Text="Installs the RenoDX / DLSS 5 route for this title."
+                                   Classes="muted" TextWrapping="Wrap" />
+                        <Button x:Name="InstallButton" Classes="accent"
+                                Content="{Binding CardPrimaryActionLabel}"
+                                IsEnabled="{Binding CanCardInstall}"
+                                HorizontalAlignment="Left" />
+
+                        <ProgressBar IsVisible="{Binding IsInstalling}"
+                                     Value="{Binding InstallProgress}" Maximum="100" />
+                        <TextBlock Text="{Binding ActionMessage}" Classes="muted"
+                                   IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Verify / diagnose -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Verify" Classes="h2" />
+                        <TextBlock Text="Check whether neural rendering is actually active for this game."
+                                   Classes="muted" TextWrapping="Wrap" />
+                        <Button x:Name="DiagnoseButton" Classes="subtle"
+                                Content="Run diagnosis" HorizontalAlignment="Left" />
+                        <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Extras / components -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Extras" Classes="h2" />
+                        <WrapPanel>
+                            <Button x:Name="DxvkButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="DXVK" />
+                            <Button x:Name="ReShadeButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="ReShade" />
+                            <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="Open game folder" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>
