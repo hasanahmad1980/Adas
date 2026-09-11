@@ -33,6 +33,7 @@ public partial class GameSetupView : UserControl
 
         InstallButton.Click += OnInstall;
         DiagnoseButton.Click += OnDiagnose;
+        OptiScalerButton.Click += OnOptiScaler;
         DxvkButton.Click += OnDxvk;
         ReShadeButton.Click += OnReShade;
         OpenFolderButton.Click += OnOpenFolder;
@@ -314,6 +315,59 @@ public partial class GameSetupView : UserControl
         FolderText.Text = "Using detected folder.";
         card.NotifyAll();
         await RefreshAssessmentAsync();
+    }
+
+    /// <summary>
+    /// Per-game OptiScaler (universal upscaler) install — resolves the engine service and mirrors the
+    /// WinUI InstallEventHandler flow (GPU type / DLSS inputs / hotkey from settings, per-game variant).
+    /// The PD-Upscaler REFramework swap for RE Engine titles is not yet ported.
+    /// </summary>
+    private async void OnOptiScaler(object? sender, RoutedEventArgs e)
+    {
+        if (Main is null || Card is not { } card) return;
+        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
+        {
+            ExtrasResult.Text = "No install path resolved for this game yet.";
+            ExtrasResult.IsVisible = true;
+            return;
+        }
+
+        var svc = AppServices.Services.GetService<IOptiScalerService>();
+        if (svc is null) { ExtrasResult.Text = "OptiScaler service unavailable."; ExtrasResult.IsVisible = true; return; }
+
+        OptiScalerButton.IsEnabled = false;
+        ExtrasProgress.IsVisible = true;
+        ExtrasProgress.Value = 0;
+        ExtrasResult.IsVisible = false;
+        var progress = new Progress<(string message, double percent)>(u =>
+        {
+            ExtrasProgress.Value = u.percent;
+            ExtrasResult.Text = u.message;
+            ExtrasResult.IsVisible = true;
+        });
+
+        try
+        {
+            var variant = Main.GetOsVariant(card.GameName, card.Source ?? "");
+            var record = await svc.InstallAsync(card, progress,
+                Main.Settings.OsGpuType, Main.Settings.OsDlssInputs, Main.Settings.OsHotkey, variant);
+            ExtrasResult.Text = record is null
+                ? "OptiScaler install did not complete — see log."
+                : $"OptiScaler installed{(string.IsNullOrWhiteSpace(record.OsVariant) ? "" : $" ({record.OsVariant})")}.";
+            ExtrasResult.IsVisible = true;
+            try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
+            await RefreshAssessmentAsync();
+        }
+        catch (Exception ex)
+        {
+            ExtrasResult.Text = $"OptiScaler failed: {ex.Message}";
+            ExtrasResult.IsVisible = true;
+        }
+        finally
+        {
+            ExtrasProgress.IsVisible = false;
+            OptiScalerButton.IsEnabled = true;
+        }
     }
 
     private async void OnDxvk(object? sender, RoutedEventArgs e)

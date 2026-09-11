@@ -121,6 +121,8 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="Extras" Classes="h2" />
                         <WrapPanel>
+                            <Button x:Name="OptiScalerButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="OptiScaler" />
                             <Button x:Name="DxvkButton" Classes="subtle" Margin="0,0,8,8"
                                     Content="DXVK" />
                             <Button x:Name="ReShadeButton" Classes="subtle" Margin="0,0,8,8"
@@ -128,6 +130,9 @@
                             <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
                                     Content="Open game folder" />
                         </WrapPanel>
+                        <ProgressBar x:Name="ExtrasProgress" IsVisible="False" Maximum="100" />
+                        <SelectableTextBlock x:Name="ExtrasResult" Classes="muted" TextWrapping="Wrap"
+                                             IsVisible="False" />
                     </StackPanel>
                 </Border>
 
