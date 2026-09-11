@@ -9,6 +9,7 @@
         <conv:BoolNegationConverter x:Key="BoolNegationConverter" />
         <conv:GameStatusTextConverter x:Key="GameStatusTextConverter" />
         <conv:GameStatusColorConverter x:Key="GameStatusColorConverter" />
+        <conv:RouteStatusBrushConverter x:Key="RouteStatusBrushConverter" />
 
         <!-- Adas palette (dark-first, matches the neural / RTX identity) -->
         <Color x:Key="AdasBackground">#0E1116</Color>

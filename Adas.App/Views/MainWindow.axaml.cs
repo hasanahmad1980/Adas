@@ -20,6 +20,7 @@ public partial class MainWindow : Window
 
         RefreshButton.Click += OnRefresh;
         RescanButton.Click += OnRescan;
+        ToolsButton.Click += OnTools;
 
         DataContextChanged += (_, _) =>
         {
@@ -60,6 +61,12 @@ public partial class MainWindow : Window
         {
             try { await vm.FullRefreshAsync(null); } catch (Exception ex) { vm.StatusText = $"Rescan failed: {ex.Message}"; }
         }
+    }
+
+    private void OnTools(object? sender, RoutedEventArgs e)
+    {
+        var tools = new ToolsWindow(Vm);
+        tools.Show(this);
     }
 
     /// <summary>

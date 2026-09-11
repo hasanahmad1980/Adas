@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RenoDXCommander.ViewModels"
+             xmlns:shell="using:Adas.App.Shell"
              x:Class="Adas.App.Views.GameSetupView"
              x:DataType="vm:GameCardViewModel">
 
@@ -32,31 +33,33 @@
                     <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
                 </StackPanel>
 
-                <!-- Recommended route (engine assessment) -->
-                <Border Classes="card">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Recommended route" Classes="h2" />
-                        <TextBlock x:Name="RouteText" Text="Analysing…" Classes="muted" TextWrapping="Wrap" />
-                        <SelectableTextBlock x:Name="RouteReasons" Classes="muted" TextWrapping="Wrap"
-                                             IsVisible="False" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Primary action: install / manage DLSS 5 -->
+                <!-- DLSS 5 route selector -->
                 <Border Classes="card">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="DLSS 5 neural rendering" Classes="h2" />
-                        <TextBlock Text="Installs the RenoDX / DLSS 5 route for this title."
-                                   Classes="muted" TextWrapping="Wrap" />
-                        <Button x:Name="InstallButton" Classes="accent"
-                                Content="{Binding CardPrimaryActionLabel}"
-                                IsEnabled="{Binding CanCardInstall}"
-                                HorizontalAlignment="Left" />
+                        <TextBlock Text="Choose a DLSS 5 route" Classes="h2" />
+                        <TextBlock x:Name="RouteSummary" Text="Analysing…" Classes="muted" TextWrapping="Wrap" />
 
-                        <ProgressBar IsVisible="{Binding IsInstalling}"
-                                     Value="{Binding InstallProgress}" Maximum="100" />
-                        <TextBlock Text="{Binding ActionMessage}" Classes="muted"
-                                   IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0"
+                                 MaxHeight="360">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="shell:RouteOption">
+                                    <StackPanel Spacing="2" Margin="0,3">
+                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <Button x:Name="InstallButton" Classes="accent"
+                                Content="Install selected route" HorizontalAlignment="Left" />
+
+                        <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100" />
+                        <SelectableTextBlock x:Name="InstallResult" Classes="muted" TextWrapping="Wrap"
+                                             IsVisible="False" />
                     </StackPanel>
                 </Border>
 

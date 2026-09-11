@@ -1,12 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Adas.App.Shell;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Abstractions;
 using RenoDXCommander.Models;
@@ -41,61 +43,103 @@ public partial class GameSetupView : UserControl
     private GameCardViewModel? Card => DataContext as GameCardViewModel;
 
     /// <summary>
-    /// Runs the engine compatibility probe/assessment for the selected game off the UI thread and
-    /// surfaces the recommended route + any blocking reasons. This is the Avalonia rebuild of the
-    /// per-game route summary the WinUI detail panel showed.
+    /// Probes/assesses the selected game off the UI thread and populates the route list — every route
+    /// shown, recommended preselected, incompatible flagged with a reason. Avalonia rebuild of the WinUI
+    /// detail-panel profile selector.
     /// </summary>
     private async Task RefreshAssessmentAsync()
     {
         var card = Card;
         if (card is null) return;
 
-        RouteText.Text = "Analysing…";
-        RouteReasons.IsVisible = false;
+        RouteSummary.Text = "Analysing…";
+        RoutesList.ItemsSource = null;
+        InstallResult.IsVisible = false;
 
-        string route = "", reasons = "";
+        string summary = "";
+        IReadOnlyList<RouteOption> routes = Array.Empty<RouteOption>();
+        RouteOption? recommended = null;
+
         await Task.Run(() =>
         {
             try
             {
                 var compat = AppServices.Services.GetService<Dlss5CompatibilityService>();
-                if (compat is null) { route = "Compatibility service unavailable."; return; }
+                if (compat is null) { summary = "Compatibility service unavailable."; return; }
 
-                var probe = compat.Probe(card);
-                var assessment = Dlss5CompatibilityService.Assess(probe);
+                var assessment = Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true);
 
-                route = assessment.CanInstall
-                    ? $"✓ {assessment.ModeLabel}"
-                    : $"✗ {assessment.ModeLabel} — not available for this game";
+                // Seed from an existing install of the same mode, else auto-pick from renderer/arch.
+                var installed = assessment.DeploymentPath is { } dp ? Dlss5ComponentService.LoadRecord(dp) : null;
+                var seed = installed?.Mode == assessment.Mode ? installed.Profile : Dlss5InstallProfile.MaximumQuality;
+                var pick = Dlss5RouteCatalog.Recommend(assessment, seed);
 
-                var lines = assessment.BlockingReasons
-                    .Concat(assessment.MissingRequirements)
-                    .Where(s => !string.IsNullOrWhiteSpace(s))
-                    .Distinct()
-                    .ToArray();
-                if (lines.Length > 0)
-                    reasons = "• " + string.Join(Environment.NewLine + "• ", lines);
+                routes = Dlss5RouteCatalog.Build(assessment, pick);
+                recommended = routes.FirstOrDefault(r => r.Profile == pick && r.Supported)
+                              ?? routes.FirstOrDefault(r => r.Recommended);
+
+                summary = assessment.CanInstall
+                    ? $"Detected: {assessment.ModeLabel} ({(assessment.Is64Bit ? "64-bit" : "32-bit")}). Recommended route is preselected."
+                    : "Not available for this game: "
+                      + string.Join("; ", assessment.BlockingReasons.Concat(assessment.MissingRequirements)
+                          .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
             }
-            catch (Exception ex) { route = $"Assessment failed: {ex.Message}"; }
+            catch (Exception ex) { summary = $"Assessment failed: {ex.Message}"; }
         });
 
         void Apply()
         {
             if (!ReferenceEquals(Card, card)) return; // selection changed while probing
-            RouteText.Text = route;
-            RouteReasons.Text = reasons;
-            RouteReasons.IsVisible = !string.IsNullOrEmpty(reasons);
+            RouteSummary.Text = summary;
+            RoutesList.ItemsSource = routes;
+            RoutesList.SelectedItem = recommended;
         }
 
         if (Dispatcher.UIThread.CheckAccess()) Apply();
         else await Dispatcher.UIThread.InvokeAsync(Apply);
     }
 
-    private void OnInstall(object? sender, RoutedEventArgs e)
+    private async void OnInstall(object? sender, RoutedEventArgs e)
     {
-        if (Main is null || Card is null) return;
-        if (Main.InstallModCommand.CanExecute(Card))
-            Main.InstallModCommand.Execute(Card);
+        var card = Card;
+        if (Main is null || card is null) return;
+        if (RoutesList.SelectedItem is not RouteOption route)
+        {
+            InstallResult.Text = "Select a route first.";
+            InstallResult.IsVisible = true;
+            return;
+        }
+
+        var owner = this.FindAncestorOfType<Window>();
+        if (owner is null) return;
+
+        InstallButton.IsEnabled = false;
+        InstallProgress.IsVisible = true;
+        InstallProgress.Value = 0;
+        InstallResult.IsVisible = false;
+
+        var progress = new Progress<(string message, double percent)>(u =>
+        {
+            InstallProgress.Value = u.percent;
+            RouteSummary.Text = u.message;
+        });
+
+        try
+        {
+            var outcome = await Dlss5Installer.InstallAsync(Main, owner, card, route.Profile, progress);
+            InstallResult.Text = outcome.Message;
+            InstallResult.IsVisible = true;
+            if (outcome.Ran)
+            {
+                try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
+                await RefreshAssessmentAsync();
+            }
+        }
+        finally
+        {
+            InstallProgress.IsVisible = false;
+            InstallButton.IsEnabled = true;
+        }
     }
 
     private async void OnDxvk(object? sender, RoutedEventArgs e)

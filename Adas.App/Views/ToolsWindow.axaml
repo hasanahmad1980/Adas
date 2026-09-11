@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Adas.App.Views.ToolsWindow"
+        Width="620" Height="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AdasBackgroundBrush}"
+        Title="Adas — Tools">
+
+    <ScrollViewer Padding="22">
+        <StackPanel Spacing="16">
+            <TextBlock Text="Tools" Classes="h1" />
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="NeuralScreen" Classes="h2" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                               Text="Launch the standalone DLSS Neural Rendering test window to confirm NR works on this PC, independent of any game." />
+                    <Button x:Name="NeuralScreenButton" Classes="accent" Content="Launch NeuralScreen"
+                            HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Universal MFG unlock" Classes="h2" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                               Text="Install the RTX 40-series Multi-Frame-Generation unlock (dxgi.dll proxy) into the game selected in the library. Select an RTX 40 game first." />
+                    <TextBlock x:Name="MfgTarget" Classes="muted" />
+                    <Button x:Name="MfgButton" Classes="subtle" Content="Install MFG unlock into selected game"
+                            HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Diagnostics report" Classes="h2" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                               Text="Generate a full system + install diagnostics report (GPU, driver, detected games, DLSS 5 state) you can save or share." />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="DiagButton" Classes="subtle" Content="Generate report" />
+                        <Button x:Name="SaveDiagButton" Classes="subtle" Content="Save to file…" IsEnabled="False" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <SelectableTextBlock x:Name="Output" Classes="muted" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>
