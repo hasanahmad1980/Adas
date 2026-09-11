@@ -37,8 +37,29 @@ public partial class GameSetupView : UserControl
         ReShadeButton.Click += OnReShade;
         OpenFolderButton.Click += OnOpenFolder;
 
+        BitnessCombo.ItemsSource = new[] { "Auto", "32-bit", "64-bit" };
+        ApiCombo.ItemsSource = new[] { "Auto", "DirectX8", "DirectX9", "DirectX10", "DirectX11", "DirectX12", "Vulkan", "OpenGL" };
+        ReShadeCombo.ItemsSource = new[] { "Default", "Stable", "Nightly", "Custom" };
+        DxvkCombo.ItemsSource = new[] { "Default", "Development", "Stable", "LiliumHdr" };
+        ShaderModeCombo.ItemsSource = new[] { "Global", "Custom", "Select", "Off" };
+
+        BitnessCombo.SelectionChanged += OnBitnessChanged;
+        ApiCombo.SelectionChanged += OnApiChanged;
+        ReShadeCombo.SelectionChanged += OnReShadeChannelChanged;
+        DxvkCombo.SelectionChanged += OnDxvkVariantChanged;
+        ShaderModeCombo.SelectionChanged += OnShaderModeChanged;
+        ChoosePacksButton.Click += OnChoosePacks;
+        ChangeFolderButton.Click += OnChangeFolder;
+        ResetFolderButton.Click += OnResetFolder;
+
         DataContextChanged += (_, _) => _ = RefreshAssessmentAsync();
     }
+
+    /// <summary>True while combos are being seeded from the card, so SelectionChanged handlers
+    /// don't write the value straight back and trigger spurious re-assessments.</summary>
+    private bool _populatingOverrides;
+
+    private string Store => Card?.Source ?? "";
 
     private GameCardViewModel? Card => DataContext as GameCardViewModel;
 
@@ -97,6 +118,7 @@ public partial class GameSetupView : UserControl
             RouteSummary.Text = summary;
             RoutesList.ItemsSource = routes;
             RoutesList.SelectedItem = recommended;
+            PopulateOverrides(card);
         }
 
         if (Dispatcher.UIThread.CheckAccess()) Apply();
@@ -144,6 +166,154 @@ public partial class GameSetupView : UserControl
             InstallProgress.IsVisible = false;
             InstallButton.IsEnabled = true;
         }
+    }
+
+    // ── Advanced per-game overrides ─────────────────────────────────────────
+    // Seeds each combo from the persisted per-game override; handlers below write changes back
+    // through the same MainViewModel getters/setters the WinUI overrides panel used.
+    private void PopulateOverrides(GameCardViewModel card)
+    {
+        if (Main is null) return;
+        _populatingOverrides = true;
+        try
+        {
+            var store = card.Source ?? "";
+
+            BitnessCombo.SelectedItem = Main.GetBitnessOverride(card.GameName, store) switch
+            {
+                "32" => "32-bit",
+                "64" => "64-bit",
+                _ => "Auto",
+            };
+
+            var api = Main.GetApiOverride(card.GameName, store);
+            ApiCombo.SelectedItem = api is { Count: > 0 }
+                ? api[0] switch
+                {
+                    "DirectX12" => "DirectX12", "DirectX11" => "DirectX11", "DirectX10" => "DirectX10",
+                    "DirectX9" => "DirectX9", "DirectX8" => "DirectX8", "Vulkan" => "Vulkan",
+                    "OpenGL" => "OpenGL", _ => "Auto",
+                }
+                : "Auto";
+
+            ReShadeCombo.SelectedItem = Main.GetReShadeChannelOverride(card.GameName, store) switch
+            {
+                null => "Default",
+                "Stable" => "Stable",
+                "Nightly" => "Nightly",
+                "Custom" => "Custom",
+                _ => "Default", // legacy version string — not represented as a discrete option here
+            };
+
+            DxvkCombo.SelectedItem = Main.GetDxvkVariantOverride(card.GameName, store) ?? "Default";
+            ShaderModeCombo.SelectedItem = Main.GetPerGameShaderMode(card.GameName, store);
+
+            var folder = Main.GetFolderOverride(card.GameName, store);
+            FolderText.Text = string.IsNullOrWhiteSpace(folder) ? "Using detected folder." : folder;
+        }
+        finally { _populatingOverrides = false; }
+    }
+
+    private void OnBitnessChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_populatingOverrides || Main is null || Card is not { } card) return;
+        var value = (BitnessCombo.SelectedItem as string) switch { "32-bit" => "32", "64-bit" => "64", _ => (string?)null };
+        Main.SetBitnessOverride(card.GameName, value, Store);
+        if (value == "32") card.Is32Bit = true;
+        else if (value == "64") card.Is32Bit = false;
+        card.NotifyAll();
+        _ = RefreshAssessmentAsync();
+    }
+
+    private void OnApiChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_populatingOverrides || Main is null || Card is not { } card) return;
+        var sel = ApiCombo.SelectedItem as string;
+        var apis = sel is null or "Auto" ? null : new List<string> { sel };
+        Main.SetApiOverride(card.GameName, apis, Store);
+        card.NotifyAll();
+        _ = RefreshAssessmentAsync();
+    }
+
+    private void OnReShadeChannelChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_populatingOverrides || Main is null || Card is not { } card) return;
+        var sel = ReShadeCombo.SelectedItem as string;
+        Main.SetReShadeChannelOverride(card.GameName, sel == "Default" ? null : sel, Store);
+    }
+
+    private void OnDxvkVariantChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_populatingOverrides || Main is null || Card is not { } card) return;
+        var sel = DxvkCombo.SelectedItem as string;
+        Main.SetDxvkVariantOverride(card.GameName, sel == "Default" ? null : sel, Store);
+    }
+
+    private void OnShaderModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_populatingOverrides || Main is null || Card is not { } card) return;
+        var mode = ShaderModeCombo.SelectedItem as string ?? "Global";
+        Main.SetPerGameShaderMode(card.GameName, mode, Store);
+        if (mode == "Select") _ = ChoosePacksAsync(card);
+    }
+
+    private void OnChoosePacks(object? sender, RoutedEventArgs e)
+    {
+        if (Card is { } card) _ = ChoosePacksAsync(card);
+    }
+
+    private async Task ChoosePacksAsync(GameCardViewModel card)
+    {
+        if (Main is null) return;
+        var picker = Main.ShowPerGameShaderSelectionPicker;
+        if (picker is null) return;
+
+        var svc = Main.GameNameServiceInstance;
+        var key = GameKey.From(card.GameName, Store).ToKey();
+        var current = svc.PerGameShaderSelection.TryGetValue(key, out var existing) ? existing : null;
+
+        var result = await picker(card.GameName, current);
+        if (result is null) return; // cancelled
+
+        svc.PerGameShaderSelection[key] = result;
+        if (ShaderModeCombo.SelectedItem as string != "Select")
+        {
+            _populatingOverrides = true;
+            ShaderModeCombo.SelectedItem = "Select";
+            _populatingOverrides = false;
+            Main.SetPerGameShaderMode(card.GameName, "Select", Store);
+        }
+        Main.SaveSettingsPublic();
+        Main.DeployShadersForCard(card.GameName);
+    }
+
+    private async void OnChangeFolder(object? sender, RoutedEventArgs e)
+    {
+        if (Main is null || Card is not { } card) return;
+        var owner = this.FindAncestorOfType<Window>();
+        if (owner?.StorageProvider is not { } sp) return;
+
+        var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = "Select the game's install folder",
+            AllowMultiple = false,
+        });
+        var path = folders.Count > 0 ? folders[0].Path.LocalPath : null;
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        Main.SetFolderOverride(card.GameName, path, Store);
+        FolderText.Text = path;
+        card.NotifyAll();
+        await RefreshAssessmentAsync();
+    }
+
+    private async void OnResetFolder(object? sender, RoutedEventArgs e)
+    {
+        if (Main is null || Card is not { } card) return;
+        Main.ResetFolderOverride(card);
+        FolderText.Text = "Using detected folder.";
+        card.NotifyAll();
+        await RefreshAssessmentAsync();
     }
 
     private async void OnDxvk(object? sender, RoutedEventArgs e)
