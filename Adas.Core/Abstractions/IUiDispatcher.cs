@@ -18,6 +18,21 @@ public interface IUiDispatcher
 }
 
 /// <summary>
+/// Neutral access point for the current thread's UI dispatcher. The active UI shell assigns
+/// <see cref="CurrentThreadFactory"/> at startup (WinUI wraps DispatcherQueue.GetForCurrentThread,
+/// Avalonia wraps Dispatcher.UIThread) so engine code can capture the UI dispatcher without
+/// referencing a concrete UI framework.
+/// </summary>
+public static class UiDispatcher
+{
+    /// <summary>Set by the shell; returns an <see cref="IUiDispatcher"/> for the calling (UI) thread, or null.</summary>
+    public static Func<IUiDispatcher?>? CurrentThreadFactory { get; set; }
+
+    /// <summary>Captures the current thread's UI dispatcher via the shell-supplied factory, if any.</summary>
+    public static IUiDispatcher? ForCurrentThread() => CurrentThreadFactory?.Invoke();
+}
+
+/// <summary>
 /// Requests an application restart (used by the self-update subsystem after applying an update).
 /// Implemented by the active UI shell.
 /// </summary>

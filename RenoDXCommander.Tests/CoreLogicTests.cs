@@ -149,7 +149,7 @@ public class CoreLogicTests
     [Fact]
     public void CreateDirectLaunchInfo_UsesTheExecutableDirectory()
     {
-        var info = MainWindow.CreateDirectLaunchInfo(@"E:\Games\Example\game.exe", "-safe");
+        var info = ShellHelpers.CreateDirectLaunchInfo(@"E:\Games\Example\game.exe", "-safe");
         Assert.Equal(@"E:\Games\Example", info.WorkingDirectory);
         Assert.Equal("-safe", info.Arguments);
         Assert.True(info.UseShellExecute);

@@ -157,10 +157,11 @@ public static class CrashReporter
     // ── Hook registration ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Register all available unhandled-exception hooks for a WinUI 3 unpackaged app.
-    /// Call once from App constructor, before anything else runs.
+    /// Register the framework-neutral unhandled-exception hooks (CLR thread + unobserved Task).
+    /// Call once at startup, before anything else runs. The active UI shell registers its own
+    /// UI-framework dispatcher hook separately and routes it to <see cref="WriteCrashReport"/>.
     /// </summary>
-    public static void Register(Microsoft.UI.Xaml.Application app)
+    public static void RegisterCore()
     {
         // 1. CLR thread exceptions (non-UI threads, synchronous throws)
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -179,15 +180,7 @@ public static class CrashReporter
             e.SetObserved(); // Prevent the process from being killed
         };
 
-        // 3. WinUI / XAML dispatcher exceptions
-        app.UnhandledException += (_, e) =>
-        {
-            WriteCrashReport("Microsoft.UI.Xaml.Application.UnhandledException", e.Exception,
-                note: $"WinUI exception. Handled = true (app will attempt to continue). Message: {e.Message}");
-            e.Handled = true; // Try to keep the app alive
-        };
-
-        Log("CrashReporter registered.");
+        Log("CrashReporter core hooks registered.");
     }
 
     // ── Report writer ─────────────────────────────────────────────────────────────

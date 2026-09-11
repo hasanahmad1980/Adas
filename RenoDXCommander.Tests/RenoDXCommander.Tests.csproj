@@ -29,7 +29,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RenoDXCommander\RenoDXCommander.csproj" />
+    <!-- Tests target the headless engine (Adas.Core). The WinUI shell (RenoDXCommander) is being
+         retired in the Avalonia migration and is no longer referenced. -->
     <ProjectReference Include="..\Adas.Core\Adas.Core.csproj" />
   </ItemGroup>
 

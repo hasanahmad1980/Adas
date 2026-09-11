@@ -164,7 +164,7 @@ public partial class MainViewModel
     {
         if (card == null) return;
         // Allow toggle for any UE card that shows the button
-        if (card.UeExtendedToggleVisibility != Microsoft.UI.Xaml.Visibility.Visible) return;
+        if (card.UeExtendedToggleVisibility != RenoDXCommander.Abstractions.UiVisibility.Visible) return;
 
         bool nowExtended = !card.UseUeExtended;
 

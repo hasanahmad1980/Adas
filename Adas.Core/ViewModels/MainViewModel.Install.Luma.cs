@@ -1054,27 +1054,9 @@ public partial class MainViewModel
 
         try
         {
-            Microsoft.UI.Xaml.XamlRoot? xamlRoot = null;
-            if (Microsoft.UI.Xaml.Application.Current is App app)
-            {
-                var field = typeof(App).GetField("_window", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field?.GetValue(app) is MainWindow mw)
-                    xamlRoot = mw.Content?.XamlRoot;
-            }
-            if (xamlRoot == null) return true;
-
-            var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
-            {
-                Title = $"⚠ Install Note — {gameName}",
-                Content = message,
-                PrimaryButtonText = "Continue",
-                CloseButtonText = "Cancel",
-                DefaultButton = Microsoft.UI.Xaml.Controls.ContentDialogButton.Primary,
-                XamlRoot = xamlRoot,
-            };
-
-            var result = await dialog.ShowAsync();
-            return result == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary;
+            // Shell-supplied confirm dialog; when unset (headless/tests) proceed.
+            if (ConfirmContinueDialog is null) return true;
+            return await ConfirmContinueDialog($"⚠ Install Note — {gameName}", message);
         }
         catch (Exception ex)
         {

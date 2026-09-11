@@ -20,8 +20,18 @@ public partial class App : Application
     {
         InitializeComponent();
         // Register crash/error reporting before anything else runs.
-        // This catches AppDomain, TaskScheduler, and WinUI exceptions.
-        CrashReporter.Register(this);
+        // Framework-neutral hooks (AppDomain, TaskScheduler) live in CrashReporter; the
+        // WinUI dispatcher hook is wired here in the shell and routed to WriteCrashReport.
+        CrashReporter.RegisterCore();
+        // Let engine code capture the UI-thread dispatcher without referencing WinUI directly.
+        RenoDXCommander.Abstractions.UiDispatcher.CurrentThreadFactory =
+            () => Services.WinUiDispatcher.ForCurrentThread();
+        UnhandledException += (_, e) =>
+        {
+            CrashReporter.WriteCrashReport("Microsoft.UI.Xaml.Application.UnhandledException", e.Exception,
+                note: $"WinUI exception. Handled = true (app will attempt to continue). Message: {e.Message}");
+            e.Handled = true; // Try to keep the app alive
+        };
 
         // Configure DI container
         var services = new ServiceCollection();
@@ -134,6 +144,9 @@ public partial class App : Application
         services.AddTransient<MainWindow>();
 
         Services = services.BuildServiceProvider();
+        // Publish the provider to the framework-neutral locator so engine services in Adas.Core
+        // can resolve late-bound dependencies without referencing the WinUI App type.
+        RenoDXCommander.Abstractions.AppServices.Services = Services;
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

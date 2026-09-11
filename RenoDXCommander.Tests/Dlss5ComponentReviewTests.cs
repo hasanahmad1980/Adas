@@ -1600,7 +1600,7 @@ public sealed class Dlss5ComponentReviewTests
             Summary: "The installation is complete and ready to test in game.",
             Findings: new[] { "Open the RenoDX DLSS tab." });
 
-        var status = MainWindow.DescribeSimpleInstalledStatus(report);
+        var status = ShellHelpers.DescribeSimpleInstalledStatus(report);
 
         Assert.Equal("DLSS 5 files are installed", status.Title);
         Assert.Contains("not yet confirmed", status.Summary, StringComparison.OrdinalIgnoreCase);

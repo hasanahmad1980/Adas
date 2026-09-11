@@ -1,3 +1,4 @@
+using RenoDXCommander.Abstractions;
 // AutoUpdateService.cs -- Silent background auto-update for all RHI-managed components.
 // Triggered after each update check (startup and 4-hour periodic timer).
 // Respects all per-game ExcludeFromUpdateAll* flags via the existing UpdateAll* methods.
@@ -47,8 +48,8 @@ public class AutoUpdateService
         _viewModel = viewModel;
         // Capture the dispatcher at setup time. SetViewModel is called from MainViewModel's
         // constructor, which runs on the UI thread, so the current-thread queue is the UI queue.
-        // The concrete adapter (WinUI today, Avalonia later) is resolved from the shell.
-        _dispatcher = WinUiDispatcher.ForCurrentThread();
+        // The concrete adapter (WinUI today, Avalonia later) is resolved from the shell-supplied factory.
+        _dispatcher = RenoDXCommander.Abstractions.UiDispatcher.ForCurrentThread();
     }
 
     // ── Public entry point ────────────────────────────────────────────────────────
@@ -282,7 +283,7 @@ public class AutoUpdateService
         if (FeatureFlags.NexusMods)
         {
             var nexusDl = _viewModel.AllCards.Count > 0
-                ? App.Services.GetRequiredService<NexusDownloadService>()
+                ? AppServices.Services.GetRequiredService<NexusDownloadService>()
                 : null;
 
             if (nexusDl?.IsApiKeyConfigured == true && nexusDl.IsPremium)

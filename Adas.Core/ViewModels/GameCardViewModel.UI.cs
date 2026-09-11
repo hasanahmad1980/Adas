@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using Microsoft.UI.Xaml;
+using Visibility = RenoDXCommander.Abstractions.UiVisibility;
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
 

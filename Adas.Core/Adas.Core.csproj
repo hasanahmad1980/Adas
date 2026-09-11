@@ -30,6 +30,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Bundled DLSS 5 payloads. The engine resolves these via AppContext.BaseDirectory\Assets\DLSS5,
+         so they are copied to the output of Adas.Core and (transitively) every consumer — tests and
+         the Avalonia app. Still physically under the (being-retired) WinUI project during the
+         migration; Phase 4 converts these to runtime-fetch and Phase 5 relocates what remains. -->
+    <None Include="..\RenoDXCommander\Assets\DLSS5\*">
+      <Link>Assets\DLSS5\%(Filename)%(Extension)</Link>
+      <TargetPath>Assets\DLSS5\%(Filename)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.11.71" />
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />

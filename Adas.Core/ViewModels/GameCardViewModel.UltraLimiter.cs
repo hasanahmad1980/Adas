@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml;
+using Visibility = RenoDXCommander.Abstractions.UiVisibility;
 using RenoDXCommander.Models;
 
 namespace RenoDXCommander.ViewModels;

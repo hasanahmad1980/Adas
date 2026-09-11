@@ -739,7 +739,7 @@ public partial class MainViewModel
                     {
                         try
                         {
-                            var rdx5Svc = App.Services.GetRequiredService<Renodx5AddonService>();
+                            var rdx5Svc = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<Renodx5AddonService>();
                             await rdx5Svc.DeployNrDllIfAbsentAsync(card.InstallPath).ConfigureAwait(false);
 
                             // Refresh the card's DLSS detection so the NR column shows immediately

@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Collections;
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
-using Microsoft.UI.Xaml;
+using Visibility = RenoDXCommander.Abstractions.UiVisibility;
 
 namespace RenoDXCommander.ViewModels;
 
@@ -186,6 +186,20 @@ public partial class MainViewModel : ObservableObject
     /// Returns true if the user chooses to proceed, false to cancel.
     /// </summary>
     public Func<Task<bool>>? ShowVulkanLayerWarningDialog { get; set; }
+
+    /// <summary>
+    /// Async callback set by the UI layer. Shows a simple continue/cancel confirmation with the
+    /// given title and message. Returns true if the user chose to continue. When null (headless
+    /// or tests), callers proceed as if confirmed.
+    /// </summary>
+    public Func<string, string, Task<bool>>? ConfirmContinueDialog { get; set; }
+
+    /// <summary>
+    /// Async callback set by the UI layer. Shows a warning with a "don't show again" opt-out.
+    /// Returns (confirmed, dontShowAgain). When null (headless or tests), callers proceed as if
+    /// confirmed without opting out.
+    /// </summary>
+    public Func<string, string, Task<(bool confirmed, bool dontShowAgain)>>? ConfirmWithOptOutDialog { get; set; }
 
     // ── Testable seams for Vulkan layer operations in InstallReShadeVulkanAsync ──
     /// <summary>
@@ -603,11 +617,11 @@ public partial class MainViewModel : ObservableObject
         _nexusUpdateService = nexusUpdateService;
         _dlssStreamlineService = dlssStreamlineService;
         _dlssPresetService = dlssPresetService;
-        _dofFixService = App.Services.GetRequiredService<DofFixService>();
-        _mfgUnlockService = App.Services.GetRequiredService<MfgUnlockService>();
-        _autoUpdateService = App.Services.GetRequiredService<AutoUpdateService>();
+        _dofFixService = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<DofFixService>();
+        _mfgUnlockService = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<MfgUnlockService>();
+        _autoUpdateService = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<AutoUpdateService>();
         _autoUpdateService.SetViewModel(this);
-        _customReShadeHashService = App.Services.GetRequiredService<CustomReShadeHashService>();
+        _customReShadeHashService = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<CustomReShadeHashService>();
         _seenWikiModsService = seenWikiModsService;
         _seenUltraPlusModsService = seenUltraPlusModsService;
         _seenLumaModsService = seenLumaModsService;

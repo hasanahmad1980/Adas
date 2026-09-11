@@ -1,3 +1,4 @@
+using RenoDXCommander.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Models;
 using RenoDXCommander.ViewModels;
@@ -156,7 +157,7 @@ public partial class DxvkService
                     progress?.Report(("Setting NVIDIA profile...", 78));
                     try
                     {
-                        var presetSvc = App.Services.GetRequiredService<DlssPresetService>();
+                        var presetSvc = AppServices.Services.GetRequiredService<DlssPresetService>();
                         presetSvc.SetLiliumPresentMethod(card.GameName, card.InstallPath);
                         CrashReporter.Log("[DxvkService.InstallAsync] Lilium HDR: set NVIDIA present method settings");
                     }
@@ -482,7 +483,7 @@ public partial class DxvkService
                 {
                     try
                     {
-                        var presetSvc = App.Services.GetRequiredService<DlssPresetService>();
+                        var presetSvc = AppServices.Services.GetRequiredService<DlssPresetService>();
                         presetSvc.ClearLiliumPresentMethod(card.GameName, card.InstallPath);
                     }
                     catch { }

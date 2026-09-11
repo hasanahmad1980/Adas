@@ -1180,7 +1180,7 @@ public partial class MainViewModel
             // Check DLSS Enabler update and auto-deploy if newer version available
             try
             {
-                var dlssEnablerService = App.Services.GetRequiredService<DlssEnablerService>();
+                var dlssEnablerService = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<DlssEnablerService>();
                 bool deHasUpdate = await dlssEnablerService.CheckForUpdateAsync().ConfigureAwait(false);
                 if (deHasUpdate)
                     await dlssEnablerService.EnsureStagingAsync().ConfigureAwait(false);
@@ -1193,7 +1193,7 @@ public partial class MainViewModel
             // Check the unified RenoDX DLSS add-on and auto-deploy if a newer version is available.
             try
             {
-                var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
+                var rdx5Service = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<Renodx5AddonService>();
                 bool rdx5HasUpdate = await rdx5Service.CheckForUpdateAsync().ConfigureAwait(false);
                 if (rdx5HasUpdate)
                     await rdx5Service.EnsureStagingAsync().ConfigureAwait(false);

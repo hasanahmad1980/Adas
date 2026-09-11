@@ -1,3 +1,4 @@
+using RenoDXCommander.Abstractions;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Models;
@@ -111,7 +112,7 @@ public class AddonPackService : IAddonPackService
         // RenoDX DLSS is staged by Renodx5AddonService — check its staging dir directly.
         if (IsRenoDxDlssPackageName(packageName))
         {
-            var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
+            var rdx5Service = AppServices.Services.GetRequiredService<Renodx5AddonService>();
             return rdx5Service.IsStagingReady;
         }
 
@@ -312,7 +313,7 @@ public class AddonPackService : IAddonPackService
             if (entry.SectionId.Equals("renodx-dlss", StringComparison.OrdinalIgnoreCase))
             {
                 progress?.Report(("Preparing unified RenoDX DLSS add-on...", 10));
-                var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
+                var rdx5Service = AppServices.Services.GetRequiredService<Renodx5AddonService>();
                 await rdx5Service.EnsureStagingAsync(progress).ConfigureAwait(false);
                 if (!rdx5Service.IsStagingReady)
                 {
@@ -533,7 +534,7 @@ public class AddonPackService : IAddonPackService
                 // RenoDX DLSS is staged by Renodx5AddonService in its own directory.
                 if (IsRenoDxDlssPackageName(packageName))
                 {
-                    var rdx5Service = App.Services.GetRequiredService<Renodx5AddonService>();
+                    var rdx5Service = AppServices.Services.GetRequiredService<Renodx5AddonService>();
                     stagingFile = rdx5Service.StagedFilePath;
                     if (!File.Exists(stagingFile))
                     {
@@ -621,7 +622,7 @@ public class AddonPackService : IAddonPackService
                 if (!FilesMatch(stagingFile, destFile))
                     File.Copy(stagingFile, destFile, overwrite: true);
                 if (IsRenoDxDlssPackageName(packageName))
-                    App.Services.GetRequiredService<Renodx5AddonService>().RetireObsoleteAddons(installPath, installPath);
+                    AppServices.Services.GetRequiredService<Renodx5AddonService>().RetireObsoleteAddons(installPath, installPath);
                 deployedFileNames.Add(deployName + bitnessExt);
                 if (CrashReporter.VerboseLogging)
                     CrashReporter.Log($"[AddonPackService.DeployAddonsForGame] Synchronized '{deployName}{bitnessExt}' to '{installPath}'.");

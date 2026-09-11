@@ -20,7 +20,7 @@ public partial class MainViewModel
     {
         if (!FeatureFlags.NexusMods) return;
 
-        var nexusDl = App.Services.GetRequiredService<NexusDownloadService>();
+        var nexusDl = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<NexusDownloadService>();
         if (!nexusDl.IsApiKeyConfigured || !nexusDl.IsPremium) return;
 
         var parsed = NexusUpdateService.ParseNexusUrl(card.NexusUrl);
@@ -86,7 +86,7 @@ public partial class MainViewModel
 
         try
         {
-            var nexusDl = App.Services.GetRequiredService<NexusDownloadService>();
+            var nexusDl = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<NexusDownloadService>();
 
             // Resolve the download URI — try NXM key path first (works for both premium and free)
             string? uri = null;
@@ -144,7 +144,7 @@ public partial class MainViewModel
     public async Task UpdateNexusModAsync(GameCardViewModel card)
     {
         if (!FeatureFlags.NexusMods) return;
-        var nexusDl = App.Services.GetRequiredService<NexusDownloadService>();
+        var nexusDl = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<NexusDownloadService>();
         if (!nexusDl.IsApiKeyConfigured || !nexusDl.IsPremium) return;
 
         // Re-use install path — it fetches latest MAIN file
@@ -158,7 +158,7 @@ public partial class MainViewModel
     /// </summary>
     private async Task InstallNexusFileAsync(GameCardViewModel card, string domain, int modId, NexusModFile file)
     {
-        var nexusDl = App.Services.GetRequiredService<NexusDownloadService>();
+        var nexusDl = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<NexusDownloadService>();
 
         DispatcherQueue?.TryEnqueue(() => card.ActionMessage = "Resolving download link...");
 
@@ -185,7 +185,7 @@ public partial class MainViewModel
             return;
         }
 
-        var nexusDl = App.Services.GetRequiredService<NexusDownloadService>();
+        var nexusDl = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<NexusDownloadService>();
 
         var progress = new Progress<(string msg, double pct)>(p =>
             DispatcherQueue?.TryEnqueue(() => { card.ActionMessage = p.msg; card.InstallProgress = p.pct; }));
@@ -209,7 +209,7 @@ public partial class MainViewModel
             try
             {
                 // Use 7-Zip for extraction (same as the rest of RHI)
-                var sevenZip = App.Services.GetRequiredService<ISevenZipExtractor>();
+                var sevenZip = RenoDXCommander.Abstractions.AppServices.Services.GetRequiredService<ISevenZipExtractor>();
                 var sevenZipExe = sevenZip.Find7ZipExe();
                 if (!string.IsNullOrEmpty(sevenZipExe))
                 {

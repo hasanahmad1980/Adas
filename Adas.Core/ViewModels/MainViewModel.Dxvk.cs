@@ -1,4 +1,3 @@
-using Microsoft.UI.Xaml.Controls;
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
@@ -18,7 +17,24 @@ public partial class MainViewModel
     /// Shows a first-time warning dialog if not yet acknowledged this session.
     /// Sets <c>DxvkIsInstalling</c> during the operation to disable controls.
     /// </summary>
-    public async Task InstallDxvkAsync(GameCardViewModel card, Microsoft.UI.Xaml.XamlRoot? xamlRoot = null)
+    /// <summary>Fixed body text for the first-run DXVK advanced-feature warning (rendered by the shell).</summary>
+    public const string DxvkWarningMessage =
+        "⚠ ADVANCED FEATURE — USE AT YOUR OWN RISK\n\n"
+        + "DXVK is an unofficial DirectX-to-Vulkan translation layer.\n"
+        + "No support will be provided if a game is not compatible.\n\n"
+        + "WHO SHOULD USE THIS:\n"
+        + "• Primarily benefits older DX8/DX9 games (e.g. FFXIV, Morrowind)\n"
+        + "• Enables ReShade compute shaders on games that don't support them natively\n"
+        + "• Can reduce CPU-bound stuttering in older titles\n\n"
+        + "IMPORTANT WARNINGS:\n"
+        + "• Anti-cheat games may ban players using DXVK\n"
+        + "• Game overlays (Steam, NVIDIA, RTSS) may conflict or stop working\n"
+        + "• Exclusive fullscreen is blocked — use borderless windowed\n"
+        + "• First launch will be slow due to shader compilation (improves on subsequent runs)\n"
+        + "• Some games may crash or have graphical glitches with DXVK\n\n"
+        + "Do you want to continue?";
+
+    public async Task InstallDxvkAsync(GameCardViewModel card)
     {
         if (string.IsNullOrEmpty(card.InstallPath)) return;
 
@@ -26,52 +42,12 @@ public partial class MainViewModel
         if (!await CheckInstallWarningAsync(card.GameName, "dxvk")) return;
 
         // ── DXVK warning (shown unless user has opted out via checkbox) ─────────
-        if (xamlRoot != null && !_settingsViewModel.DxvkWarningDismissed)
+        if (ConfirmWithOptOutDialog is not null && !_settingsViewModel.DxvkWarningDismissed)
         {
-            var dontShowAgain = new CheckBox
-            {
-                Content = "Don't show this warning again",
-                Foreground = UIFactory.Brush(ResourceKeys.TextSecondaryBrush),
-                Margin = new Microsoft.UI.Xaml.Thickness(0, 8, 0, 0),
-            };
+            var (confirmed, dontShowAgain) = await ConfirmWithOptOutDialog("⚠ DXVK Warning", DxvkWarningMessage);
+            if (!confirmed) return;
 
-            var contentPanel = new StackPanel();
-            contentPanel.Children.Add(new TextBlock
-            {
-                Text = "⚠ ADVANCED FEATURE — USE AT YOUR OWN RISK\n\n"
-                    + "DXVK is an unofficial DirectX-to-Vulkan translation layer.\n"
-                    + "No support will be provided if a game is not compatible.\n\n"
-                    + "WHO SHOULD USE THIS:\n"
-                    + "• Primarily benefits older DX8/DX9 games (e.g. FFXIV, Morrowind)\n"
-                    + "• Enables ReShade compute shaders on games that don't support them natively\n"
-                    + "• Can reduce CPU-bound stuttering in older titles\n\n"
-                    + "IMPORTANT WARNINGS:\n"
-                    + "• Anti-cheat games may ban players using DXVK\n"
-                    + "• Game overlays (Steam, NVIDIA, RTSS) may conflict or stop working\n"
-                    + "• Exclusive fullscreen is blocked — use borderless windowed\n"
-                    + "• First launch will be slow due to shader compilation (improves on subsequent runs)\n"
-                    + "• Some games may crash or have graphical glitches with DXVK\n\n"
-                    + "Do you want to continue?",
-                TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
-                Foreground = UIFactory.Brush(ResourceKeys.TextPrimaryBrush),
-                FontSize = 13,
-            });
-            contentPanel.Children.Add(dontShowAgain);
-
-            var warningDialog = new ContentDialog
-            {
-                Title = "⚠ DXVK Warning",
-                Content = contentPanel,
-                PrimaryButtonText = "Continue",
-                CloseButtonText = "Cancel",
-                XamlRoot = xamlRoot,
-                RequestedTheme = Microsoft.UI.Xaml.ElementTheme.Dark,
-            };
-
-            var result = await DialogService.ShowSafeAsync(warningDialog);
-            if (result != ContentDialogResult.Primary) return;
-
-            if (dontShowAgain.IsChecked == true)
+            if (dontShowAgain)
             {
                 _settingsViewModel.DxvkWarningDismissed = true;
                 SaveSettingsPublic();
@@ -236,13 +212,13 @@ public partial class MainViewModel
     /// When toggled ON, triggers the DXVK install flow.
     /// When toggled OFF, triggers the DXVK uninstall flow.
     /// </summary>
-    public async Task HandleDxvkToggleAsync(GameCardViewModel card, bool enabled, Microsoft.UI.Xaml.XamlRoot? xamlRoot = null)
+    public async Task HandleDxvkToggleAsync(GameCardViewModel card, bool enabled)
     {
         card.DxvkEnabled = enabled;
 
         if (enabled)
         {
-            await InstallDxvkAsync(card, xamlRoot);
+            await InstallDxvkAsync(card);
 
             // If install failed (status didn't change to Installed), revert the toggle
             if (card.DxvkStatus != GameStatus.Installed && card.DxvkStatus != GameStatus.UpdateAvailable)
