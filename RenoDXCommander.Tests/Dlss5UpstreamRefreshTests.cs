@@ -125,7 +125,7 @@ public sealed class Dlss5UpstreamRefreshTests
         => Assert.Equal(expected, Dlss5ComponentService.NormalizeProfileForMode(mode, is64Bit, selected));
 
     [Theory]
-    [InlineData("SF-2026-09-07", true)]
+    [InlineData("SF-2026-09-11", true)]
     [InlineData("SF-0.3", false)]
     [InlineData("SF-2026-99-02", false)]
     [InlineData(null, false)]

@@ -1,3 +1,8 @@
+## v2.6.54 — ShortFuse unified refresh + DLSS 5 status fix (2026-09-11)
+
+- **ShortFuse unified add-on** refreshed to the supplied **2026-09-11** build (`SF-2026-09-11`), deployed as `renodx-dlss.addon64` with no download suffix (x64 ReShade add-on, verified). Stable RenoDX 4.55/4.70 remain separate; the payload manifest hash was updated to match.
+- **Fixed the DLSS 5 status showing "Available" after a successful install.** The setup page and library card reused the RenoDX-only status badge, which no DLSS 5 install ever changed, so a completed DLSS 5 route (e.g. Alien: Isolation) kept reading "Available". DLSS 5 now has its own status driven by the on-disk install record: the badge flips to **Installed**, the active route is marked "✓ Installed" and highlighted, the library card gains a green **DLSS 5** chip, and the chip appears on library load (not only after opening the setup page).
+
 ## v2.6.53 — Upstream refresh: AIO 2.2.4, OneClick 0.13.13, multipass 0.7.7, NeuralScreen 1.6.0 (2026-09-11)
 
 - **DLSS5-ReShade-AIO** bundled binaries updated **2.2.3 → 2.2.4** — the add-on and the AIO caller-bridge `nvngx.dll` changed (the feed shader `DLSS5_AIO_Feed.fx` is byte-identical to v2.2.1); all three files re-verified against the author's v2.2.4 64-bit release (archive SHA-256 matches the author's published `DLSS5-ReShade-AIO-v2.2.4-SHA256.txt`). Upstream adds live 32-bit Optical Flow enable/disable and working-resolution changes from the ReShade menu.

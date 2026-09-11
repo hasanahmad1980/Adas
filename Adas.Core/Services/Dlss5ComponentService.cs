@@ -39,7 +39,7 @@ public sealed partial class Dlss5ComponentService
     private const string ObsoleteBridgeLog = "dlss5-dx11-bridge.log";
 
     private const string FeederRepo = "jlrouzies-fr/DLSS5-Feeder";
-    private const string BundledRenoDxVersion = "SF-2026-09-07";
+    private const string BundledRenoDxVersion = "SF-2026-09-11";
     internal const string RenoDxDeploymentName = "renodx-dlss5.addon64";
     private const string NativeRenoDxAsset = "renodx-dlss5-4.70.addon64";
     private const string FeederRenoDxAsset = "renodx-dlss5-4.55.addon64";
