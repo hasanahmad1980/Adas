@@ -96,7 +96,7 @@ The private Adas package includes the user-supplied DLSS/Streamline runtime arch
 
 Source: <https://github.com/JakobPCoder/ReshadeMotionEstimation>
 
-Copyright Jakob Wapenhensch. Licensed under Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). This remains available through RHI's general shader-pack library but is no longer the DLSS5-Feeder default because upstream Feeder 0.7 reports that DRME does not compile on ReShade 6.8.
+Copyright Jakob Wapenhensch. Licensed under Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). This remains available through Adas's general shader-pack library but is no longer the DLSS5-Feeder default because upstream Feeder 0.7 reports that DRME does not compile on ReShade 6.8.
 
 License: <https://creativecommons.org/licenses/by-nc/4.0/>
 
