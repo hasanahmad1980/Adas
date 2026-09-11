@@ -161,14 +161,14 @@ public partial class MainViewModel
     }
 
     /// <summary>
-    /// Reads the bundled RHI_PatchNotes.md and extracts the last N version sections.
+    /// Reads the bundled Adas_PatchNotes.md and extracts the last N version sections.
     /// Each section starts with "## vX.Y.Z".
     /// </summary>
     public static string GetRecentPatchNotes(int count = 3)
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "RHI_PatchNotes.md");
+            var path = Path.Combine(AppContext.BaseDirectory, "Adas_PatchNotes.md");
             if (!File.Exists(path)) return "Patch notes file not found.";
 
             var lines = File.ReadAllLines(path);

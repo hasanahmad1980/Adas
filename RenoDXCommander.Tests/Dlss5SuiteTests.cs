@@ -439,9 +439,9 @@ public sealed class Dlss5SuiteTests
     [Fact]
     public void BundledFeeder_SurfacesMasterSwitchAndCompleteRenoDxNeuralControls()
     {
-        var shaderPath = FindRepositoryFile("RenoDXCommander", "Assets", "DLSS5", "DLSS5_Feed.fx");
+        var shaderPath = FindRepositoryFile("Adas.Core", "Assets", "DLSS5", "DLSS5_Feed.fx");
         var shader = File.ReadAllText(shaderPath);
-        var feeder32Path = FindRepositoryFile("RenoDXCommander", "Assets", "DLSS5", "dlss5-feed.addon32");
+        var feeder32Path = FindRepositoryFile("Adas.Core", "Assets", "DLSS5", "dlss5-feed.addon32");
         var feeder32Strings = System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(feeder32Path));
         Assert.Contains("DLSS5_MV_PROVIDER", shader, StringComparison.Ordinal);
         Assert.Contains("LumeniteFX Kernel", shader, StringComparison.Ordinal);
@@ -463,7 +463,7 @@ public sealed class Dlss5SuiteTests
     [InlineData("dlss5-feed-host64.exe")]
     public void FeederCompatibilityPatch_RecognizesUnifiedRenoDxFileName(string assetName)
     {
-        var assetPath = FindRepositoryFile("RenoDXCommander", "Assets", "DLSS5", assetName);
+        var assetPath = FindRepositoryFile("Adas.Core", "Assets", "DLSS5", assetName);
         var original = File.ReadAllBytes(assetPath);
 
         var patched = Dlss5ComponentService.PatchRenoDxAddonProbeName((byte[])original.Clone());
@@ -735,7 +735,7 @@ public sealed class Dlss5SuiteTests
              directory != null;
              directory = directory.Parent)
         {
-            if (!File.Exists(Path.Combine(directory.FullName, "RenoDXCommander.sln"))) continue;
+            if (!File.Exists(Path.Combine(directory.FullName, "Adas.sln"))) continue;
             return Path.Combine(new[] { directory.FullName }.Concat(relativeSegments).ToArray());
         }
 

@@ -135,7 +135,7 @@ function Assert-Dlss5Payload {
 # The source tree is the source of truth for every reviewed payload, including the
 # runtime-fetched OptiScaler archives (their pinned SHA-256 lives here).
 Assert-Dlss5Payload `
-    -Directory (Join-Path $repositoryRoot 'RenoDXCommander\Assets\DLSS5') `
+    -Directory (Join-Path $repositoryRoot 'Adas.Core\Assets\DLSS5') `
     -Description 'Source tree'
 
 $env:DOTNET_CLI_HOME = Join-Path $repositoryRoot '.dotnet-home'

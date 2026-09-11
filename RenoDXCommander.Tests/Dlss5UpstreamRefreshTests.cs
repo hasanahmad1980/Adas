@@ -203,9 +203,19 @@ public sealed class Dlss5UpstreamRefreshTests
     }
 
     [Fact]
-    public void BundledPreSrMultipassArchiveMatchesThePinnedRelease()
+    public void SourcePreSrMultipassArchiveMatchesThePinnedRelease()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5", "optiscaler-multipass.zip");
+        // The OptiScaler pre-SR multipass archive is runtime-fetched (Phase 4), so it is no longer
+        // copied to the build output — but the source-tree copy under Adas.Core stays the pinned,
+        // SHA-checked reference for the download. Verify that copy here.
+        string? repoRoot = null;
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "Adas.sln"))) { repoRoot = dir.FullName; break; }
+        }
+        Assert.NotNull(repoRoot);
+
+        var path = Path.Combine(repoRoot!, "Adas.Core", "Assets", "DLSS5", "optiscaler-multipass.zip");
         Assert.Equal(
             "3C07CE758C5BFBAAD30BA669A9D9E071F6127A873ADCAE584BD46F49832EB829",
             FileHelper.ComputeSha256(path), ignoreCase: true);

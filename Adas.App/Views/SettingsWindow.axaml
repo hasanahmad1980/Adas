@@ -29,7 +29,6 @@
                     <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
                     <CheckBox Content="Close to system tray" IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
                     <CheckBox Content="Show recent games menu" IsChecked="{Binding RecentGamesMenu, Mode=TwoWay}" />
-                    <CheckBox Content="Enable drop-helper" IsChecked="{Binding DropHelperEnabled, Mode=TwoWay}" />
                 </StackPanel>
             </Border>
 

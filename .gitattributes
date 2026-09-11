@@ -1,1 +1,1 @@
-RenoDXCommander/Assets/DLSS5/*.zip filter=lfs diff=lfs merge=lfs -text
+Adas.Core/Assets/DLSS5/*.zip filter=lfs diff=lfs merge=lfs -text

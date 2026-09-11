@@ -518,7 +518,7 @@ public sealed class Dlss5ComponentReviewTests
     public void RelocateLegacyReShadeProxy_MovesDx9ReShadeToDxgiAndFreesTranslatorSlot()
     {
         var root = CreateTemporaryDirectory("adas-dx9-reshade-relocation");
-        var source = FindRepositoryFile("RenoDXCommander", "Assets", "DLSS5", "ReShade-6.8.0-32.dll");
+        var source = FindRepositoryFile("Adas.Core", "Assets", "DLSS5", "ReShade-6.8.0-32.dll");
         var d3d9 = Path.Combine(root, "d3d9.dll");
         var dxgi = Path.Combine(root, "dxgi.dll");
         File.Copy(source, d3d9);
@@ -545,7 +545,7 @@ public sealed class Dlss5ComponentReviewTests
     public void Mislabelled64BitRenoDxAddon_DoesNotCountAsInstalledAndIsArchivedOnRemoval()
     {
         var root = CreateTemporaryDirectory("adas-mislabelled-x64-addon32");
-        var source = FindRepositoryFile("RenoDXCommander", "Assets", "DLSS5", "renodx-dlss5-4.55.addon64");
+        var source = FindRepositoryFile("Adas.Core", "Assets", "DLSS5", "renodx-dlss5-4.55.addon64");
         var invalid = Path.Combine(root, "renodx-dlss5.addon32");
         File.Copy(source, invalid);
         try

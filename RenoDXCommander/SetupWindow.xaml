@@ -1,8 +1,0 @@
-<Window
-    x:Class="RenoDXCommander.SetupWindow"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Background="#FF121518">
-        <ContentPresenter x:Name="RootContent"/>
-    </Grid>
-</Window>

@@ -33,8 +33,8 @@
   <ItemGroup>
     <!-- Bundled DLSS 5 payloads. The engine resolves these via AppContext.BaseDirectory\Assets\DLSS5,
          so they are copied to the output of Adas.Core and (transitively) every consumer — tests and
-         the Avalonia app. Still physically under the (being-retired) WinUI project during the
-         migration; Phase 5 relocates what remains.
+         the Avalonia app. Phase 5 relocated them into this (engine) project from the retired WinUI
+         RenoDXCommander tree; the .gitattributes LFS rule follows the new path.
 
          Phase 4 (runtime-fetch): the three OptiScaler NR archives (~380 MB) are NO LONGER bundled.
          Their install path (Dlss5ComponentService.OptiScalerNr.cs) already fetches them on demand from
@@ -43,10 +43,17 @@
          simply exercises that download path (offline installs reuse the SHA-checked cache). The AIO /
          Feeder / Streamline runtimes stay bundled for now: they are deliberately offline-only ("no
          download is required") and have no hosted, license-clean download URL yet. -->
-    <None Include="..\RenoDXCommander\Assets\DLSS5\*"
-          Exclude="..\RenoDXCommander\Assets\DLSS5\optiscaler-multipass.zip;..\RenoDXCommander\Assets\DLSS5\optiscaler-nr.zip;..\RenoDXCommander\Assets\DLSS5\optiscaler-split.zip">
+    <None Include="Assets\DLSS5\*"
+          Exclude="Assets\DLSS5\optiscaler-multipass.zip;Assets\DLSS5\optiscaler-nr.zip;Assets\DLSS5\optiscaler-split.zip">
       <Link>Assets\DLSS5\%(Filename)%(Extension)</Link>
       <TargetPath>Assets\DLSS5\%(Filename)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <!-- Release notes surfaced by MainViewModel.GetRecentPatchNotes (read from
+         AppContext.BaseDirectory\Adas_PatchNotes.md). Relocated here from the retired WinUI project. -->
+    <None Include="Adas_PatchNotes.md">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
