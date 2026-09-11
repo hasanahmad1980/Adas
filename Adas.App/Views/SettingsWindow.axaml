@@ -1,0 +1,90 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RenoDXCommander.ViewModels"
+        x:Class="Adas.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Width="560" Height="680"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AdasBackgroundBrush}"
+        Title="Adas — Settings">
+
+    <ScrollViewer Padding="22">
+        <StackPanel Spacing="16">
+            <TextBlock Text="Settings" Classes="h1" />
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Updates" Classes="h2" />
+                    <CheckBox Content="Skip the app update check on launch" IsChecked="{Binding SkipUpdateCheck, Mode=TwoWay}" />
+                    <CheckBox Content="Opt in to beta / pre-release builds" IsChecked="{Binding BetaOptIn, Mode=TwoWay}" />
+                    <CheckBox Content="Auto-update installed components" IsChecked="{Binding AutoUpdateComponents, Mode=TwoWay}" />
+                    <CheckBox Content="Auto-update DLSS DLLs" IsChecked="{Binding AutoUpdateDlss, Mode=TwoWay}" />
+                    <CheckBox Content="Auto-update Streamline" IsChecked="{Binding AutoUpdateStreamline, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Behaviour" Classes="h2" />
+                    <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
+                    <CheckBox Content="Close to system tray" IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
+                    <CheckBox Content="Show recent games menu" IsChecked="{Binding RecentGamesMenu, Mode=TwoWay}" />
+                    <CheckBox Content="Enable drop-helper" IsChecked="{Binding DropHelperEnabled, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Shaders" Classes="h2" />
+                    <CheckBox Content="Use a custom shader selection" IsChecked="{Binding UseCustomShaders, Mode=TwoWay}" />
+                    <CheckBox Content="Disable global shaders" IsChecked="{Binding GlobalShadersOff, Mode=TwoWay}" />
+                    <CheckBox Content="Cache all shaders locally" IsChecked="{Binding CacheAllShaders, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Defaults" Classes="h2" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="ReShade channel" Classes="muted" />
+                        <ComboBox x:Name="ReShadeChannelCombo" HorizontalAlignment="Stretch"
+                                  SelectedItem="{Binding ReShadeChannel, Mode=TwoWay}" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="DXVK variant" Classes="muted" />
+                        <ComboBox x:Name="DxvkVariantCombo" HorizontalAlignment="Stretch"
+                                  SelectedItem="{Binding DxvkVariant, Mode=TwoWay}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="OptiScaler defaults" Classes="h2" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="GPU type" Classes="muted" />
+                        <ComboBox x:Name="OsGpuTypeCombo" HorizontalAlignment="Stretch"
+                                  SelectedItem="{Binding OsGpuType, Mode=TwoWay}" />
+                    </StackPanel>
+                    <CheckBox Content="Use DLSS inputs" IsChecked="{Binding OsDlssInputs, Mode=TwoWay}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Overlay hotkey" Classes="muted" />
+                        <TextBox Text="{Binding OsHotkey, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Diagnostics" Classes="h2" />
+                    <CheckBox Content="Verbose logging" IsChecked="{Binding VerboseLogging, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <TextBlock x:Name="SavedHint" Classes="muted" VerticalAlignment="Center" Text="Changes are saved when you close this window." />
+                <Button x:Name="CloseButton" Classes="accent" Content="Done" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

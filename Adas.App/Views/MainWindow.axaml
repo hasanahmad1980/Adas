@@ -30,6 +30,7 @@
                     <TextBox x:Name="SearchBox" Width="220" Watermark="Search games…"
                              Text="{Binding SearchQuery, Mode=TwoWay}"
                              VerticalAlignment="Center" />
+                    <Button x:Name="SettingsButton" Content="Settings" Classes="subtle" />
                     <Button x:Name="ToolsButton" Content="Tools" Classes="subtle" />
                     <Button x:Name="RefreshButton" Content="↻ Refresh" Classes="subtle" />
                     <Button x:Name="RescanButton" Content="Full rescan" Classes="accent" />

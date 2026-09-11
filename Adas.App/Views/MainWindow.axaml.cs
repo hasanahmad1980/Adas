@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         RefreshButton.Click += OnRefresh;
         RescanButton.Click += OnRescan;
         ToolsButton.Click += OnTools;
+        SettingsButton.Click += OnSettings;
 
         DataContextChanged += (_, _) =>
         {
@@ -71,6 +72,12 @@ public partial class MainWindow : Window
     {
         var tools = new ToolsWindow(Vm);
         tools.Show(this);
+    }
+
+    private void OnSettings(object? sender, RoutedEventArgs e)
+    {
+        var settings = new SettingsWindow(Vm);
+        settings.Show(this);
     }
 
     /// <summary>
