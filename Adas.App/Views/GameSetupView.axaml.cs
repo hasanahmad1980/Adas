@@ -221,8 +221,33 @@ public partial class GameSetupView : UserControl
         if (_populatingOverrides || Main is null || Card is not { } card) return;
         var value = (BitnessCombo.SelectedItem as string) switch { "32-bit" => "32", "64-bit" => "64", _ => (string?)null };
         Main.SetBitnessOverride(card.GameName, value, Store);
-        if (value == "32") card.Is32Bit = true;
-        else if (value == "64") card.Is32Bit = false;
+
+        // Compute the new effective bitness (explicit override, or re-resolve auto-detection).
+        bool newIs32Bit;
+        if (value == "32") newIs32Bit = true;
+        else if (value == "64") newIs32Bit = false;
+        else
+        {
+            var detected = AppServices.Services.GetService<IPeHeaderService>()?.DetectGameArchitecture(card.InstallPath ?? "")
+                           ?? MachineType.Native;
+            newIs32Bit = Main.ResolveIs32Bit(card.GameName, detected, card.Source ?? "");
+        }
+
+        // If bitness actually flips, uninstall every installed component BEFORE updating card.Is32Bit —
+        // the uninstall paths resolve deployed DLL filenames from card.Is32Bit. Ports the WinUI cascade.
+        if (card.Is32Bit != newIs32Bit && !card.RequiresVulkanInstall)
+        {
+            if (card.IsRsInstalled) Main.UninstallReShade(card);
+            if (card.IsDcInstalled) Main.UninstallDc(card);
+            if (card.InstalledRecord != null) Main.UninstallMod(card);
+            if (card.IsUlInstalled) Main.UninstallUl(card);
+            if (card.IsOsInstalled) AppServices.Services.GetService<IOptiScalerService>()?.Uninstall(card);
+            if (card.IsDxvkInstalled) Main.UninstallDxvk(card);
+            if (card.IsRefInstalled) Main.UninstallREFramework(card);
+            if (card.IsLumaInstalled) Main.UninstallLuma(card);
+        }
+
+        card.Is32Bit = newIs32Bit;
         card.NotifyAll();
         _ = RefreshAssessmentAsync();
     }
@@ -356,6 +381,31 @@ public partial class GameSetupView : UserControl
                 ? "OptiScaler install did not complete — see log."
                 : $"OptiScaler installed{(string.IsNullOrWhiteSpace(record.OsVariant) ? "" : $" ({record.OsVariant})")}.";
             ExtrasResult.IsVisible = true;
+
+            // PD-Upscaler REFramework swap for compatible RE Engine titles (ports the WinUI flow):
+            // manifest lists the game and a dinput8.dll is already present.
+            if (record is not null
+                && Main.Manifest?.PdUpscalerGames is { } pd
+                && pd.TryGetValue(card.GameName, out var pdArtifact)
+                && File.Exists(Path.Combine(card.InstallPath!, "dinput8.dll")))
+            {
+                try
+                {
+                    var refSvc = AppServices.Services.GetService<IREFrameworkService>();
+                    if (refSvc is not null)
+                    {
+                        await refSvc.InstallPdUpscalerAsync(card.GameName, card.InstallPath!, pdArtifact, progress);
+                        card.RefInstalledVersion = "PD-Upscaler";
+                        card.NotifyAll();
+                    }
+                }
+                catch (Exception pdEx)
+                {
+                    // Non-fatal — OptiScaler is already installed.
+                    ExtrasResult.Text += $"  (PD-Upscaler swap skipped: {pdEx.Message})";
+                }
+            }
+
             try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
             await RefreshAssessmentAsync();
         }
