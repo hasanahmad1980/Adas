@@ -29,6 +29,7 @@
                     <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
                     <CheckBox Content="Close to system tray" IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
                     <CheckBox Content="Show recent games menu" IsChecked="{Binding RecentGamesMenu, Mode=TwoWay}" />
+                    <CheckBox Content="Show the drag-and-drop helper" IsChecked="{Binding DropHelperEnabled, Mode=TwoWay}" />
                 </StackPanel>
             </Border>
 
@@ -38,6 +39,7 @@
                     <CheckBox Content="Use a custom shader selection" IsChecked="{Binding UseCustomShaders, Mode=TwoWay}" />
                     <CheckBox Content="Disable global shaders" IsChecked="{Binding GlobalShadersOff, Mode=TwoWay}" />
                     <CheckBox Content="Cache all shaders locally" IsChecked="{Binding CacheAllShaders, Mode=TwoWay}" />
+                    <CheckBox Content="Group ReShade effect files with tabs instead of a tree" IsChecked="{Binding RsVariableListUseTabs, Mode=TwoWay}" />
                     <Button x:Name="AddonsButton" Classes="subtle" Content="RenoDX add-ons…" HorizontalAlignment="Left" />
                     <TextBlock x:Name="AddonsHint" Classes="muted" TextWrapping="Wrap" />
                 </StackPanel>
@@ -96,6 +98,44 @@
                         <TextBlock Text="Target resolution (e.g. 3840x2160)" Classes="muted" />
                         <TextBox Text="{Binding ResolutionTarget, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" />
                     </StackPanel>
+                    <CheckBox Content="Set the RenoDX peak brightness (nits) on install" IsChecked="{Binding PeakNitsEnabled, Mode=TwoWay}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Peak brightness (nits)" Classes="muted" />
+                        <NumericUpDown Value="{Binding PeakNits, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                       Increment="100" Width="200" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Frame limiter (ReLimiter)" Classes="h2" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Target FPS (0 = off)" Classes="muted" />
+                        <NumericUpDown Value="{Binding UlTargetFps, Mode=TwoWay}" Minimum="0" Maximum="1000"
+                                       Increment="1" Width="200" HorizontalAlignment="Left" />
+                    </StackPanel>
+                    <CheckBox Content="Hook DLSS frame generation" IsChecked="{Binding UlDlssHooks, Mode=TwoWay}" />
+                    <CheckBox Content="Share presets across games" IsChecked="{Binding UlSharedPresets, Mode=TwoWay}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="On-screen-display hotkey" Classes="muted" />
+                        <TextBox Text="{Binding UlOsdHotkey, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Screenshots" Classes="h2" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Screenshot folder" Classes="muted" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBox x:Name="ScreenshotPathBox" Text="{Binding ScreenshotPath, Mode=TwoWay}"
+                                     Width="320" Watermark="Default (game folder)" />
+                            <Button x:Name="ScreenshotFolderButton" Classes="subtle" Content="Browse…" />
+                        </StackPanel>
+                    </StackPanel>
+                    <CheckBox Content="Use a per-game screenshot subfolder" IsChecked="{Binding PerGameScreenshotFolders, Mode=TwoWay}" />
                 </StackPanel>
             </Border>
 

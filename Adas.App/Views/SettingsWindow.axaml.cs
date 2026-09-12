@@ -12,8 +12,9 @@ namespace Adas.App.Views;
 /// <summary>
 /// Global settings editor. Binds two-way to the app's single <see cref="SettingsViewModel"/>
 /// instance so edits mutate live state; the owning <see cref="MainViewModel"/> persists them via
-/// SaveSettingsPublic when the window closes. Avalonia rebuild of the WinUI Settings page (subset —
-/// the most-used global toggles; per-component update-skip flags and Nexus/HDR settings are TODO).
+/// SaveSettingsPublic when the window closes. Avalonia rebuild of the WinUI Settings page: update
+/// channels + per-component skip flags, behaviour, shaders, ReShade/DXVK/OptiScaler defaults, the
+/// frame limiter, screenshots, HDR/resolution, Nexus, and diagnostics.
 /// </summary>
 public partial class SettingsWindow : Window
 {
@@ -33,6 +34,7 @@ public partial class SettingsWindow : Window
         if (main is not null) DataContext = main.Settings;
 
         AddonsButton.Click += OnChooseAddons;
+        ScreenshotFolderButton.Click += OnChooseScreenshotFolder;
         CloseButton.Click += OnClose;
         Closed += (_, _) => _main?.SaveSettingsPublic();
 
@@ -48,6 +50,18 @@ public partial class SettingsWindow : Window
     }
 
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
+
+    private async void OnChooseScreenshotFolder(object? sender, RoutedEventArgs e)
+    {
+        if (_main is null || StorageProvider is not { } sp) return;
+        var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = "Select the screenshot folder",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0)
+            _main.Settings.ScreenshotPath = folders[0].Path.LocalPath;
+    }
 
     private async void OnChooseAddons(object? sender, RoutedEventArgs e)
     {
