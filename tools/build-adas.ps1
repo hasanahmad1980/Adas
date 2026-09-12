@@ -9,6 +9,18 @@ $localDotnet = Join-Path $repositoryRoot '.dotnet\dotnet.exe'
 $dotnet = if (Test-Path $localDotnet) { $localDotnet } else { 'dotnet' }
 $artifacts = Join-Path $repositoryRoot 'artifacts'
 $publish = Join-Path $artifacts 'publish'
+
+# Single source of truth for the app version is Adas Setup.iss (#define MyAppVersion "X.Y.Z").
+# Parse it here and stamp the publish so Assembly/File versions match the installer — this is what
+# the in-app update check (UpdateService.CurrentVersion) compares against the GitHub release tag.
+$issPath = Join-Path $repositoryRoot 'Adas Setup.iss'
+$issText = Get-Content -LiteralPath $issPath -Raw
+$versionMatch = [regex]::Match($issText, '(?m)^#define\s+MyAppVersion\s+"([0-9]+\.[0-9]+\.[0-9]+)"')
+if (-not $versionMatch.Success) {
+    throw "Could not parse MyAppVersion from $issPath (expected e.g. #define MyAppVersion `"2.6.57`")."
+}
+$appVersion = $versionMatch.Groups[1].Value
+Write-Host "Adas version (from Adas Setup.iss): $appVersion"
 $requiredDlss5Payload = @(
     'renodx-dlss.addon64',
     'renodx-dlss5-4.70.addon64',
@@ -177,7 +189,8 @@ if (-not $SkipTests) {
 # in Adas.App.csproj). No PublishSingleFile: the DLSS 5 payloads and the runtime must stay as
 # loose files (the engine resolves Assets\DLSS5 relative to AppContext.BaseDirectory).
 & $dotnet publish (Join-Path $repositoryRoot 'Adas.App\Adas.App.csproj') `
-    -c Release -r win-x64 --self-contained true --no-restore -o $publish
+    -c Release -r win-x64 --self-contained true --no-restore -o $publish `
+    "-p:Version=$appVersion" "-p:AssemblyVersion=$appVersion" "-p:FileVersion=$appVersion" "-p:InformationalVersion=$appVersion"
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 
 # The publish output does NOT carry the runtime-fetched OptiScaler archives (see above).

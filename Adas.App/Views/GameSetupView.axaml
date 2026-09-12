@@ -18,22 +18,37 @@
                       Padding="22">
             <StackPanel Spacing="18">
 
-                <!-- Title + status -->
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{Binding GameName}" Classes="h1" TextWrapping="Wrap" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{Binding Source}" Classes="muted" VerticalAlignment="Center" />
-                        <Border CornerRadius="5" Padding="8,3"
-                                Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
-                            <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
-                                       Foreground="White" FontSize="12" FontWeight="SemiBold" />
-                        </Border>
+                <!-- Title + status (with cover art) -->
+                <Grid ColumnDefinitions="Auto,*">
+                    <!-- Cover art (Steam library portrait), hidden until fetched -->
+                    <Border Grid.Column="0" Width="92" Height="138" CornerRadius="6"
+                            Margin="0,0,14,0" ClipToBounds="True" Background="#0E1116"
+                            VerticalAlignment="Top" IsVisible="{Binding HasArtwork}">
+                        <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
+                               Stretch="UniformToFill" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding GameName}" Classes="h1" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Source}" Classes="muted" VerticalAlignment="Center" />
+                            <Border CornerRadius="5" Padding="8,3"
+                                    Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
+                                <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
+                                           Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                            </Border>
+                            <!-- Detected graphics API (DX12/DX11/VLK/OGL…), accurate from the scan -->
+                            <Border CornerRadius="5" Padding="8,3" Background="#232A36"
+                                    VerticalAlignment="Center" IsVisible="{Binding HasGraphicsApiBadge}">
+                                <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AdasAccentBrush}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Dlss5InstalledLabel}" Classes="muted"
+                                   IsVisible="{Binding Dlss5InstalledLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Text="{Binding WikiStatusLabel}" Classes="muted" />
+                        <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
                     </StackPanel>
-                    <TextBlock Text="{Binding Dlss5InstalledLabel}" Classes="muted"
-                               IsVisible="{Binding Dlss5InstalledLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <TextBlock Text="{Binding WikiStatusLabel}" Classes="muted" />
-                    <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
-                </StackPanel>
+                </Grid>
 
                 <!-- DLSS 5 route selector -->
                 <Border Classes="card">

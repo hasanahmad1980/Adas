@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 namespace RenoDXCommander.Services;
 
 /// <summary>
-/// Checks GitHub Releases for a newer version of RHI and downloads the installer if requested.
+/// Checks GitHub Releases for a newer version of Adas and downloads the installer if requested.
 /// </summary>
 public class UpdateService : IUpdateService
 {
@@ -19,29 +19,24 @@ public class UpdateService : IUpdateService
         _http = http;
         _etagCache = etagCache;
     }
-    // GitHub API endpoint for the latest release (new per-version tags like "RHI 1.6.7").
-    // This is the primary check — uses /releases/latest to find the newest release.
+    // GitHub API endpoint for the latest Adas release. Releases are tagged "vX.Y.Z" and named
+    // "Adas X.Y.Z", both of which RdxcVersion.TryParse understands. /releases/latest returns the
+    // newest non-prerelease, which is exactly what the installer flow ships.
     private const string LatestReleaseApiUrl =
-        "https://api.github.com/repos/RankFTW/RHI/releases/latest";
+        "https://api.github.com/repos/hasanahmad1980/Adas/releases/latest";
 
-    // Fallback: legacy tag-based endpoints for older releases.
-    private const string ReleaseApiUrl =
-        "https://api.github.com/repos/RankFTW/RHI/releases/tags/RHI";
-    private const string LegacyReleaseApiUrl =
-        "https://api.github.com/repos/RankFTW/RenoDXChecker/releases/tags/RDXC";
-
-    // GitHub API endpoint for the "RDXC-BETA" release tag.
-    private const string BetaReleaseApiUrl =
-        "https://api.github.com/repos/RankFTW/RenoDXChecker/releases/tags/RDXC-BETA";
-
-    // The asset filenames to look for when updating (checked in order).
-    private static readonly string[] InstallerFileNames = ["RHI-Setup.exe", "RDXC-Setup.exe"];
+    // The asset filename to look for when updating (the Inno Setup output, see Adas Setup.iss).
+    private static readonly string[] InstallerFileNames = ["Adas-Setup.exe"];
 
     /// <summary>
-    /// Returns the current app version from the assembly metadata (set via .csproj AssemblyVersion).
+    /// Returns the current app version from the assembly metadata. Prefers the entry assembly
+    /// (Adas.exe) so the version reflects the shipped app rather than this engine library; both
+    /// are stamped from <c>Adas Setup.iss</c>'s <c>MyAppVersion</c> at publish time
+    /// (see <c>tools/build-adas.ps1</c>). Falls back to the executing assembly for unit tests.
     /// </summary>
     public Version CurrentVersion =>
-        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+        (Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()).GetName().Version
+            ?? new Version(0, 0, 0, 0);
 
     /// <summary>
     /// Silently checks GitHub for a newer release. When <paramref name="betaOptIn"/> is true,
@@ -53,33 +48,11 @@ public class UpdateService : IUpdateService
     {
         try
         {
-            // Always fetch the stable release — try /releases/latest first, then tag-based fallbacks
+            // Adas ships a single stable channel via /releases/latest. (betaOptIn is retained for
+            // interface compatibility but there is no separate Adas beta feed to query.)
+            _ = betaOptIn;
             var stable = await FetchReleaseAsync(LatestReleaseApiUrl).ConfigureAwait(false);
-            if (stable == null)
-            {
-                CrashReporter.Log("[UpdateService.CheckForUpdateAsync] /releases/latest returned nothing, trying RHI tag...");
-                stable = await FetchReleaseAsync(ReleaseApiUrl).ConfigureAwait(false);
-            }
-            if (stable == null)
-            {
-                CrashReporter.Log("[UpdateService.CheckForUpdateAsync] RHI tag returned nothing, trying legacy RDXC...");
-                stable = await FetchReleaseAsync(LegacyReleaseApiUrl).ConfigureAwait(false);
-            }
-
-            // Fetch beta release only when opted in; failure is non-fatal
             (RdxcVersion version, string downloadUrl)? beta = null;
-            if (betaOptIn)
-            {
-                try
-                {
-                    beta = await FetchReleaseAsync(BetaReleaseApiUrl).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    CrashReporter.Log($"[UpdateService.CheckForUpdateAsync] Beta endpoint failed — {ex.Message}");
-                    // Continue with stable-only
-                }
-            }
 
             // Build the current version as an RdxcVersion for the resolver
             var current = CurrentVersion;
@@ -137,7 +110,7 @@ public class UpdateService : IUpdateService
     /// </summary>
     private async Task<(RdxcVersion version, string downloadUrl)?> FetchReleaseAsync(string apiUrl)
     {
-        var json = await _etagCache.GetWithETagAsync(_http, apiUrl, $"RHI/{CurrentVersion}").ConfigureAwait(false);
+        var json = await _etagCache.GetWithETagAsync(_http, apiUrl, $"Adas/{CurrentVersion}").ConfigureAwait(false);
         if (json == null)
         {
             CrashReporter.Log($"[UpdateService.FetchReleaseAsync] GitHub API returned error for {apiUrl}");
@@ -158,7 +131,7 @@ public class UpdateService : IUpdateService
             return null;
         }
 
-        // Find the installer asset download URL (check RHI-Setup.exe first, then legacy RDXC)
+        // Find the installer asset download URL (Adas-Setup.exe).
         string? downloadUrl = null;
         if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
         {
@@ -200,7 +173,7 @@ public class UpdateService : IUpdateService
             progress?.Report(("Downloading update...", 0));
 
             var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
-            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("RHI", CurrentVersion.ToString()));
+            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Adas", CurrentVersion.ToString()));
 
             var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead)
                 .ConfigureAwait(false);

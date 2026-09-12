@@ -1,10 +1,14 @@
 using System;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Adas.App.Shell;
+using RenoDXCommander.Abstractions;
 using RenoDXCommander.Models;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
@@ -14,6 +18,7 @@ namespace Adas.App.Views;
 public partial class MainWindow : Window
 {
     private bool _initialized;
+    private UpdateInfo? _pendingUpdate;
 
     public MainWindow()
     {
@@ -24,6 +29,15 @@ public partial class MainWindow : Window
         ToolsButton.Click += OnTools;
         SettingsButton.Click += OnSettings;
         HistoryButton.Click += OnHistory;
+        UpdateButton.Click += OnUpdate;
+
+        // Show the running version in the header (stamped from Adas Setup.iss at publish time).
+        try
+        {
+            var v = UpdateSvc.CurrentVersion;
+            VersionText.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
+        }
+        catch { /* version display is best-effort */ }
 
         DataContextChanged += (_, _) =>
         {
@@ -50,6 +64,83 @@ public partial class MainWindow : Window
         {
             try { await vm.InitializeAsync(); }
             catch (Exception ex) { vm.StatusText = $"Startup failed: {ex.Message}"; vm.IsLoading = false; }
+        }
+
+        // Silent app-update check after startup; surfaces the header Update button if newer.
+        _ = CheckForAppUpdateAsync();
+    }
+
+    private static IUpdateService UpdateSvc
+        => ServiceProviderServiceExtensions.GetRequiredService<IUpdateService>(AppServices.Services);
+
+    /// <summary>
+    /// Queries GitHub for a newer Adas release. When one exists, reveals the header Update button;
+    /// clicking it downloads the installer and relaunches. Failures are silent (offline, rate-limit).
+    /// </summary>
+    private async Task CheckForAppUpdateAsync()
+    {
+        try
+        {
+            var info = await UpdateSvc.CheckForUpdateAsync().ConfigureAwait(true);
+            if (info == null) return;
+
+            _pendingUpdate = info;
+            void Reveal()
+            {
+                UpdateButton.Content = $"⬆ Update to {info.DisplayVersion ?? info.RemoteVersion.ToString()}";
+                UpdateButton.IsVisible = true;
+            }
+            if (Dispatcher.UIThread.CheckAccess()) Reveal();
+            else await Dispatcher.UIThread.InvokeAsync(Reveal);
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Log($"[MainWindow.CheckForAppUpdate] {ex.Message}");
+        }
+    }
+
+    private async void OnUpdate(object? sender, RoutedEventArgs e)
+    {
+        if (_pendingUpdate is not { } info) return;
+
+        var current = UpdateSvc.CurrentVersion;
+        var confirm = await DialogHost.ConfirmAsync(this, "Update available",
+            $"A newer version of Adas is available.\n\n" +
+            $"Installed:  v{current.Major}.{current.Minor}.{current.Build}\n" +
+            $"Available:  {info.DisplayVersion ?? info.RemoteVersion.ToString()}\n\n" +
+            "Download the installer and relaunch now? Your settings and installs are preserved.",
+            primaryText: "Download & install", closeText: "Later");
+        if (!confirm) return;
+
+        UpdateButton.IsEnabled = false;
+        var progress = new Progress<(string msg, double pct)>(p =>
+        {
+            if (Vm is { } vm) vm.StatusText = p.msg;
+        });
+
+        try
+        {
+            var path = await UpdateSvc.DownloadInstallerAsync(info.DownloadUrl, progress);
+            if (string.IsNullOrEmpty(path))
+            {
+                await DialogHost.ConfirmAsync(this, "Update failed",
+                    "The installer could not be downloaded. Please try again later or download it "
+                    + "from the Adas releases page.", primaryText: "OK", closeText: "Close");
+                UpdateButton.IsEnabled = true;
+                return;
+            }
+
+            UpdateSvc.LaunchInstallerAndExit(path, () =>
+            {
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    desktop.Shutdown();
+                else Close();
+            });
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Log($"[MainWindow.OnUpdate] {ex.Message}");
+            UpdateButton.IsEnabled = true;
         }
     }
 

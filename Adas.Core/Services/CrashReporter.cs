@@ -19,7 +19,9 @@ public static class CrashReporter
     {
         get
         {
-            var v = Assembly.GetExecutingAssembly().GetName().Version;
+            // Prefer the entry assembly (Adas.exe) so logs show the shipped app version, not this
+            // engine library's. Both are stamped from Adas Setup.iss's MyAppVersion at publish time.
+            var v = (Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()).GetName().Version;
             return v != null ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.0.0";
         }
     }

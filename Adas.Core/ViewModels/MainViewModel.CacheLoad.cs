@@ -954,6 +954,8 @@ public partial class MainViewModel
         _filterViewModel.UpdateCounts();
         _filterViewModel.ApplyFilter();
 
+        _ = PopulateArtworkAsync(_allCards);
+
         // Refresh the Update All button state from cached update statuses
         // Restore Nexus update indicators from persisted baselines
         var cachedNexusUpdates = _nexusUpdateService.GetCachedUpdates();

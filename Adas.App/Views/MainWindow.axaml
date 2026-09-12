@@ -22,7 +22,11 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Adas" Classes="h1" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Adas" Classes="h1" />
+                            <TextBlock x:Name="VersionText" Classes="muted" VerticalAlignment="Bottom"
+                                       Margin="0,0,0,3" />
+                        </StackPanel>
                         <TextBlock Text="Automatic DLSS 5 neural-rendering setup" Classes="muted" />
                     </StackPanel>
                 </StackPanel>
@@ -31,6 +35,8 @@
                     <TextBox x:Name="SearchBox" Width="220" Watermark="Search games…"
                              Text="{Binding SearchQuery, Mode=TwoWay}"
                              VerticalAlignment="Center" />
+                    <Button x:Name="UpdateButton" Content="⬆ Update" Classes="accent" IsVisible="False"
+                            ToolTip.Tip="A newer version of Adas is available" />
                     <Button x:Name="SettingsButton" Content="Settings" Classes="subtle" />
                     <Button x:Name="ToolsButton" Content="Tools" Classes="subtle" />
                     <Button x:Name="HistoryButton" Content="History" Classes="subtle" />
@@ -74,14 +80,32 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:GameCardViewModel">
                             <Border Classes="card" Margin="0,0,0,8">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <StackPanel Grid.Column="0" Spacing="2">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <!-- Cover art (Steam library portrait), hidden until fetched -->
+                                    <Border Grid.Column="0" Width="46" Height="66" CornerRadius="4"
+                                            Margin="0,0,12,0" ClipToBounds="True" Background="#0E1116"
+                                            IsVisible="{Binding HasArtwork}">
+                                        <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
+                                               Stretch="UniformToFill" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding GameName}" Classes="h2" />
-                                        <TextBlock Text="{Binding Source}" Classes="muted" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="{Binding Source}" Classes="muted"
+                                                       VerticalAlignment="Center" />
+                                            <!-- Detected graphics API (DX12/DX11/VLK/OGL…), accurate from the scan -->
+                                            <Border CornerRadius="4" Padding="6,1" Background="#232A36"
+                                                    VerticalAlignment="Center"
+                                                    IsVisible="{Binding HasGraphicsApiBadge}">
+                                                <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource AdasAccentBrush}" />
+                                            </Border>
+                                        </StackPanel>
                                         <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4"
                                                 HorizontalAlignment="Right">
                                         <!-- Primary chip = DLSS 5 status (this is a DLSS-5 app), so it matches
                                              the setup pane. The RenoDX-only `Status` is no longer shown here. -->

@@ -714,6 +714,7 @@ public partial class MainViewModel
                 UseNormalReShade           = _gameNameService.NormalReShadeGames.Contains(gameKey),
                 ShaderModeOverride     = _perGameShaderMode.TryGetValue(gameKey, out var smBc) ? smBc : null,
                 Is32Bit                = ResolveIs32Bit(game.Name, detectedMachine, game.Source ?? ""),
+                SteamAppId             = game.SteamAppId,
                 GraphicsApi            = DetectGraphicsApi(installPath, engine, game.Name, game.Source),
                 DetectedApis           = _DetectAllApisForCard(installPath, game.Name, game.Source),
                 VulkanRenderingPath    = _vulkanRenderingPaths.TryGetValue(gameKey, out var vrpBc) ? vrpBc : "DirectX",

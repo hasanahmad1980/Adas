@@ -645,6 +645,8 @@ public partial class MainViewModel
             _filterViewModel.UpdateCounts();
             _filterViewModel.ApplyFilter();
 
+            _ = PopulateArtworkAsync(_allCards);
+
             // Refresh the selected game's detail panel so merged data (LumaMod, wiki, etc.) is visible
             SelectedGame?.NotifyAll();
         });

@@ -598,6 +598,8 @@ public partial class MainViewModel
             _filterViewModel.UpdateCounts();
             _filterViewModel.ApplyFilter();
 
+            _ = PopulateArtworkAsync(_allCards);
+
             // ── Deferred background work: ReShade staging + OptiScaler staging + shader sync ──────────────
             // These are not needed for card display, so we run them after the UI is ready.
             // rsTask (ReShade download/staging) was started earlier but not awaited.

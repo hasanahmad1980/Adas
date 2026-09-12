@@ -60,6 +60,7 @@ public static class AdasEngineServices
         services.AddSingleton<INexusModsService, NexusModsService>();
         services.AddSingleton<INexusUpdateService, NexusUpdateService>();
         services.AddSingleton<ISteamAppIdResolver, SteamAppIdResolver>();
+        services.AddSingleton<IGameArtworkService, GameArtworkService>();
         services.AddSingleton<IPcgwService, PcgwService>();
         services.AddSingleton<IUltrawideFixService, UltrawideFixService>();
         services.AddSingleton<IUltraPlusService, UltraPlusService>();
