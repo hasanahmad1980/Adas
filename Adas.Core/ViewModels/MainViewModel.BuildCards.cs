@@ -1168,6 +1168,13 @@ public partial class MainViewModel
                 {
                     var dlss5Rec = Dlss5ComponentService.LoadRecord(installPath)
                         ?? Dlss5ComponentService.LoadRecord(ModInstallService.GetAddonDeployPath(installPath));
+                    // Records are usually written under the *resolved* deployment folder (often an exe
+                    // subfolder), not the raw install root. Use the same cached resolver the setup pane
+                    // reaches through Probe, so the card doesn't read "Not installed" and then flip to
+                    // "Installed" ~2s later once the pane re-probes and writes the status back.
+                    if (dlss5Rec == null
+                        && Dlss5ComponentService.FindInstalledDeploymentPath(installPath) is { } deployPath)
+                        dlss5Rec = Dlss5ComponentService.LoadRecord(deployPath);
                     if (dlss5Rec != null)
                     {
                         newCard.Dlss5Status = GameStatus.Installed;
