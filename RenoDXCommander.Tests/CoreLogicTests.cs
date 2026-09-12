@@ -174,6 +174,51 @@ public class CoreLogicTests
         }
     }
 
+    [Theory]
+    [InlineData("Skyrim Demo.exe")]
+    [InlineData("Skyrim_Demo.exe")]
+    [InlineData("SkyrimTrial.exe")]
+    [InlineData("Benchmark.exe")]
+    public void FindGameExe_PrefersFullGameOverALargerTrialOrDemo(string trialName)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"adas-trial-exe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var gameExe = Path.Combine(root, "Skyrim.exe");
+            File.WriteAllBytes(gameExe, new byte[64]);
+            // The trial/demo/benchmark build is larger, so size alone would pick it.
+            File.WriteAllBytes(Path.Combine(root, trialName), new byte[4096]);
+
+            Assert.Equal(gameExe, new PeHeaderService().FindGameExe(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("Industrial.exe")]  // contains "trial" but is not a trial build
+    [InlineData("Democracy.exe")]   // contains "demo" but is not a demo build
+    public void FindGameExe_DoesNotMistakeSubstringsForTrialBuilds(string onlyExe)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"adas-substr-exe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var gameExe = Path.Combine(root, onlyExe);
+            File.WriteAllBytes(gameExe, new byte[64]);
+            File.WriteAllBytes(Path.Combine(root, "unins000.exe"), new byte[1024]);
+
+            Assert.Equal(gameExe, new PeHeaderService().FindGameExe(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void FindGameExe_PrefersNestedGameBinaryOverRootLauncher()
     {

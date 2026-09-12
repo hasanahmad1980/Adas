@@ -2551,8 +2551,36 @@ public sealed partial class Dlss5ComponentService
             })
             .Concat(compatibilityPlan.InstallDx11Bridge
                 ? Array.Empty<string>()
-                : new[] { Path.Combine(root, BridgeConfig), Path.Combine(root, BridgeLog) });
+                : new[] { Path.Combine(root, BridgeConfig), Path.Combine(root, BridgeLog) })
+            // The allow-list above only knows the exact RenoDX consumer names Adas deploys. A
+            // foreign or renamed consumer (e.g. renodx-dlss5-multipass.addon64, or a second build
+            // dropped by another tool) still registers as "RenoDX DLSS"; ReShade keeps whichever
+            // add-on loads first and drops the other, so the route the user picked could stop
+            // deciding what runs. Sweep every renodx-dlss*.addon64 that is not the one we keep.
+            // Borrowed from DLSS5-Swapper 2.2.6.
+            .Concat(EnumerateForeignRenoDxConsumers(root, addonDeployPath, keep));
         RetireComponentFiles(root, paths, record);
+    }
+
+    /// <summary>
+    /// Yields every <c>renodx-dlss*.addon64</c> in the game root or the add-on deploy folder whose
+    /// file name is not in <paramref name="keep"/> — i.e. a duplicate/foreign RenoDX neural consumer
+    /// that would be double-loaded beside the one Adas just deployed.
+    /// </summary>
+    private static IEnumerable<string> EnumerateForeignRenoDxConsumers(
+        string root, string addonDeployPath, ISet<string> keep)
+    {
+        foreach (var dir in new[] { addonDeployPath, root }.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists(dir)) continue;
+            string[] files;
+            try { files = Directory.GetFiles(dir, "renodx-dlss*.addon64"); }
+            catch (IOException) { continue; }
+            catch (UnauthorizedAccessException) { continue; }
+            foreach (var file in files)
+                if (!keep.Contains(Path.GetFileName(file)))
+                    yield return file;
+        }
     }
 
     private static void RemoveFeederComponent(

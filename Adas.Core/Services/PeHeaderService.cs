@@ -141,6 +141,15 @@ public class PeHeaderService : IPeHeaderService
                 .ToArray();
             var candidates = likelyGameExecutables.Length > 0 ? likelyGameExecutables : exeFiles;
 
+            // Prefer the full game over a bundled trial/demo/benchmark build of the same engine, which
+            // can otherwise win on size. Deprioritize (never exclude): fall back to these only when no
+            // other candidate exists, so a game genuinely named "…Demo" is still found. (DLSS5-Autopilot 1.8.1)
+            var fullGameExecutables = candidates
+                .Where(file => !IsTrialOrDemoExecutable(file.Name))
+                .ToArray();
+            if (fullGameExecutables.Length > 0)
+                candidates = fullGameExecutables;
+
             var largest = candidates[0];
             for (int i = 1; i < candidates.Length; i++)
             {
@@ -219,6 +228,25 @@ public class PeHeaderService : IPeHeaderService
             || name.Equals("support", StringComparison.OrdinalIgnoreCase)
             || name.Equals("dlss5-feed-host64", StringComparison.OrdinalIgnoreCase)
             || name.Equals("launcher", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// True when the executable name marks it as a trial, demo or benchmark build rather than the
+    /// full game. Matches only whole, separator-delimited tokens (so "Industrial.exe" and
+    /// "Democracy.exe" are not caught); used to deprioritize — never to exclude — such builds.
+    /// </summary>
+    private static bool IsTrialOrDemoExecutable(string fileName)
+    {
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        // Separator-delimited token, any case: "Skyrim Demo", "skyrim_trial", "Benchmark".
+        if (System.Text.RegularExpressions.Regex.IsMatch(
+                name, @"(^|[ _\-.])(trial|demo|benchmark)([ _\-.]|$)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            return true;
+        // CamelCase token, capitalised start: "SkyrimTrial", "GameDemo2". Case-sensitive on purpose so
+        // "Industrial" (lowercase "trial") and "Democracy" (no preceding lowercase) are not caught.
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            name, @"(?<=[a-z0-9])(Trial|Demo|Benchmark)([ _\-.]|[A-Z0-9]|$)");
     }
 
     /// <summary>

@@ -1010,6 +1010,41 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public void RemoveIncompatibleDlssAddons_RetiresForeignRenoDxConsumersButKeepsTheActiveOne()
+    {
+        var root = CreateTemporaryDirectory("adas-foreign-renodx-consumers");
+        var addonPath = ModInstallService.GetAddonDeployPath(root);
+        Directory.CreateDirectory(addonPath);
+        // The active consumer for a native RenoDX route is renodx-dlss5.addon64.
+        WriteSource(addonPath, Dlss5ComponentService.RenoDxDeploymentName, "active");
+        // Duplicate/foreign RenoDX consumers left behind by other tools (all match renodx-dlss*.addon64).
+        // ReShade loads whichever add-on it finds first, so a stray one can shadow the active route.
+        WriteSource(addonPath, "renodx-dlss5-multipass.addon64", "foreign-a");
+        WriteSource(addonPath, "renodx-dlss5(2).addon64", "foreign-b");
+        WriteSource(root, "renodx-dlss.addon64", "foreign-root");
+        var record = new Dlss5InstallRecord();
+        var plan = Dlss5ComponentService.GetCompatibilityPlan(
+            Dlss5DeploymentMode.NativeDirectX12,
+            is64Bit: true,
+            Dlss5InstallProfile.MaximumQuality);
+        try
+        {
+            Dlss5ComponentService.RemoveIncompatibleDlssAddons(
+                root, addonPath, plan, record, useNeuralUpstream: false);
+
+            Assert.True(File.Exists(Path.Combine(addonPath, Dlss5ComponentService.RenoDxDeploymentName)),
+                "the active consumer must be kept");
+            Assert.False(File.Exists(Path.Combine(addonPath, "renodx-dlss5-multipass.addon64")),
+                "a foreign consumer in the deploy folder must be retired");
+            Assert.False(File.Exists(Path.Combine(addonPath, "renodx-dlss5(2).addon64")),
+                "a duplicate consumer in the deploy folder must be retired");
+            Assert.False(File.Exists(Path.Combine(root, "renodx-dlss.addon64")),
+                "a foreign consumer at the install root must be retired");
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public void VerifyInstallation_NeuralUpstreamRequiresItsAddonInsteadOfRenoDx()
     {
         var root = CreateTemporaryDirectory("adas-neural-upstream-verify");
