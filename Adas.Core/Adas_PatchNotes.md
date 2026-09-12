@@ -1,3 +1,8 @@
+## v3.0.2 — Luma-Framework 649 (2026-09-12)
+
+- **Luma-Framework** generic-UE build re-pinned **648 → 649**.
+- Rolls up everything in 3.0.1 (accurate bitness badge, smarter cover art, emulator logos by install path, hide games, resizable/persisted panes, NeuralScreen 1.8.0) into a fresh installer.
+
 ## v3.0.1 — Accurate bitness badge, smarter cover art, hide games, NeuralScreen 1.8.0 (2026-09-12)
 
 - **Bitness badge now matches the route probe.** The setup-pane chip (e.g. "DX11 64-bit") kept the card-build-time guess and could contradict the route reasons — showing 64-bit while ShortFuse / Standalone AIO were greyed "requires a 64-bit game" from the authoritative PE-header probe. The chip is now reconciled to the probe after each assessment (Alien: Isolation correctly reads **32-bit**), and only ever corrects a concrete mismatch.
@@ -6,7 +11,6 @@
 - **Hide games from the list.** Right-click a library card → **Hide/Show**, plus a header **Hidden** toggle to reveal what you've hidden.
 - **Resizable, remembered panes.** The library/detail split grows equally and can be dragged to a custom ratio that persists across launches; long text in the detail pane wraps instead of clipping.
 - **NeuralScreen** re-pinned **1.7.0 → 1.8.0** (runtime-fetched, SHA-256 re-verified against the author's release). Upstream adds experimental HDR support, off until enabled in its settings.
-- **Luma-Framework** generic-UE build re-pinned **648 → 649**.
 - Everything else remains current (AIO 2.2.4, OneClick 0.13.14, multipass 0.7.7, Feeder 0.15.1, OptiScaler NR 0.2.0 / NR-before-SR 0.1.2, DLSS5 Bridge 1.4.12, Neural Upstream 0.3.0); MFG Ada Unlock / RTXMFG / OptiScaler mainline / DXVK / dgVoodoo2 fetch the latest release at run time.
 
 ## v2.6.56 — DLSS 5 setup: Remove/Repair, route-aware driver pre-flight, safer Extras (2026-09-11)
