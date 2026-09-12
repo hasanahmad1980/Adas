@@ -96,12 +96,27 @@
                             <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,10,0,0">
                                 <TextBlock Text="ReShade channel" Classes="muted" />
                                 <ComboBox x:Name="ReShadeCombo" HorizontalAlignment="Stretch" />
+                                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                           Text="Which ReShade build to install. Default = Adas picks (the signed stable build — leave this unless you have a reason). Stable = force the official release. Nightly = newest unsigned build; more fixes, less tested. Custom = a build you provide." />
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="0,10,0,0">
                                 <TextBlock Text="DXVK variant" Classes="muted" />
                                 <ComboBox x:Name="DxvkCombo" HorizontalAlignment="Stretch" />
+                                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                           Text="DXVK translates DirectX to Vulkan (only used on Vulkan/translated routes). Default = Adas picks. Stable = official DXVK. Development = newest upstream build; least tested. LiliumHdr = the HDR fork that adds HDR output to DX9/11 games." />
                             </StackPanel>
                         </Grid>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Deep Fried Chicken" Classes="muted" />
+                            <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                       Text="An alternative neural consumer by Alexander, used in place of RenoDX. Its licence forbids redistribution, so Adas can't bundle it — import the author's official release (.zip or the extracted folder) once. It's verified and cached, then it appears as a route above." />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="ImportDfcButton" Classes="subtle" Content="Import…" />
+                                <TextBlock x:Name="DfcStatusText" Classes="muted" FontSize="11"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </StackPanel>
 
                         <StackPanel Spacing="4">
                             <TextBlock Text="RenoDX shader packs" Classes="muted" />

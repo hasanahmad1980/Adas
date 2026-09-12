@@ -656,6 +656,32 @@ public partial class MainViewModel
                     : _optiScalerService.StagedVersion;
             }
 
+            // ── DLSS 5 state (cache path) ──────────────────────────────────────
+            // Mirror the primary `Status` pattern: a present game defaults to "Available" (a
+            // call-to-action, not a dull "Not installed"), and a found record promotes it to
+            // "Installed". Only the two cheap, direct record reads run here — no BFS resolver — so
+            // startup stays fast; the Phase 2 BuildCards scan promotes exe-subfolder deployments
+            // (via FindInstalledDeploymentPath) the same way it refines every other status.
+            if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
+            {
+                newCard.Dlss5Status = GameStatus.Available;
+                try
+                {
+                    var dlss5Rec = Dlss5ComponentService.LoadRecord(installPath)
+                        ?? Dlss5ComponentService.LoadRecord(ModInstallService.GetAddonDeployPath(installPath));
+                    if (dlss5Rec != null)
+                    {
+                        newCard.Dlss5Status = GameStatus.Installed;
+                        newCard.Dlss5InstalledLabel = "Active route: " + dlss5Rec.Profile
+                            + (string.IsNullOrWhiteSpace(dlss5Rec.ComponentVersion) ? "" : $" ({dlss5Rec.ComponentVersion})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    CrashReporter.Log($"[CacheLoad] DLSS 5 record read for '{game.Name}' failed — {ex.Message}");
+                }
+            }
+
             // RE Framework from records: prefer Name+Store match, fallback to Name+InstallPath
             if (newCard.IsREEngineGame)
             {
