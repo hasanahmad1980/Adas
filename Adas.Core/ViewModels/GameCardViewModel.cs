@@ -427,6 +427,7 @@ public partial class GameCardViewModel : ObservableObject
         // ── Graphics API badge computed properties ───────────────────────
         NotifyOnce(nameof(HasGraphicsApiBadge));
         NotifyOnce(nameof(GraphicsApiLabel));
+        NotifyOnce(nameof(BitnessLabel));
 
         // ── Properties not covered by targeted methods ────────────────────────
         NotifyOnce(nameof(DualBitInstallVisibility));

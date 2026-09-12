@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -39,6 +41,10 @@ public partial class MainWindow : Window
         }
         catch { /* version display is best-effort */ }
 
+        // Restore the saved library/detail split, and persist it whenever the user drags the divider.
+        RestoreSplit();
+        BodySplitter.DragCompleted += OnSplitterDragCompleted;
+
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MainViewModel vm)
@@ -52,6 +58,28 @@ public partial class MainWindow : Window
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
+
+    // Body columns: [0] = library, [1] = splitter, [2] = detail. (x:Name on a ColumnDefinition
+    // does not generate a field, so we address them by index on the named grid.)
+    private ColumnDefinition LeftCol => BodyGrid.ColumnDefinitions[0];
+    private ColumnDefinition RightCol => BodyGrid.ColumnDefinitions[2];
+
+    /// <summary>Applies the persisted library/detail split ratio to the two star columns.</summary>
+    private void RestoreSplit()
+    {
+        if (UiLayoutStore.LoadSplitRatio() is not { } ratio) return;
+        LeftCol.Width = new GridLength(ratio, GridUnitType.Star);
+        RightCol.Width = new GridLength(1 - ratio, GridUnitType.Star);
+    }
+
+    /// <summary>Persists the split ratio after the user finishes dragging the divider.</summary>
+    private void OnSplitterDragCompleted(object? sender, VectorEventArgs e)
+    {
+        var left = LeftCol.Width.IsStar ? LeftCol.Width.Value : LeftCol.ActualWidth;
+        var right = RightCol.Width.IsStar ? RightCol.Width.Value : RightCol.ActualWidth;
+        var total = left + right;
+        if (total > 0) UiLayoutStore.SaveSplitRatio(left / total);
+    }
 
     private async void OnLoaded(object? sender, RoutedEventArgs e)
     {

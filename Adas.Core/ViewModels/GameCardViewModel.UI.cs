@@ -211,6 +211,8 @@ public partial class GameCardViewModel
     public Visibility EngineBadgeVisibility      => !string.IsNullOrEmpty(EngineHint) ? Visibility.Visible : Visibility.Collapsed;
     public string GraphicsApiLabel               => GraphicsApiDetector.GetMultiLabel(DetectedApis, GraphicsApi);
     public bool HasGraphicsApiBadge              => GraphicsApi != GraphicsApiType.Unknown;
+    /// <summary>Process bitness shown alongside the graphics-API badge (e.g. "64-bit"/"32-bit").</summary>
+    public string BitnessLabel                   => Is32Bit ? "32-bit" : "64-bit";
     public Visibility NotesButtonVisibility      => HasNotes ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ProgressVisibility         => IsInstalling ? Visibility.Visible : Visibility.Collapsed;
     public Visibility MessageVisibility          => string.IsNullOrEmpty(ActionMessage) ? Visibility.Collapsed : Visibility.Visible;

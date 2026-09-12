@@ -111,14 +111,40 @@ public class SteamAppIdResolver : ISteamAppIdResolver
 
     /// <summary>
     /// Queries the Steam Store search API for the game name, rate-limited to 1 request per second.
-    /// Returns the AppID of the first result whose normalized name matches, or null.
+    /// The raw name is cleaned first (dots→spaces, scene/repack tags and edition/version noise
+    /// stripped) and results are matched fuzzily, so messy folder names like
+    /// <c>Assetto.Corsa.EVO-InsaneRamZes</c> still resolve. Returns the best AppID, or null.
     /// </summary>
     private async Task<int?> SearchSteamStoreAsync(string gameName)
+    {
+        var candidates = GameNameCleaner.SearchCandidates(gameName);
+        if (candidates.Count == 0)
+            candidates = new[] { gameName };
+
+        foreach (var term in candidates)
+        {
+            var items = await QuerySteamStoreAsync(term).ConfigureAwait(false);
+            if (items == null || items.Count == 0)
+                continue;
+
+            // Exact normalized match first (cheap, high-confidence), then fuzzy over the raw name.
+            var exact = FindMatchingAppId(gameName, items);
+            if (exact.HasValue) return exact;
+
+            var fuzzy = GameNameCleaner.BestMatch(gameName, items.Select(i => (i.Id, i.Name)).ToList());
+            if (fuzzy.HasValue) return fuzzy;
+        }
+
+        return null;
+    }
+
+    /// <summary>Single rate-limited Steam Store search request; returns the raw items or null.</summary>
+    private async Task<List<SteamStoreSearchItem>?> QuerySteamStoreAsync(string term)
     {
         await _rateLimiter.WaitAsync().ConfigureAwait(false);
         try
         {
-            var encodedName = Uri.EscapeDataString(gameName);
+            var encodedName = Uri.EscapeDataString(term);
             var url = $"https://store.steampowered.com/api/storesearch/?term={encodedName}&l=english&cc=US";
 
             var response = await _http.GetAsync(url).ConfigureAwait(false);
@@ -148,10 +174,7 @@ public class SteamAppIdResolver : ISteamAppIdResolver
                 return null;
             }
 
-            if (searchResult?.Items == null || searchResult.Items.Count == 0)
-                return null;
-
-            return FindMatchingAppId(gameName, searchResult.Items);
+            return searchResult?.Items;
         }
         catch (Exception ex)
         {

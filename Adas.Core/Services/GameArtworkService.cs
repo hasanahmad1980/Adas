@@ -58,6 +58,13 @@ public sealed class GameArtworkService : IGameArtworkService
                 // Another card for the same title may have filled the cache while we waited.
                 if (IsUsable(jpg)) return jpg;
 
+                // Emulators are never on the Steam store under a game name — map them to a logo first.
+                if (GameNameCleaner.TryGetEmulatorArtUrl(gameName, out var emuUrl)
+                    && await TryDownloadAsync(emuUrl, jpg).ConfigureAwait(false))
+                {
+                    return jpg;
+                }
+
                 var appId = await _appIdResolver
                     .ResolveAsync(gameName, steamAppId, installPath, manifest)
                     .ConfigureAwait(false);
