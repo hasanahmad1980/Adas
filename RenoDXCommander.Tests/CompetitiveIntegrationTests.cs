@@ -113,7 +113,7 @@ public sealed class CompetitiveIntegrationTests
     [InlineData(Dlss5DeploymentMode.NativeVulkan)]
     public void DriverPreflightWarnsOn61664ForAffectedRoutes(Dlss5DeploymentMode mode)
     {
-        Assert.NotNull(Dlss5CompatibilityService.GetDriverPreflightWarning(mode, "616.64"));
+        Assert.NotNull(Dlss5CompatibilityService.GetDriverPreflightWarning(mode, driverVersion: "616.64"));
     }
 
     [Fact]
@@ -122,7 +122,26 @@ public sealed class CompetitiveIntegrationTests
         // A known-good driver on an affected route, and a known-bad driver on a route that does not
         // use the RenoDX consumer, both stay silent. (An empty version falls back to the machine's real
         // driver by design, so it is not asserted here.)
-        Assert.Null(Dlss5CompatibilityService.GetDriverPreflightWarning(Dlss5DeploymentMode.Dx11Feeder, "616.56"));
-        Assert.Null(Dlss5CompatibilityService.GetDriverPreflightWarning(Dlss5DeploymentMode.None, "616.64"));
+        Assert.Null(Dlss5CompatibilityService.GetDriverPreflightWarning(Dlss5DeploymentMode.Dx11Feeder, driverVersion: "616.56"));
+        Assert.Null(Dlss5CompatibilityService.GetDriverPreflightWarning(Dlss5DeploymentMode.None, driverVersion: "616.64"));
+    }
+
+    // The RenoDX-consumer routes are the ones 616.64 breaks; the standalone AIO suite and the
+    // OptiScaler-NR forks route around that consumer, so the pre-flight must stay silent for them
+    // even on an affected mode + bad driver.
+    [Theory]
+    [InlineData(Dlss5InstallProfile.MaximumQuality, true)]
+    [InlineData(Dlss5InstallProfile.ExperimentalUnified, true)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, true)]
+    [InlineData(Dlss5InstallProfile.NeuralUpstream, true)]
+    [InlineData(Dlss5InstallProfile.StandaloneAio, false)]
+    [InlineData(Dlss5InstallProfile.OptiScalerNeuralRendering, false)]
+    [InlineData(Dlss5InstallProfile.OptiScalerNrBeforeSr, false)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, false)]
+    public void DriverPreflightIsProfileAware(Dlss5InstallProfile profile, bool expectWarning)
+    {
+        var warning = Dlss5CompatibilityService.GetDriverPreflightWarning(
+            Dlss5DeploymentMode.NativeDirectX12, profile, driverVersion: "616.64");
+        Assert.Equal(expectWarning, warning is not null);
     }
 }

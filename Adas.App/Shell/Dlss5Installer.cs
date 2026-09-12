@@ -49,6 +49,16 @@ public static class Dlss5Installer
         if (string.IsNullOrWhiteSpace(root))
             return new Outcome(false, "No install path resolved for this game.");
 
+        // ── Known-bad-driver pre-flight (route-aware) ────────────────────────
+        // Warn before we touch anything when the installed NVIDIA driver is known to break this
+        // specific route's neural consumer; the user can still continue.
+        var driverWarning = await Task.Run(() =>
+            Dlss5CompatibilityService.GetDriverPreflightWarning(assessment.Mode, profile));
+        if (!string.IsNullOrWhiteSpace(driverWarning)
+            && !await DialogHost.ConfirmAsync(owner, "Driver may be incompatible with this route",
+                   driverWarning, "Install anyway", "Cancel"))
+            return new Outcome(false, "Cancelled.");
+
         // ── Conflict cleanup approval ────────────────────────────────────────
         Dlss5CleanupPlan cleanup;
         try { cleanup = await Task.Run(() => Dlss5ComponentService.GetCleanupPlan(root, assessment.Mode, profile)); }

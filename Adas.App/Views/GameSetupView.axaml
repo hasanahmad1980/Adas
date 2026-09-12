@@ -56,6 +56,16 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
 
+                        <Border x:Name="DriverWarningBanner" IsVisible="False"
+                                CornerRadius="6" Padding="10,8" Background="#3A2A00"
+                                BorderBrush="#8A6D2F" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="⚠" Foreground="#F0B429" VerticalAlignment="Top" />
+                                <TextBlock x:Name="DriverWarningText" TextWrapping="Wrap"
+                                           Foreground="#F5D77E" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button x:Name="InstallButton" Classes="accent"
                                     Content="Install selected route" />

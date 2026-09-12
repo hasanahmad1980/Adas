@@ -34,6 +34,7 @@ public partial class GameSetupView : UserControl
         InstallButton.Click += OnInstall;
         RepairButton.Click += OnRepair;
         RemoveButton.Click += OnRemove;
+        RoutesList.SelectionChanged += OnRouteSelectionChanged;
         DiagnoseButton.Click += OnDiagnose;
         OptiScalerButton.Click += OnOptiScaler;
         DisplayCommanderButton.Click += OnDisplayCommander;
@@ -63,6 +64,10 @@ public partial class GameSetupView : UserControl
     /// don't write the value straight back and trigger spurious re-assessments.</summary>
     private bool _populatingOverrides;
 
+    /// <summary>The deployment mode from the most recent assessment, used to key the route-aware
+    /// driver pre-flight warning against the currently selected route.</summary>
+    private Dlss5DeploymentMode _assessedMode = Dlss5DeploymentMode.None;
+
     private string Store => Card?.Source ?? "";
 
     private GameCardViewModel? Card => DataContext as GameCardViewModel;
@@ -90,6 +95,7 @@ public partial class GameSetupView : UserControl
         RouteOption? recommended = null;
         GameStatus dlss5Status = GameStatus.NotInstalled;
         string? dlss5Label = null;
+        Dlss5DeploymentMode assessedMode = Dlss5DeploymentMode.None;
 
         await Task.Run(() =>
         {
@@ -99,6 +105,7 @@ public partial class GameSetupView : UserControl
                 if (compat is null) { summary = "Compatibility service unavailable."; return; }
 
                 var assessment = Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true);
+                assessedMode = assessment.Mode;
 
                 // Seed from an existing install of the same mode, else auto-pick from renderer/arch.
                 var installed = assessment.DeploymentPath is { } dp ? Dlss5ComponentService.LoadRecord(dp) : null;
@@ -142,6 +149,8 @@ public partial class GameSetupView : UserControl
             RoutesList.SelectedItem = recommended;
             card.Dlss5Status = dlss5Status;
             card.Dlss5InstalledLabel = dlss5Label;
+            _assessedMode = assessedMode;
+            UpdateDriverWarning(recommended);
             PopulateOverrides(card);
         }
 
@@ -190,6 +199,22 @@ public partial class GameSetupView : UserControl
             InstallProgress.IsVisible = false;
             InstallButton.IsEnabled = true;
         }
+    }
+
+    private void OnRouteSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => UpdateDriverWarning(RoutesList.SelectedItem as RouteOption);
+
+    /// <summary>
+    /// Shows the known-bad-driver pre-flight warning for the selected route, keyed to the assessed
+    /// deployment mode and the route's profile so it only fires for routes the driver actually breaks.
+    /// </summary>
+    private void UpdateDriverWarning(RouteOption? route)
+    {
+        var warning = route is null
+            ? null
+            : Dlss5CompatibilityService.GetDriverPreflightWarning(_assessedMode, route.Profile);
+        DriverWarningText.Text = warning ?? "";
+        DriverWarningBanner.IsVisible = !string.IsNullOrWhiteSpace(warning);
     }
 
     private void OnRepair(object? sender, RoutedEventArgs e) =>

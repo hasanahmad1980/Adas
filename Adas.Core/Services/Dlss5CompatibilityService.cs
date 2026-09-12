@@ -383,14 +383,17 @@ public sealed class Dlss5CompatibilityService
     /// when <paramref name="driverVersion"/> is not supplied. Borrowed from the Feeder/oneclick driver
     /// pre-flight; the recommendation mirrors what the post-install diagnostic already tells users.
     /// </summary>
-    public static string? GetDriverPreflightWarning(Dlss5DeploymentMode mode, string? driverVersion = null)
+    public static string? GetDriverPreflightWarning(Dlss5DeploymentMode mode,
+        Dlss5InstallProfile? profile = null, string? driverVersion = null)
     {
         var version = string.IsNullOrWhiteSpace(driverVersion) ? DetectedDriverVersion : driverVersion;
         if (string.IsNullOrWhiteSpace(version)) return null;
 
         // 616.64 fails inside D3D12Core with the RenoDX v4.6/v4.7 neural consumer that the Feeder
-        // and native RenoDX routes deploy. The classic AIO/OptiScaler routes do not use that consumer.
+        // and native RenoDX routes deploy. The classic AIO/OptiScaler routes do not use that consumer,
+        // so when the caller knows the selected route, suppress the warning for those routes.
         if (Driver61664.IsMatch(version)
+            && (profile is null || UsesRenoDxNeuralConsumer(profile.Value))
             && (IsFeederMode(mode)
                 || mode is Dlss5DeploymentMode.NativeDirectX12 or Dlss5DeploymentMode.NativeDirectX11
                     or Dlss5DeploymentMode.NativeVulkan))
@@ -399,6 +402,15 @@ public sealed class Dlss5CompatibilityService
                  + "neural consumer / a classic-engine route. Adas will still install if you continue.";
         return null;
     }
+
+    /// <summary>
+    /// True when the profile deploys the RenoDX v4.6/v4.7 neural consumer (the component driver 616.64
+    /// breaks). The standalone AIO suite and the OptiScaler-NR forks route around it, so they are exempt.
+    /// Mirrors the InstallCoreAsync fan-out in <see cref="Dlss5ComponentService"/>.
+    /// </summary>
+    internal static bool UsesRenoDxNeuralConsumer(Dlss5InstallProfile profile)
+        => profile != Dlss5InstallProfile.StandaloneAio
+            && !Dlss5ComponentService.IsOptiScalerNrProfile(profile);
 
     /// <summary>True when the given GPU name is a GeForce RTX 40-series (Ada) part — the only
     /// GPUs MFG Ada Unlock applies to.</summary>
