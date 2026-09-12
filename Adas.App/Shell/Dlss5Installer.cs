@@ -215,18 +215,8 @@ public static class Dlss5Installer
     /// </summary>
     private static async Task<Outcome?> EnsureGameClosedAsync(Window owner, GameCardViewModel card)
     {
-        var running = await Task.Run(() => GameProcessService.FindRunningProcesses(card.InstallPath));
-        if (running.Count == 0) return null;
-
-        if (!await DialogHost.ConfirmAsync(owner, $"Close {card.GameName} and continue?",
-                "Windows keeps active ReShade and DLSS add-ons locked while the game is running. Adas will close the game, wait for the files to release, then continue.",
-                "Close game and continue", "Cancel"))
-            return new Outcome(false, "Cancelled.");
-
-        var stopErrors = await GameProcessService.StopProcessesAsync(running);
-        if (stopErrors.Count > 0)
-            return new Outcome(false, $"Could not close {card.GameName}:\n• " + string.Join("\n• ", stopErrors));
-        await Task.Delay(250);
-        return null;
+        var result = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
+        if (result.CanProceed) return null;
+        return new Outcome(false, result.WasCancelled ? "Cancelled." : result.Error!);
     }
 }

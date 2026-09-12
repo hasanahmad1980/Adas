@@ -268,6 +268,20 @@ public partial class GameSetupView : UserControl
         }
     }
 
+    /// <summary>
+    /// Closes a running game before an Extras component writes DLLs Windows keeps locked. Returns true when
+    /// it is safe to proceed; on cancel/failure it reports through <paramref name="report"/> and returns false.
+    /// </summary>
+    private async Task<bool> GuardGameClosedAsync(GameCardViewModel card, Action<string> report)
+    {
+        var owner = this.FindAncestorOfType<Window>();
+        if (owner is null) return true;
+        var result = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
+        if (result.CanProceed) return true;
+        if (result.Error is { } err) report(err);
+        return false;
+    }
+
     // ── Advanced per-game overrides ─────────────────────────────────────────
     // Seeds each combo from the persisted per-game override; handlers below write changes back
     // through the same MainViewModel getters/setters the WinUI overrides panel used.
@@ -459,6 +473,8 @@ public partial class GameSetupView : UserControl
         var svc = AppServices.Services.GetService<IOptiScalerService>();
         if (svc is null) { ExtrasResult.Text = "OptiScaler service unavailable."; ExtrasResult.IsVisible = true; return; }
 
+        if (!await GuardGameClosedAsync(card, m => { ExtrasResult.Text = m; ExtrasResult.IsVisible = true; })) return;
+
         OptiScalerButton.IsEnabled = false;
         ExtrasProgress.IsVisible = true;
         ExtrasProgress.Value = 0;
@@ -533,6 +549,8 @@ public partial class GameSetupView : UserControl
             return;
         }
 
+        if (!await GuardGameClosedAsync(card, m => { ExtrasResult.Text = m; ExtrasResult.IsVisible = true; })) return;
+
         DisplayCommanderButton.IsEnabled = false;
         try
         {
@@ -561,16 +579,18 @@ public partial class GameSetupView : UserControl
 
     private async void OnDxvk(object? sender, RoutedEventArgs e)
     {
-        if (Main is null || Card is null) return;
-        try { await Main.InstallDxvkAsync(Card); }
-        catch (Exception ex) { Card.ActionMessage = $"DXVK failed: {ex.Message}"; }
+        if (Main is null || Card is not { } card) return;
+        if (!await GuardGameClosedAsync(card, m => card.ActionMessage = m)) return;
+        try { await Main.InstallDxvkAsync(card); }
+        catch (Exception ex) { card.ActionMessage = $"DXVK failed: {ex.Message}"; }
     }
 
     private async void OnReShade(object? sender, RoutedEventArgs e)
     {
-        if (Main is null || Card is null) return;
-        try { await Main.InstallReShadeAsync(Card); }
-        catch (Exception ex) { Card.ActionMessage = $"ReShade failed: {ex.Message}"; }
+        if (Main is null || Card is not { } card) return;
+        if (!await GuardGameClosedAsync(card, m => card.ActionMessage = m)) return;
+        try { await Main.InstallReShadeAsync(card); }
+        catch (Exception ex) { card.ActionMessage = $"ReShade failed: {ex.Message}"; }
     }
 
     private void OnDiagnose(object? sender, RoutedEventArgs e)

@@ -69,6 +69,13 @@ public partial class ToolsWindow : Window
             return;
         }
 
+        var guard = await Shell.GameCloseGuard.EnsureClosedAsync(this, card!.GameName, folder);
+        if (!guard.CanProceed)
+        {
+            Output.Text = guard.Error ?? "Cancelled.";
+            return;
+        }
+
         MfgButton.IsEnabled = false;
         try
         {
