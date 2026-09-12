@@ -659,8 +659,9 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
             {
                 _crashReporter.Log($"[UpdateOrchestrationService.CheckForUpdatesAsync] {lumaInstalled.Count} Luma cards to check");
 
-                // Single API call — all Luma mods share the same release
-                var latestBuild = await _lumaService.GetLatestBuildNumberAsync().ConfigureAwait(false);
+                // Compare against the pinned build, not live upstream, so cards aren't flagged
+                // for an update past the pin (bump LumaService.LumaPinnedBuild to offer one).
+                var latestBuild = LumaService.LumaPinnedBuild;
                 if (latestBuild > 0)
                 {
                     foreach (var card in lumaInstalled)

@@ -14,6 +14,25 @@ public class LumaService : ILumaService
 {
     private const string WikiUrl = "https://github.com/Filoppi/Luma-Framework/wiki";
 
+    // ── Pinned Luma-Framework build ────────────────────────────────────────────────
+    // Luma publishes very frequently under rolling "latest-NNN" tags. Rather than always
+    // fetching /releases/latest/ (irreproducible, and a fresh zip can outrun the wiki notes
+    // we scrape), Adas pins the generic Unreal Engine framework zip to one verified build and
+    // caps the "update available" check at it. Bump this deliberately after verifying a newer
+    // build. NOTE: named per-game Luma mods come from the live wiki and are NOT pinned by this.
+    public const int LumaPinnedBuild = 648;
+
+    /// <summary>The pinned release tag, e.g. "latest-648".</summary>
+    public static string LumaPinnedTag => $"latest-{LumaPinnedBuild}";
+
+    /// <summary>
+    /// Download URL for the generic Unreal Engine Luma framework zip at the pinned build.
+    /// The card-build paths that synthesise a generic-Luma mod use this instead of the
+    /// rolling /releases/latest/ URL.
+    /// </summary>
+    public static string GenericUnrealEngineZipUrl =>
+        $"https://github.com/Filoppi/Luma-Framework/releases/download/{LumaPinnedTag}/Luma-Unreal_Engine.zip";
+
     private static readonly string DbPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "RHI", "luma_installed.json");
@@ -738,7 +757,9 @@ public class LumaService : ILumaService
             DownloadUrl = mod.DownloadUrl,
             InstalledFiles = installedFiles,
             InstalledAt = DateTime.UtcNow,
-            InstalledBuildNumber = await GetLatestBuildNumberAsync().ConfigureAwait(false),
+            // Record the pinned build we deploy (the generic-UE zip is pinned; named mods share the
+            // pinned framework release tag), so the capped update check below stays consistent.
+            InstalledBuildNumber = LumaPinnedBuild,
         };
         SaveRecord(record);
         progress?.Report(("Luma installed!", 100));
@@ -985,11 +1006,12 @@ public class LumaService : ILumaService
     }
 
     /// <inheritdoc />
-    public async Task<bool> CheckForUpdateAsync(LumaInstalledRecord record)
+    public Task<bool> CheckForUpdateAsync(LumaInstalledRecord record)
     {
-        if (record.InstalledBuildNumber <= 0) return false; // no version info — can't compare
-        var latest = await GetLatestBuildNumberAsync().ConfigureAwait(false);
-        return latest > 0 && latest > record.InstalledBuildNumber;
+        if (record.InstalledBuildNumber <= 0) return Task.FromResult(false); // no version info — can't compare
+        // Compare against the pinned build, not live upstream, so an install stays "up to date"
+        // until the pin is deliberately bumped.
+        return Task.FromResult(LumaPinnedBuild > record.InstalledBuildNumber);
     }
 
     // ── Install from local archive (drag-drop / file watcher) ─────────────────────

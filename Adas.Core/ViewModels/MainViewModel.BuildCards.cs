@@ -1257,7 +1257,7 @@ public partial class MainViewModel
                     {
                         Name = game.Name,
                         IsGenericLuma = true,
-                        DownloadUrl = "https://github.com/Filoppi/Luma-Framework/releases/latest/download/Luma-Unreal_Engine.zip",
+                        DownloadUrl = LumaService.GenericUnrealEngineZipUrl,
                         Status = "✅",
                     };
                     // Populate notes from the scraped UE wiki table if available

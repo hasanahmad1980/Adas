@@ -667,7 +667,7 @@ public partial class MainViewModel
                 {
                     Name = card.GameName,
                     IsGenericLuma = true,
-                    DownloadUrl = "https://github.com/Filoppi/Luma-Framework/releases/latest/download/Luma-Unreal_Engine.zip",
+                    DownloadUrl = LumaService.GenericUnrealEngineZipUrl,
                     Status = "✅",
                 };
                 if (_lumaGenericEntries.TryGetValue(card.GameName, out var entry))
