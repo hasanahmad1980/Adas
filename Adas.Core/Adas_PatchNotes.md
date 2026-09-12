@@ -1,3 +1,13 @@
+## v2.6.56 — DLSS 5 setup: Remove/Repair, route-aware driver pre-flight, safer Extras (2026-09-11)
+
+Five improvements to the DLSS 5 setup experience, from an internal review of the new Avalonia UI:
+
+- **Remove & Repair on the setup pane** — once a route is installed, the pane now shows **Repair** (re-writes the ReShade/add-on configuration from the tracked install record) and **Remove** (full uninstall) next to Install. Both close the game first if it is running, and Remove restores every file Adas backed up.
+- **Route-aware driver pre-flight** — the known-bad-driver warning (e.g. **616.64**) now fires only for routes that actually use the RenoDX neural consumer that trips the bug. Classic AIO and the OptiScaler-NR forks route around it, so they no longer raise a false alarm. A matching amber banner appears under the route list as you select a route, and a confirmation is shown at install time.
+- **Running-game guard for Extras & Tools** — installing OptiScaler, Display Commander, DXVK or ReShade from **Extras**, and the Universal MFG unlock from **Tools**, now use the same "close the game first" guard as the main install, so files are never written under a live process.
+- **Route-catalog tests** — the per-game route list and recommendation logic moved into the engine (`Adas.Core`) and gained direct test coverage (availability matrix, 32-bit exclusions, recommendation, installed/recommended markers).
+- **Expanded Settings coverage** — Settings now exposes the drag-and-drop helper toggle, ReShade effect-list tabs, RenoDX peak-brightness (nits), the ReLimiter frame limiter (target FPS, DLSS FG hook, shared presets, OSD hotkey), and screenshot folder options.
+
 ## v2.6.55 — Upstream refresh: OneClick 0.13.14, NeuralScreen 1.6.1 (2026-09-11)
 
 - **OneClick** re-pinned **0.13.13 → 0.13.14** (runtime-fetched, SHA-256 re-verified against the author's official release). Upstream documents a working DLSS 5 recipe under Proton (Elden Ring), plus fixes to three misleading status messages.

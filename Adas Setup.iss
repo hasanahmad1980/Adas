@@ -2,7 +2,7 @@
 ; Targets the new lean Adas.exe (Avalonia, self-contained + trimmed), replacing the retired
 ; WinUI RHI.exe. New AppId so it installs side-by-side rather than upgrading an RHI install.
 #define MyAppName "Adas"
-#define MyAppVersion "2.6.55"
+#define MyAppVersion "2.6.56"
 #define MyAppPublisher "Adas"
 #define MyAppURL "https://github.com/hasanahmad1980/Adas"
 #define MyAppExeName "Adas.exe"
