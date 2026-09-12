@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RenoDXCommander.ViewModels"
-             xmlns:shell="using:Adas.App.Shell"
+             xmlns:svc="using:RenoDXCommander.Services"
              x:Class="Adas.App.Views.GameSetupView"
              x:DataType="vm:GameCardViewModel">
 
@@ -44,7 +44,7 @@
                         <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0"
                                  MaxHeight="360">
                             <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="shell:RouteOption">
+                                <DataTemplate x:DataType="svc:RouteOption">
                                     <StackPanel Spacing="2" Margin="0,3">
                                         <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />

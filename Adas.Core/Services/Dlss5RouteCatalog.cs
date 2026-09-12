@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using RenoDXCommander.Models;
-using RenoDXCommander.Services;
 
-namespace Adas.App.Shell;
+namespace RenoDXCommander.Services;
 
 /// <summary>One selectable DLSS 5 install route (profile) with its availability verdict for a game.</summary>
 public sealed record RouteOption(
@@ -18,6 +17,7 @@ public sealed record RouteOption(
 /// Builds the per-game route list — every route shown, recommended marked, incompatible flagged with
 /// a reason. This is the Avalonia rebuild of the WinUI detail-panel profile selector; the availability
 /// predicates and copy are ported verbatim from <c>MainWindow.Events.Dlss5.cs</c> so behaviour matches.
+/// Pure engine-facing logic (no UI dependency), so it lives in Adas.Core and is unit-tested directly.
 /// </summary>
 public static class Dlss5RouteCatalog
 {
