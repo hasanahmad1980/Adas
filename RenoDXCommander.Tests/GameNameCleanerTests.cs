@@ -56,6 +56,30 @@ public class GameNameCleanerTests
         Assert.Null(GameNameCleaner.BestMatch("Assetto.Corsa-CODEX", results));
     }
 
+    [Fact]
+    public void BestMatch_treats_roman_and_arabic_numerals_as_equal()
+    {
+        // Steam returns the roman-numeral store title for an arabic-numeral folder.
+        var results = new List<(int, string)>
+        {
+            (289070, "Sid Meier's Civilization VI"),
+            (1295660, "Sid Meier's Civilization VII"),
+        };
+        Assert.Equal(289070, GameNameCleaner.BestMatch("Civilization 6", results));
+    }
+
+    [Fact]
+    public void BestMatch_handles_a_glued_trailing_digit_typo()
+    {
+        var results = new List<(int, string)>
+        {
+            (2968420, "PowerWash Simulator 2"),
+            (1290000, "PowerWash Simulator"),
+        };
+        // "Simulator1" (folder typo) should resolve to the base game, not the sequel.
+        Assert.Equal(1290000, GameNameCleaner.BestMatch("PowerWash Simulator1", results));
+    }
+
     [Theory]
     [InlineData("RPCS3", true)]
     [InlineData("Dolphin-x64", true)]

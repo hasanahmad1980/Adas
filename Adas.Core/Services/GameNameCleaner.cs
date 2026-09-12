@@ -144,15 +144,69 @@ public static class GameNameCleaner
 
         double covByCand = (double)inter / cs.Count;   // how much of the Steam title the query covers
         double covByQuery = (double)inter / qs.Count;   // how much of the query the Steam title covers
-        // Require the Steam result to be well-covered (so "Call of Duty" doesn't win for "Call of Duty 2"),
-        // and reward mutual overlap.
+
+        // Every distinctive query token appears in the candidate (e.g. "Civilization 6" fully inside
+        // "Sid Meier's Civilization VI"): a strong match even when the store title adds a publisher
+        // prefix. Guarded to multi-token queries so "Halo" doesn't grab "Halo Wars".
+        if (qs.Count >= 2 && covByQuery >= 0.999)
+            return 0.85;
+
+        // Otherwise require the Steam result to be well-covered (so "Call of Duty" doesn't win for
+        // "Call of Duty 2") and reward mutual overlap.
         return (covByCand * 0.7) + (covByQuery * 0.3);
     }
 
     private static List<string> Tokens(string s)
-        => Regex.Split(s.ToLowerInvariant(), @"[^a-z0-9]+")
-                .Where(t => t.Length > 0 && !StopWords.Contains(t))
-                .ToList();
+    {
+        var raw = Regex.Split(s.ToLowerInvariant(), @"[^a-z0-9]+")
+                       .Where(t => t.Length > 0 && !StopWords.Contains(t));
+
+        var outp = new List<string>();
+        foreach (var t in raw)
+        {
+            // Split letter/digit runs so a glued sequel/typo tokenises like a spaced one
+            // ("simulator1" → "simulator","1"; "cod2" → "cod","2").
+            foreach (Match m in Regex.Matches(t, @"[a-z]+|[0-9]+"))
+                outp.Add(NumeralKey(m.Value));
+        }
+        return outp;
+    }
+
+    // Normalises roman numerals to arabic so "VI" and "6" compare equal. Only multi-character romans
+    // are converted, to avoid mangling single letters that are real titles ("V Rising", "X").
+    private static string NumeralKey(string token)
+    {
+        if (token.Length >= 2 && Regex.IsMatch(token, "^[ivxl]+$"))
+        {
+            var v = RomanToInt(token);
+            if (v > 0) return v.ToString();
+        }
+        return token;
+    }
+
+    private static int RomanToInt(string s)
+    {
+        int Val(char c) => c switch { 'i' => 1, 'v' => 5, 'x' => 10, 'l' => 50, _ => 0 };
+        int total = 0, prev = 0;
+        for (int i = s.Length - 1; i >= 0; i--)
+        {
+            int v = Val(s[i]);
+            if (v == 0) return 0;
+            total += v < prev ? -v : v;
+            prev = v;
+        }
+        // Reject nonsense that isn't a canonical roman numeral (e.g. "ill" → i,l,l).
+        return total is > 0 and <= 49 && IntToRoman(total) == s ? total : 0;
+    }
+
+    private static string IntToRoman(int n)
+    {
+        var map = new (int V, string R)[] { (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i") };
+        var sb = new System.Text.StringBuilder();
+        foreach (var (v, r) in map)
+            while (n >= v) { sb.Append(r); n -= v; }
+        return sb.ToString();
+    }
 
     // ── Emulators ───────────────────────────────────────────────────────────────────────────────
 

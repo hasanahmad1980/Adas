@@ -188,6 +188,13 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Context-menu "Hide"/"Show" on a library card toggles the game's hidden state.</summary>
+    private void OnHideGameClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: GameCardViewModel card })
+            Vm?.ToggleHideGame(card);
+    }
+
     private void OnTools(object? sender, RoutedEventArgs e)
     {
         var tools = new ToolsWindow(Vm);

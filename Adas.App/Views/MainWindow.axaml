@@ -37,6 +37,9 @@
                              VerticalAlignment="Center" />
                     <Button x:Name="UpdateButton" Content="⬆ Update" Classes="accent" IsVisible="False"
                             ToolTip.Tip="A newer version of Adas is available" />
+                    <ToggleButton Content="Hidden" Classes="subtle"
+                                  IsChecked="{Binding Filter.ShowHidden, Mode=TwoWay}"
+                                  ToolTip.Tip="Show games you've hidden from the list" />
                     <Button x:Name="SettingsButton" Content="Settings" Classes="subtle" />
                     <Button x:Name="ToolsButton" Content="Tools" Classes="subtle" />
                     <Button x:Name="HistoryButton" Content="History" Classes="subtle" />
@@ -92,6 +95,11 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:GameCardViewModel">
                             <Border Classes="card" Margin="0,0,0,8">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{Binding HideButtonLabel}" Click="OnHideGameClick" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <Grid ColumnDefinitions="Auto,*,Auto">
                                     <!-- Cover art (Steam library portrait), hidden until fetched -->
                                     <Border Grid.Column="0" Width="46" Height="66" CornerRadius="4"

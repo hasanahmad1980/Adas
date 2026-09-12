@@ -97,6 +97,8 @@ public partial class GameSetupView : UserControl
         GameStatus dlss5Status = GameStatus.NotInstalled;
         string? dlss5Label = null;
         Dlss5DeploymentMode assessedMode = Dlss5DeploymentMode.None;
+        bool assessedIs64Bit = !card.Is32Bit;
+        bool haveAssessedBitness = false;
 
         await Task.Run(() =>
         {
@@ -107,6 +109,8 @@ public partial class GameSetupView : UserControl
 
                 var assessment = Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true);
                 assessedMode = assessment.Mode;
+                assessedIs64Bit = assessment.Is64Bit;
+                haveAssessedBitness = true;
 
                 // Seed from an existing install of the same mode, else auto-pick from renderer/arch.
                 var installed = assessment.DeploymentPath is { } dp ? Dlss5ComponentService.LoadRecord(dp) : null;
@@ -153,6 +157,18 @@ public partial class GameSetupView : UserControl
             RoutesList.SelectedItem = recommended;
             card.Dlss5Status = dlss5Status;
             card.Dlss5InstalledLabel = dlss5Label;
+
+            // Reconcile the header bitness badge with the authoritative PE-header probe the route list
+            // just used. Without this the "64-bit"/"32-bit" chip keeps the card-build-time guess and can
+            // contradict the route reasons (e.g. badge says 64-bit while ShortFuse is greyed "requires a
+            // 64-bit game"). The probe echoes the card when architecture is indeterminate, so this only
+            // ever corrects a concrete mismatch.
+            if (haveAssessedBitness && card.Is32Bit != !assessedIs64Bit)
+            {
+                card.Is32Bit = !assessedIs64Bit;
+                card.NotifyAll();
+            }
+
             _assessedMode = assessedMode;
             UpdateDriverWarning(recommended);
             PopulateOverrides(card);

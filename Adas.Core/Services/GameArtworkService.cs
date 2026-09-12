@@ -29,6 +29,14 @@ public sealed class GameArtworkService : IGameArtworkService
     /// <summary>How long a "no art" result is trusted before we retry the network.</summary>
     private static readonly TimeSpan MissTtl = TimeSpan.FromDays(7);
 
+    /// <summary>
+    /// Bumped whenever the resolution logic improves. On mismatch the negative cache (<c>*.miss</c>)
+    /// is wiped once so previously-unresolved games get another chance without re-downloading art
+    /// that already succeeded. Downloaded <c>*.jpg</c> files are kept.
+    /// </summary>
+    private const int CacheVersion = 2;
+    private static int _cacheBusted;
+
     /// <summary>Caps concurrent artwork fetches so a large library doesn't flood the CDN.</summary>
     private static readonly SemaphoreSlim _gate = new(3, 3);
 
@@ -44,6 +52,7 @@ public sealed class GameArtworkService : IGameArtworkService
         try
         {
             Directory.CreateDirectory(CacheDir);
+            BustStaleNegativeCache();
             var key = Slug(gameName);
             var jpg = Path.Combine(CacheDir, key + ".jpg");
             if (IsUsable(jpg)) return jpg;
@@ -59,7 +68,10 @@ public sealed class GameArtworkService : IGameArtworkService
                 if (IsUsable(jpg)) return jpg;
 
                 // Emulators are never on the Steam store under a game name — map them to a logo first.
-                if (GameNameCleaner.TryGetEmulatorArtUrl(gameName, out var emuUrl)
+                // Try the display name, then the install folder name (e.g. a "PS3 Emulator" entry
+                // living in ...\Emulators\RPCS3).
+                if ((GameNameCleaner.TryGetEmulatorArtUrl(gameName, out var emuUrl)
+                     || GameNameCleaner.TryGetEmulatorArtUrl(SafeFolderName(installPath), out emuUrl))
                     && await TryDownloadAsync(emuUrl, jpg).ConfigureAwait(false))
                 {
                     return jpg;
@@ -90,6 +102,33 @@ public sealed class GameArtworkService : IGameArtworkService
             CrashReporter.Log($"[GameArtworkService] '{gameName}' — {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>Last path segment (folder name) of an install path, for emulator matching.</summary>
+    private static string SafeFolderName(string installPath)
+    {
+        try { return string.IsNullOrEmpty(installPath) ? "" : Path.GetFileName(installPath.TrimEnd('\\', '/')); }
+        catch { return ""; }
+    }
+
+    /// <summary>Wipes the negative cache once when the resolution logic version has changed.</summary>
+    private static void BustStaleNegativeCache()
+    {
+        if (Interlocked.Exchange(ref _cacheBusted, 1) == 1) return;
+        try
+        {
+            var verFile = Path.Combine(CacheDir, ".cachever");
+            var current = CacheVersion.ToString();
+            var stored = File.Exists(verFile) ? File.ReadAllText(verFile).Trim() : "";
+            if (stored == current) return;
+
+            foreach (var miss in Directory.EnumerateFiles(CacheDir, "*.miss"))
+            {
+                try { File.Delete(miss); } catch { /* best-effort */ }
+            }
+            File.WriteAllText(verFile, current);
+        }
+        catch { /* cache busting is best-effort */ }
     }
 
     private static bool IsUsable(string path)
