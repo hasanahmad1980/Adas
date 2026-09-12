@@ -11,7 +11,10 @@ public sealed record RouteOption(
     bool Supported,
     bool Recommended,
     string StatusText,
-    bool Installed = false);
+    bool Installed = false,
+    // True for the Deep Fried Chicken entry: it runs on the stable MaximumQuality plan but swaps the
+    // RenoDX consumer for the user-imported DFC binaries via Dlss5ManualOverrides(DeepFriedChicken:true).
+    bool DeepFriedChicken = false);
 
 /// <summary>
 /// Builds the per-game route list — every route shown, recommended marked, incompatible flagged with
@@ -22,7 +25,9 @@ public sealed record RouteOption(
 public static class Dlss5RouteCatalog
 {
     public static IReadOnlyList<RouteOption> Build(Dlss5Assessment assessment, Dlss5InstallProfile recommended,
-        Dlss5InstallProfile? installedProfile = null)
+        Dlss5InstallProfile? installedProfile = null,
+        bool deepFriedChickenAvailable = false,
+        bool installedDeepFriedChicken = false)
     {
         var mode = assessment.Mode;
         var is64 = assessment.Is64Bit;
@@ -42,10 +47,14 @@ public static class Dlss5RouteCatalog
 
         var list = new List<RouteOption>();
 
-        void Add(Dlss5InstallProfile profile, string label, string description, bool supported, string unsupportedReason)
+        void Add(Dlss5InstallProfile profile, string label, string description, bool supported, string unsupportedReason,
+            bool dfcEntry = false)
         {
-            bool isInstalled = installedProfile == profile;
-            bool isRecommended = supported && profile == recommended;
+            // Deep Fried Chicken shares MaximumQuality's plan, so profile alone can't tell the two entries
+            // apart — the DFC flag disambiguates which one an install is "active" for, and keeps DFC from
+            // ever being the auto-recommended default.
+            bool isInstalled = installedProfile == profile && dfcEntry == installedDeepFriedChicken;
+            bool isRecommended = supported && profile == recommended && !dfcEntry;
             string status = isInstalled
                 ? "✓ Installed — currently active for this game."
                 : supported
@@ -53,7 +62,7 @@ public static class Dlss5RouteCatalog
                         ? "✓ Recommended for this game's detected renderer and architecture."
                         : "Available — experimental; use only when you specifically need this route."
                     : $"✕ Not recommended — {unsupportedReason}";
-            list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled));
+            list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled, dfcEntry));
         }
 
         Add(Dlss5InstallProfile.MaximumQuality,
@@ -119,6 +128,19 @@ public static class Dlss5RouteCatalog
             multipassSupported,
             !is64 ? "the pre-SR multipass fork requires a 64-bit game"
                   : "the pre-SR multipass fork requires native DirectX 12");
+
+        // Deep Fried Chicken — an alternative neural consumer (© Alexander) that replaces the RenoDX
+        // consumer on the stable route. Its licence forbids redistribution, so Adas never bundles it:
+        // the user imports the author's release once and it lives in a local cache. Greyed with a
+        // "import first" reason until that import exists, then selectable on any stable-route game.
+        Add(Dlss5InstallProfile.MaximumQuality,
+            "Deep Fried Chicken (imported)",
+            "Alternative neural consumer by Alexander — installed in place of RenoDX on the stable route. You supply the author's official release (Adas never bundles it); it is verified and cached, then deployed like any other consumer.",
+            stableSupported && deepFriedChickenAvailable,
+            deepFriedChickenAvailable
+                ? "Deep Fried Chicken needs a native or Feeder route Adas supports for this game"
+                : "import the Deep Fried Chicken release first — Advanced overrides ▸ Import…",
+            dfcEntry: true);
 
         return list;
     }

@@ -27,8 +27,10 @@ public sealed class RouteCatalogTests
     {
         var routes = Dlss5RouteCatalog.Build(Assess(mode, is64), Dlss5InstallProfile.MaximumQuality);
 
-        // Every profile the catalog offers appears exactly once, so "every route shown" holds.
-        var listed = routes.Select(r => r.Profile).ToArray();
+        // Every profile the catalog offers appears exactly once, so "every route shown" holds. The Deep
+        // Fried Chicken entry deliberately reuses the MaximumQuality profile (it swaps only the consumer),
+        // so exclude it from the by-profile uniqueness check.
+        var listed = routes.Where(r => !r.DeepFriedChicken).Select(r => r.Profile).ToArray();
         Assert.Equal(listed.Length, listed.Distinct().Count());
         foreach (var expected in new[]
                  {
@@ -131,5 +133,43 @@ public sealed class RouteCatalogTests
         var recommended = Dlss5RouteCatalog.Recommend(Assess(Dlss5DeploymentMode.NativeDirectX12, true),
             Dlss5InstallProfile.MaximumQuality);
         Assert.Equal(Dlss5InstallProfile.MaximumQuality, recommended);
+    }
+
+    [Fact]
+    public void DeepFriedChickenRouteIsGreyedUntilImportedThenSelectable()
+    {
+        var assess = Assess(Dlss5DeploymentMode.NativeDirectX12, true);
+
+        var notImported = Dlss5RouteCatalog.Build(assess, Dlss5InstallProfile.MaximumQuality)
+            .Single(r => r.DeepFriedChicken);
+        Assert.False(notImported.Supported);
+        Assert.StartsWith("✕", notImported.StatusText);
+        Assert.Contains("Import", notImported.StatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.False(notImported.Recommended); // DFC is never the auto-recommendation
+
+        var imported = Dlss5RouteCatalog.Build(assess, Dlss5InstallProfile.MaximumQuality,
+                deepFriedChickenAvailable: true)
+            .Single(r => r.DeepFriedChicken);
+        Assert.True(imported.Supported);
+        Assert.DoesNotContain("✕", imported.StatusText);
+        Assert.False(imported.Recommended);
+    }
+
+    [Fact]
+    public void DeepFriedChickenInstallMarksTheDfcEntryNotThePlainStableEntry()
+    {
+        var routes = Dlss5RouteCatalog.Build(Assess(Dlss5DeploymentMode.NativeDirectX12, true),
+            Dlss5InstallProfile.MaximumQuality,
+            installedProfile: Dlss5InstallProfile.MaximumQuality,
+            deepFriedChickenAvailable: true,
+            installedDeepFriedChicken: true);
+
+        // Both entries carry the MaximumQuality profile; only the DFC one is "active", and exactly one
+        // route in the whole list claims the installed marker.
+        var dfc = routes.Single(r => r.DeepFriedChicken);
+        var plain = routes.Single(r => r.Profile == Dlss5InstallProfile.MaximumQuality && !r.DeepFriedChicken);
+        Assert.True(dfc.Installed);
+        Assert.False(plain.Installed);
+        Assert.Single(routes.Where(r => r.Installed));
     }
 }

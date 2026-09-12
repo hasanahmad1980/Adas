@@ -56,6 +56,7 @@ public partial class GameSetupView : UserControl
         ChoosePacksButton.Click += OnChoosePacks;
         ChangeFolderButton.Click += OnChangeFolder;
         ResetFolderButton.Click += OnResetFolder;
+        ImportDfcButton.Click += OnImportDeepFriedChicken;
 
         DataContextChanged += (_, _) => _ = RefreshAssessmentAsync();
     }
@@ -112,7 +113,10 @@ public partial class GameSetupView : UserControl
                 var seed = installed?.Mode == assessment.Mode ? installed.Profile : Dlss5InstallProfile.MaximumQuality;
                 var pick = Dlss5RouteCatalog.Recommend(assessment, seed);
 
-                routes = Dlss5RouteCatalog.Build(assessment, pick, installed?.Profile);
+                var dfc = AppServices.Services.GetService<DeepFriedChickenService>();
+                routes = Dlss5RouteCatalog.Build(assessment, pick, installed?.Profile,
+                    deepFriedChickenAvailable: dfc?.IsImported == true,
+                    installedDeepFriedChicken: installed?.DeepFriedChicken == true);
                 recommended = routes.FirstOrDefault(r => r.Installed)
                               ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported)
                               ?? routes.FirstOrDefault(r => r.Recommended);
@@ -185,7 +189,8 @@ public partial class GameSetupView : UserControl
 
         try
         {
-            var outcome = await Dlss5Installer.InstallAsync(Main, owner, card, route.Profile, progress);
+            var outcome = await Dlss5Installer.InstallAsync(Main, owner, card, route.Profile, progress,
+                deepFriedChicken: route.DeepFriedChicken);
             InstallResult.Text = outcome.Message;
             InstallResult.IsVisible = true;
             if (outcome.Ran)
@@ -324,6 +329,8 @@ public partial class GameSetupView : UserControl
 
             var folder = Main.GetFolderOverride(card.GameName, store);
             FolderText.Text = string.IsNullOrWhiteSpace(folder) ? "Using detected folder." : folder;
+
+            UpdateDfcStatus();
         }
         finally { _populatingOverrides = false; }
     }
@@ -453,6 +460,103 @@ public partial class GameSetupView : UserControl
         FolderText.Text = "Using detected folder.";
         card.NotifyAll();
         await RefreshAssessmentAsync();
+    }
+
+    /// <summary>Reflects whether a valid Deep Fried Chicken release is cached, and its version.</summary>
+    private void UpdateDfcStatus()
+    {
+        var dfc = AppServices.Services.GetService<DeepFriedChickenService>();
+        if (dfc?.IsImported == true)
+        {
+            var version = dfc.ImportedVersion;
+            DfcStatusText.Text = string.IsNullOrWhiteSpace(version)
+                ? "Imported — available as a route above."
+                : $"Imported {version} — available as a route above.";
+        }
+        else
+        {
+            DfcStatusText.Text = "Not imported.";
+        }
+    }
+
+    /// <summary>
+    /// Imports the user-supplied Deep Fried Chicken release. Its licence forbids redistribution, so Adas
+    /// never bundles it. First tries the author's release sitting in Downloads (or Downloads\DLSS5); if
+    /// none is found, prompts for the .zip or the folder the user extracted the release into. On success
+    /// the DFC route unlocks in the list above.
+    /// </summary>
+    private async void OnImportDeepFriedChicken(object? sender, RoutedEventArgs e)
+    {
+        var dfc = AppServices.Services.GetService<DeepFriedChickenService>();
+        if (dfc is null) { DfcStatusText.Text = "Deep Fried Chicken service unavailable."; return; }
+
+        ImportDfcButton.IsEnabled = false;
+        try
+        {
+            DfcStatusText.Text = "Looking in Downloads…";
+            if (await dfc.EnsureImportedFromDefaultLocationsAsync() && dfc.IsImported)
+            {
+                UpdateDfcStatus();
+                await RefreshAssessmentAsync();
+                return;
+            }
+
+            var owner = this.FindAncestorOfType<Window>();
+            if (owner?.StorageProvider is not { } sp)
+            {
+                DfcStatusText.Text = "Could not open a file picker.";
+                return;
+            }
+
+            // Prefer a file picker for the official .zip; if the user cancels it, offer a folder picker for
+            // an already-extracted release (the 1.7.x password-protected .7z workflow).
+            var files = await sp.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+            {
+                Title = "Select the Deep Fried Chicken release (.zip)",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new Avalonia.Platform.Storage.FilePickerFileType("Deep Fried Chicken release")
+                    { Patterns = new[] { "*.zip" } },
+                },
+            });
+            string? source = files.Count > 0 ? files[0].Path.LocalPath : null;
+
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+                {
+                    Title = "…or select the extracted Deep Fried Chicken folder",
+                    AllowMultiple = false,
+                });
+                source = folders.Count > 0 ? folders[0].Path.LocalPath : null;
+            }
+
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                UpdateDfcStatus();
+                return;
+            }
+
+            DfcStatusText.Text = "Verifying and importing…";
+            var error = await dfc.ImportAsync(source);
+            if (error != null)
+            {
+                DfcStatusText.Text = "Import failed: " + error;
+                return;
+            }
+
+            UpdateDfcStatus();
+            await RefreshAssessmentAsync();
+        }
+        catch (Exception ex)
+        {
+            DfcStatusText.Text = "Import failed: " + ex.Message;
+        }
+        finally
+        {
+            ImportDfcButton.IsEnabled = true;
+        }
     }
 
     /// <summary>

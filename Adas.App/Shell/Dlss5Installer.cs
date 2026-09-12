@@ -25,7 +25,8 @@ public static class Dlss5Installer
         Window owner,
         GameCardViewModel card,
         Dlss5InstallProfile profile,
-        IProgress<(string message, double percent)> progress)
+        IProgress<(string message, double percent)> progress,
+        bool deepFriedChicken = false)
     {
         var services = AppServices.Services;
         var compat = services.GetService<Dlss5CompatibilityService>();
@@ -101,7 +102,7 @@ public static class Dlss5Installer
                 store: card.Source,
                 profile: profile,
                 cleanupApproval: cleanup,
-                overrides: null));
+                overrides: deepFriedChicken ? new Dlss5ManualOverrides(DeepFriedChicken: true) : null));
 
             var text = result.Message;
             if (result.Warnings.Count > 0)
