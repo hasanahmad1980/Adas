@@ -1160,6 +1160,10 @@ public partial class MainViewModel
             // deploy path, depending on the route.
             if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
             {
+                // A present game can always be set up for DLSS 5, so surface "Available" as the
+                // default; a found record promotes it to "Installed" below. This drives the primary
+                // library chip, so it stays a call-to-action instead of a dull "Not installed".
+                newCard.Dlss5Status = GameStatus.Available;
                 try
                 {
                     var dlss5Rec = Dlss5ComponentService.LoadRecord(installPath)
