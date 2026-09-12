@@ -20,7 +20,7 @@ public class LumaService : ILumaService
     // we scrape), Adas pins the generic Unreal Engine framework zip to one verified build and
     // caps the "update available" check at it. Bump this deliberately after verifying a newer
     // build. NOTE: named per-game Luma mods come from the live wiki and are NOT pinned by this.
-    public const int LumaPinnedBuild = 648;
+    public const int LumaPinnedBuild = 649;
 
     /// <summary>The pinned release tag, e.g. "latest-648".</summary>
     public static string LumaPinnedTag => $"latest-{LumaPinnedBuild}";

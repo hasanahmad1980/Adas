@@ -6,6 +6,7 @@
 - **Hide games from the list.** Right-click a library card → **Hide/Show**, plus a header **Hidden** toggle to reveal what you've hidden.
 - **Resizable, remembered panes.** The library/detail split grows equally and can be dragged to a custom ratio that persists across launches; long text in the detail pane wraps instead of clipping.
 - **NeuralScreen** re-pinned **1.7.0 → 1.8.0** (runtime-fetched, SHA-256 re-verified against the author's release). Upstream adds experimental HDR support, off until enabled in its settings.
+- **Luma-Framework** generic-UE build re-pinned **648 → 649**.
 - Everything else remains current (AIO 2.2.4, OneClick 0.13.14, multipass 0.7.7, Feeder 0.15.1, OptiScaler NR 0.2.0 / NR-before-SR 0.1.2, DLSS5 Bridge 1.4.12, Neural Upstream 0.3.0); MFG Ada Unlock / RTXMFG / OptiScaler mainline / DXVK / dgVoodoo2 fetch the latest release at run time.
 
 ## v2.6.56 — DLSS 5 setup: Remove/Repair, route-aware driver pre-flight, safer Extras (2026-09-11)
