@@ -85,7 +85,7 @@ public sealed partial class Dlss5ComponentService
         var aio = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (hasAio)
         {
-            var ini = IniTextDocument.Load(Path.Combine(root, "ReShade.ini"));
+            var ini = IniTextDocument.Load(AioSettingsIniPath(root));
             foreach (var (key, fallback) in AioDefaults)
                 aio[key] = ini.TryGetValue(AioSection, key, out var value) ? value.Text.Trim() : fallback;
         }
@@ -215,7 +215,22 @@ public sealed partial class Dlss5ComponentService
         var writes = new List<(string Path, string Note)>();
         void Add(string path, string note) => writes.Add((path, note));
 
-        if (profile == Dlss5InstallProfile.StandaloneAio)
+        if (profile == Dlss5InstallProfile.StandaloneAio && !is64Bit)
+        {
+            var host = Path.Combine(root, AioHostFolder);
+            Add(Path.Combine(root, AioProxyName(mode)), "ReShade 6.8 (32-bit)");
+            Add(Path.Combine(root, AioX86Addon), $"Standalone AIO {AioVersion} 32-bit add-on");
+            Add(Path.Combine(root, AioX86Config), "32-bit AIO settings");
+            Add(Path.Combine(shaders, "DLSS5_Feed.fx"), "32-bit feed shaders");
+            Add(Path.Combine(host, "AIO DLSS5 32-bit Wrapper.exe"), "64-bit AIO carrier");
+            Add(Path.Combine(host, "dxgi.dll"), "ReShade 6.8 (64-bit, for the carrier)");
+            Add(Path.Combine(host, AioAddon), "AIO add-on (64-bit)");
+            Add(Path.Combine(host, "nvngx.dll"), "AIO caller");
+            foreach (var runtime in new[] { "nvngx_dlssnr.dll", "nvngx_dlss.dll", "nvngx_dlssg.dll" })
+                if (!File.Exists(Path.Combine(host, runtime))) Add(Path.Combine(host, runtime), "NVIDIA runtime (only if missing)");
+            Add(Path.Combine(host, "ReShade.ini"), "carrier settings");
+        }
+        else if (profile == Dlss5InstallProfile.StandaloneAio)
         {
             if (!IsAioVulkan(mode)) Add(Path.Combine(root, AioProxyName(mode)), "ReShade 6.8");
             Add(Path.Combine(addonRoot, AioAddon), $"Standalone AIO {AioVersion}");

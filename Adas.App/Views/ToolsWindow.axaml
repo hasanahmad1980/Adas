@@ -24,10 +24,13 @@
                 <StackPanel Spacing="10">
                     <TextBlock Text="Universal MFG unlock" Classes="h2" />
                     <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="Install the RTX 40-series Multi-Frame-Generation unlock (dxgi.dll proxy) into the game selected in the library. Select an RTX 40 game first." />
-                    <TextBlock x:Name="MfgTarget" Classes="muted" />
-                    <Button x:Name="MfgButton" Classes="subtle" Content="Install MFG unlock into selected game"
-                            HorizontalAlignment="Left" />
+                               Text="Unlocks DLSS Multi Frame Generation on RTX 40 cards for games that ship their own DLSS Frame Generation. Adas places it beside the game exe under a DLL name the exe imports and nothing else uses, so it never overwrites the game's or another mod's files. In game, press Backspace for the menu." />
+                    <TextBlock x:Name="MfgTarget" Classes="muted" TextWrapping="Wrap" />
+                    <TextBlock x:Name="MfgPlan" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="MfgButton" Classes="subtle" Content="Install MFG unlock into selected game" />
+                        <Button x:Name="MfgRemoveButton" Classes="subtle" Content="Remove" IsVisible="False" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

@@ -307,6 +307,11 @@ internal static partial class Dlss5DiagnosticService
 
     private static void VerifyAioFiles(string root, Dlss5DeploymentMode mode, bool is64Bit, Dlss5InstallRecord record, ICollection<string> problems)
     {
+        if (!is64Bit || Dlss5ComponentService.IsAioX86Install(root))
+        {
+            VerifyAioX86Files(root, mode, record, problems);
+            return;
+        }
         if (!Dlss5ComponentService.SupportsAio(mode, is64Bit))
             problems.Add("AIO requires a supported 64-bit renderer. Use the recommended setup for this game.");
         if (Dlss5ComponentService.IsAioVulkan(mode) && !VulkanLayerService.IsLayerInstalled())
@@ -335,5 +340,41 @@ internal static partial class Dlss5DiagnosticService
         var vort = Path.Combine(root, "reshade-shaders", "Shaders", "VortShaders");
         if (!Directory.Exists(vort) || !Directory.EnumerateFiles(vort, "*.fx", SearchOption.AllDirectories).Any())
             problems.Add("The AIO VORT motion provider is missing. Run Repair.");
+    }
+
+    private static void VerifyAioX86Files(string root, Dlss5DeploymentMode mode, Dlss5InstallRecord record, ICollection<string> problems)
+    {
+        if (!Dlss5ComponentService.SupportsAio(mode, false))
+            problems.Add("32-bit AIO supports only DirectX 9 and DirectX 11 games. Use the recommended setup for this game.");
+        var host = Path.Combine(root, Dlss5ComponentService.AioHostFolder);
+        var gameSide = new[]
+        {
+            Path.Combine(root, Dlss5ComponentService.AioX86Addon),
+            Path.Combine(root, Dlss5ComponentService.AioProxyName(mode)),
+            Path.Combine(root, "reshade-shaders", "Shaders", "ReShade.fxh"),
+        };
+        var hostSide = new[]
+        {
+            Path.Combine(host, "AIO DLSS5 32-bit Wrapper.exe"), Path.Combine(host, Dlss5ComponentService.AioAddon),
+            Path.Combine(host, "nvngx.dll"), Path.Combine(host, "dxgi.dll"),
+            Path.Combine(host, "nvngx_dlssnr.dll"), Path.Combine(host, "nvngx_dlss.dll"),
+        };
+        foreach (var path in gameSide.Concat(hostSide).Concat(record.InstalledHashes.Keys).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(path)) { problems.Add($"AIO file missing: {Path.GetRelativePath(root, path)}. Run Repair."); continue; }
+            if (!path.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) && !path.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase)
+                && record.InstalledHashes.TryGetValue(path, out var hash) && !FileHelper.ComputeSha256(path).Equals(hash, StringComparison.OrdinalIgnoreCase))
+                problems.Add($"AIO managed file changed: {Path.GetRelativePath(root, path)}. Review it before Repair.");
+            if (path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".addon64", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".addon32", StringComparison.OrdinalIgnoreCase))
+            {
+                var inHost = Dlss5ComponentService.IsPathBelow(host, Path.GetFullPath(path));
+                if (!AddonPackService.IsAddonArchitectureCompatible(path, is32Bit: !inHost))
+                    problems.Add($"Wrong architecture: {Path.GetRelativePath(root, path)}. "
+                        + (inHost ? "Files in host64 must be 64-bit." : "Files beside the 32-bit game must be 32-bit."));
+            }
+        }
+        if (mode == Dlss5DeploymentMode.Dx9Feeder && File.Exists(Path.Combine(root, "dxgi.dll")))
+            problems.Add("A dxgi.dll sits beside this D3D9 game. The 32-bit AIO bridge needs Windows' real DXGI; remove it.");
     }
 }

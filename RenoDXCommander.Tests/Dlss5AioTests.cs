@@ -15,10 +15,34 @@ public sealed class Dlss5AioTests
     [InlineData(Dlss5DeploymentMode.Dx10ViaDxvkFeeder, false)]
     [InlineData(Dlss5DeploymentMode.Dx10Feeder, false)]
     [InlineData(Dlss5DeploymentMode.None, false)]
-    public void EligibilityNeverRoutes32BitGamesIntoAio(Dlss5DeploymentMode mode, bool supported)
+    public void EligibilityRoutes64BitRenderers(Dlss5DeploymentMode mode, bool supported)
+        => Assert.Equal(supported, Dlss5ComponentService.SupportsAio(mode, true));
+
+    [Theory]
+    [InlineData(Dlss5DeploymentMode.Dx9Feeder, true)]
+    [InlineData(Dlss5DeploymentMode.Dx11Feeder, true)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX11, true)]
+    [InlineData(Dlss5DeploymentMode.NativeDirectX12, false)]
+    [InlineData(Dlss5DeploymentMode.NativeVulkan, false)]
+    [InlineData(Dlss5DeploymentMode.OpenGlFeeder, false)]
+    [InlineData(Dlss5DeploymentMode.Dx8Feeder, false)]
+    public void ThirtyTwoBitAioOnlyCoversD3D9AndD3D11(Dlss5DeploymentMode mode, bool supported)
+        => Assert.Equal(supported, Dlss5ComponentService.SupportsAio(mode, false));
+
+    [Fact]
+    public void ThirtyTwoBitAioSettingsLiveInTheHostCarrier()
     {
-        Assert.Equal(supported, Dlss5ComponentService.SupportsAio(mode, true));
-        Assert.False(Dlss5ComponentService.SupportsAio(mode, false));
+        var root = Directory.CreateTempSubdirectory("adas-aio-x86-").FullName;
+        try
+        {
+            Assert.Equal(Path.Combine(root, "ReShade.ini"), Dlss5ComponentService.AioSettingsIniPath(root));
+            File.WriteAllText(Path.Combine(root, Dlss5ComponentService.AioX86Addon), "x");
+            Assert.Equal(Path.Combine(root, "host64", "ReShade.ini"), Dlss5ComponentService.AioSettingsIniPath(root));
+            File.WriteAllText(Path.Combine(root, "dxgi.dll"), "other wrapper");
+            Assert.Throws<InvalidOperationException>(() => Dlss5ComponentService.ValidateAioX86Conflicts(root, Dlss5DeploymentMode.Dx9Feeder, null));
+            Dlss5ComponentService.ValidateAioX86Conflicts(root, Dlss5DeploymentMode.Dx11Feeder, null);
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     [Fact]

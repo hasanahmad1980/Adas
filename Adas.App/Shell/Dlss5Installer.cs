@@ -38,6 +38,7 @@ public static class Dlss5Installer
         IProgress<(string message, double percent)> progress,
         bool deepFriedChicken = false,
         bool forceProfile = false,
+        bool bridgeSubstitute = false,
         string? deploymentPath = null,
         bool risksConfirmed = false)
     {
@@ -55,6 +56,7 @@ public static class Dlss5Installer
                 if (!string.IsNullOrWhiteSpace(deploymentPath))
                     assessed = Dlss5CompatibilityService.ConfirmDeploymentPath(assessed, deploymentPath);
                 var (cleared, risks) = Dlss5CompatibilityService.AcceptRisks(assessed);
+                if (bridgeSubstitute) cleared = Dlss5ComponentService.ApplyBridgeSubstitute(cleared);
                 return (probed, cleared, risks);
             });
 
@@ -142,7 +144,7 @@ public static class Dlss5Installer
         var (feederTag, motionProvider) = Dlss5GamePreferences.ResolveInstallChoices(
             Dlss5GamePreferences.Get(card.GameName, card.Source), assessment.Mode);
         var overrides = new Dlss5ManualOverrides(DeepFriedChicken: deepFriedChicken, ForceProfile: forceProfile,
-            FeederReleaseTag: feederTag, MotionProvider: motionProvider);
+            FeederReleaseTag: feederTag, MotionProvider: motionProvider, BridgeSubstitute: bridgeSubstitute);
         var channel = main.ResolveReShadeChannel(card.GameName, card.Source ?? "");
         var removedPrevious = false;
         for (var attempt = 0; ; attempt++)

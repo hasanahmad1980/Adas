@@ -776,6 +776,63 @@ public static class GraphicsApiDetector
     }
 
     /// <summary>
+    /// Lists every DLL name the PE imports (static and delay-load), lowercased. Empty when the file
+    /// can't be parsed. Used to pick a proxy filename the executable actually loads.
+    /// </summary>
+    public static HashSet<string> ReadImportedDllNames(string exePath)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var stream = new FileStream(exePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var header = new byte[HeaderBufferSize];
+            int headerRead = stream.Read(header, 0, header.Length);
+            if (headerRead < 0x40 || header[0] != (byte)'M' || header[1] != (byte)'Z') return names;
+            int peOffset = BitConverter.ToInt32(header, 0x3C);
+            if (peOffset < 0 || peOffset + 24 > headerRead || header[peOffset] != (byte)'P' || header[peOffset + 1] != (byte)'E') return names;
+            int coffOffset = peOffset + 4;
+            int numberOfSections = BitConverter.ToUInt16(header, coffOffset + 2);
+            int sizeOfOptionalHeader = BitConverter.ToUInt16(header, coffOffset + 16);
+            int optionalHeaderOffset = coffOffset + 20;
+            if (optionalHeaderOffset + sizeOfOptionalHeader > headerRead) return names;
+            ushort magic = BitConverter.ToUInt16(header, optionalHeaderOffset);
+            int importDirOffset = magic == 0x10B ? optionalHeaderOffset + 104 : magic == 0x20B ? optionalHeaderOffset + 120 : -1;
+            int delayDirOffset = magic == 0x10B ? optionalHeaderOffset + 200 : optionalHeaderOffset + 216;
+            if (importDirOffset < 0 || importDirOffset + 8 > headerRead) return names;
+
+            int sectionTableOffset = optionalHeaderOffset + sizeOfOptionalHeader;
+            var sections = new List<(uint va, uint vsize, uint rawPtr)>();
+            for (int i = 0; i < numberOfSections; i++)
+            {
+                int secOff = sectionTableOffset + (i * 40);
+                if (secOff + 40 > headerRead) break;
+                sections.Add((BitConverter.ToUInt32(header, secOff + 12), BitConverter.ToUInt32(header, secOff + 8), BitConverter.ToUInt32(header, secOff + 20)));
+            }
+
+            void Walk(uint dirRva, int entrySize, int nameOffset)
+            {
+                if (dirRva == 0) return;
+                long fileOffset = RvaToFileOffset(sections, dirRva);
+                if (fileOffset < 0) return;
+                stream.Seek(fileOffset, SeekOrigin.Begin);
+                var buf = new byte[ImportReadSize];
+                int read = stream.Read(buf, 0, buf.Length);
+                for (int i = 0; (i + 1) * entrySize <= read; i++)
+                {
+                    uint nameRva = BitConverter.ToUInt32(buf, i * entrySize + nameOffset);
+                    if (nameRva == 0) break;
+                    if (ReadDllName(stream, sections, nameRva) is { Length: > 0 } dll) names.Add(dll.ToLowerInvariant());
+                }
+            }
+
+            Walk(BitConverter.ToUInt32(header, importDirOffset), 20, 12);
+            if (delayDirOffset + 4 <= headerRead) Walk(BitConverter.ToUInt32(header, delayDirOffset), 32, 4);
+        }
+        catch (Exception ex) { CrashReporter.Log($"[GraphicsApiDetector] ReadImportedDllNames failed for '{exePath}': {ex.Message}"); }
+        return names;
+    }
+
+    /// <summary>
     /// Reads a null-terminated DLL name from the file at the given RVA.
     /// </summary>
     private static string? ReadDllName(FileStream stream, List<(uint va, uint vsize, uint rawPtr)> sections, uint nameRva)

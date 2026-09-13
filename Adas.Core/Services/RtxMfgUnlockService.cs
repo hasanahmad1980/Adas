@@ -37,7 +37,112 @@ public sealed class RtxMfgUnlockService
         "d3d9.dll", "d3d10.dll", "d3d11.dll", "d3d12.dll",
         "dsound.dll", "wininet.dll", "winhttp.dll",
         "xinput1_3.dll", "xinput1_4.dll", "xinput9_1_0.dll",
+        "xinput1_1.dll", "xinput1_2.dll", "xinputuap.dll", "binkw64.dll", "bink2w64.dll",
     };
+
+    /// <summary>
+    /// Autopilot preference order: names that rarely collide with ReShade/OptiScaler/Special K come first;
+    /// graphics-API names are only used when nothing else the game imports is free.
+    /// </summary>
+    internal static readonly string[] ProxyPreference =
+    {
+        "version.dll", "winmm.dll", "dinput8.dll",
+        "xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll", "xinput1_2.dll", "xinput1_1.dll", "xinputuap.dll",
+        "dsound.dll", "winhttp.dll", "wininet.dll",
+        "d3d12.dll", "d3d11.dll", "d3d10.dll", "d3d9.dll", "dxgi.dll",
+    };
+
+    /// <summary>The game-shipped frame-generation runtimes RTXMFG needs (it unlocks MFG on top of them).</summary>
+    internal static readonly string[] GameFrameGenerationFiles = { "nvngx_dlssg.dll", "sl.dlss_g.dll" };
+
+    /// <summary>Where and under what name Autopilot would place RTXMFG for a game, plus any warnings.</summary>
+    public sealed record MfgPlacement(
+        string? TargetFolder,
+        string? ProxyFilename,
+        string? FrameGenerationFile,
+        bool ProxyImportedByExe,
+        IReadOnlyList<string> Warnings);
+
+    /// <summary>
+    /// Plans an RTXMFG placement: finds the game exe folder, checks the game ships DLSS frame generation and an
+    /// RTX 40 GPU is present, and picks a proxy name the exe imports that no other file already occupies.
+    /// Warnings never block — the caller shows them and lets the user continue.
+    /// </summary>
+    public static MfgPlacement PlanPlacement(string installPath, string? exePath, string? gpuName)
+    {
+        var warnings = new List<string>();
+        var exeKnown = !string.IsNullOrEmpty(exePath) && File.Exists(exePath);
+        var exeDir = exeKnown ? Path.GetDirectoryName(exePath) : null;
+        exeDir ??= Directory.Exists(installPath) ? installPath : null;
+        if (exeDir is null)
+            return new MfgPlacement(null, null, null, false, new[] { "The game folder could not be found." });
+        if (!exeKnown)
+            warnings.Add("The game executable wasn't identified; RTXMFG will go in the install folder, which may not be where the game loads DLLs from.");
+
+        var fg = FindGameFrameGeneration(installPath, exeDir);
+        if (fg is null)
+            warnings.Add("This game doesn't ship DLSS Frame Generation (nvngx_dlssg.dll / sl.dlss_g.dll). RTXMFG only unlocks multi-frame generation on top of the game's own FG, so it will likely do nothing.");
+        if (!Dlss5CompatibilityService.IsAdaGpu(gpuName))
+            warnings.Add(string.IsNullOrWhiteSpace(gpuName)
+                ? "No RTX 40-series GPU was detected. RTXMFG targets RTX 40 cards (RTX 30 is experimental)."
+                : $"Detected GPU '{gpuName}' is not RTX 40-series. RTXMFG targets RTX 40 cards (RTX 30 is experimental).");
+
+        var imports = exeKnown
+            ? GraphicsApiDetector.ReadImportedDllNames(exePath!)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var (name, imported) = ChooseProxyFilename(exeDir, imports);
+        if (name is null)
+            warnings.Add("Every supported proxy filename is already used by the game or another mod; RTXMFG can't be placed without overwriting something.");
+        else if (!imported)
+            warnings.Add($"The game exe doesn't import any free supported DLL name, so RTXMFG will use {name}, which the game may only load indirectly. If the Backspace menu never appears, it isn't loading.");
+
+        return new MfgPlacement(exeDir, name, fg, imported, warnings);
+    }
+
+    /// <summary>
+    /// Picks the first preferred proxy name the exe imports whose file isn't already present (or is our own
+    /// earlier RTXMFG copy). Falls back to a free non-imported name (version.dll first).
+    /// </summary>
+    internal static (string? name, bool imported) ChooseProxyFilename(string exeDir, ISet<string> imports)
+    {
+        var ours = ReadMarkerProxy(exeDir);
+        bool Free(string n) => !File.Exists(Path.Combine(exeDir, n)) || string.Equals(n, ours, StringComparison.OrdinalIgnoreCase);
+        foreach (var n in ProxyPreference)
+            if (imports.Contains(n) && Free(n)) return (n, true);
+        foreach (var n in ProxyPreference)
+            if (Free(n)) return (n, false);
+        return (null, false);
+    }
+
+    internal static string? FindGameFrameGeneration(string installPath, string exeDir)
+    {
+        var sep = Path.DirectorySeparatorChar;
+        foreach (var dir in new[] { exeDir, installPath }.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(dir, "*.dll", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 6, IgnoreInaccessible = true }))
+                    if (GameFrameGenerationFiles.Contains(Path.GetFileName(file), StringComparer.OrdinalIgnoreCase)
+                        && !file.Contains($"{sep}.adas{sep}", StringComparison.OrdinalIgnoreCase))
+                        return file;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private static string? ReadMarkerProxy(string folder)
+    {
+        try
+        {
+            var path = Path.Combine(folder, MarkerRelativePath);
+            return File.Exists(path) ? JsonSerializer.Deserialize<RtxMfgInstallRecord>(File.ReadAllText(path))?.ProxyFilename : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>The proxy filename RTXMFG is installed under in this folder, or null.</summary>
+    public static string? InstalledProxyFilename(string gameFolder) => ReadMarkerProxy(gameFolder);
 
     public const string DefaultProxyFilename = "dxgi.dll";
 
@@ -77,7 +182,7 @@ public sealed class RtxMfgUnlockService
         Directory.CreateDirectory(_stagingDir);
         progress?.Report(("Resolving RTX40MFG-Unlock release…", 10));
 
-        var (version, downloadUrl) = await FetchLatestReleaseAsync(cancellationToken).ConfigureAwait(false);
+        var (version, downloadUrl, sha256) = await FetchLatestReleaseAsync(cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(version) || string.IsNullOrEmpty(downloadUrl))
         {
             _crashReporter.Log("[RtxMfgUnlockService.EnsureStagingAsync] Could not resolve latest release");
@@ -92,6 +197,8 @@ public sealed class RtxMfgUnlockService
         try
         {
             var bytes = await _http.GetByteArrayAsync(downloadUrl, cancellationToken).ConfigureAwait(false);
+            if (sha256 is not null && !string.Equals(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), sha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The RTXMFG download didn't match the checksum GitHub published; it was discarded.");
             await File.WriteAllBytesAsync(archive, bytes, cancellationToken).ConfigureAwait(false);
 
             var stagedDll = Path.Combine(_stagingDir, DllName);
@@ -226,7 +333,7 @@ public sealed class RtxMfgUnlockService
         entry.ExtractToFile(destPath, overwrite: true);
     }
 
-    private async Task<(string? version, string? downloadUrl)> FetchLatestReleaseAsync(CancellationToken cancellationToken)
+    private async Task<(string? version, string? downloadUrl, string? sha256)> FetchLatestReleaseAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -237,18 +344,19 @@ public sealed class RtxMfgUnlockService
                 _crashReporter.Log(_etagCache.IsRateLimited
                     ? "[RtxMfgUnlockService] GitHub API rate limited — could not fetch the latest RTXMFG release."
                     : "[RtxMfgUnlockService] GitHub API returned no release data.");
-                return (null, null);
+                return (null, null, null);
             }
 
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            if (!root.TryGetProperty("tag_name", out var tagEl)) return (null, null);
+            if (!root.TryGetProperty("tag_name", out var tagEl)) return (null, null, null);
             var tag = tagEl.GetString();
-            if (string.IsNullOrEmpty(tag)) return (null, null);
+            if (string.IsNullOrEmpty(tag)) return (null, null, null);
             var version = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag[1..] : tag;
 
             string? downloadUrl = null;
+            string? sha256 = null;
             if (root.TryGetProperty("assets", out var assets))
             {
                 foreach (var asset in assets.EnumerateArray())
@@ -262,17 +370,18 @@ public sealed class RtxMfgUnlockService
                         && asset.TryGetProperty("browser_download_url", out var urlEl))
                     {
                         downloadUrl = urlEl.GetString();
+                        sha256 = UpdateService.ParseDigest(asset.TryGetProperty("digest", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null);
                         break;
                     }
                 }
             }
 
-            return (version, downloadUrl);
+            return (version, downloadUrl, sha256);
         }
         catch (Exception ex)
         {
             _crashReporter.Log($"[RtxMfgUnlockService] FetchLatestRelease failed — {ex.Message}");
-            return (null, null);
+            return (null, null, null);
         }
     }
 

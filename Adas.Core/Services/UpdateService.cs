@@ -52,7 +52,7 @@ public class UpdateService : IUpdateService
             // interface compatibility but there is no separate Adas beta feed to query.)
             _ = betaOptIn;
             var stable = await FetchReleaseAsync(LatestReleaseApiUrl).ConfigureAwait(false);
-            (RdxcVersion version, string downloadUrl)? beta = null;
+            (RdxcVersion version, string downloadUrl, string? sha256)? beta = null;
 
             // Build the current version as an RdxcVersion for the resolver
             var current = CurrentVersion;
@@ -73,10 +73,11 @@ public class UpdateService : IUpdateService
 
             // Determine the download URL from the winning source
             string? winnerDownloadUrl = null;
+            string? winnerSha = null;
             if (stable.HasValue && winner.Value == stable.Value.version)
-                winnerDownloadUrl = stable.Value.downloadUrl;
+                (winnerDownloadUrl, winnerSha) = (stable.Value.downloadUrl, stable.Value.sha256);
             else if (beta.HasValue && winner.Value == beta.Value.version)
-                winnerDownloadUrl = beta.Value.downloadUrl;
+                (winnerDownloadUrl, winnerSha) = (beta.Value.downloadUrl, beta.Value.sha256);
 
             if (string.IsNullOrEmpty(winnerDownloadUrl))
             {
@@ -94,6 +95,7 @@ public class UpdateService : IUpdateService
                 RemoteVersion  = rmt,
                 DownloadUrl    = winnerDownloadUrl,
                 DisplayVersion = winner.Value.ToDisplayString(),
+                ExpectedSha256 = winnerSha,
             };
         }
         catch (Exception ex)
@@ -108,7 +110,7 @@ public class UpdateService : IUpdateService
     /// Fetches a single GitHub release endpoint, parses the version with <see cref="RdxcVersion.TryParse"/>,
     /// and extracts the installer download URL. Returns null if the endpoint fails or the version cannot be parsed.
     /// </summary>
-    private async Task<(RdxcVersion version, string downloadUrl)?> FetchReleaseAsync(string apiUrl)
+    private async Task<(RdxcVersion version, string downloadUrl, string? sha256)?> FetchReleaseAsync(string apiUrl)
     {
         var json = await _etagCache.GetWithETagAsync(_http, apiUrl, $"Adas/{CurrentVersion}").ConfigureAwait(false);
         if (json == null)
@@ -133,8 +135,17 @@ public class UpdateService : IUpdateService
 
         // Find the installer asset download URL (Adas-Setup.exe).
         string? downloadUrl = null;
+        string? sha256 = null;
+        string? sumsUrl = null;
         if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
         {
+            foreach (var asset in assets.EnumerateArray())
+            {
+                var assetName = asset.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (string.Equals(assetName, "SHA256SUMS.txt", StringComparison.OrdinalIgnoreCase)
+                    && asset.TryGetProperty("browser_download_url", out var su))
+                    sumsUrl = su.GetString();
+            }
             foreach (var installerName in InstallerFileNames)
             {
                 foreach (var asset in assets.EnumerateArray())
@@ -144,6 +155,7 @@ public class UpdateService : IUpdateService
                     {
                         downloadUrl = asset.TryGetProperty("browser_download_url", out var url)
                             ? url.GetString() : null;
+                        sha256 = ParseDigest(asset.TryGetProperty("digest", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null);
                         break;
                     }
                 }
@@ -157,7 +169,46 @@ public class UpdateService : IUpdateService
             return null;
         }
 
-        return (version, downloadUrl);
+        // Fall back to a SHA256SUMS.txt asset when GitHub didn't expose a digest.
+        if (sha256 is null && sumsUrl is not null)
+        {
+            try
+            {
+                var sums = await _http.GetStringAsync(sumsUrl).ConfigureAwait(false);
+                sha256 = FindSumFor(sums, Path.GetFileName(new Uri(downloadUrl).LocalPath));
+            }
+            catch (Exception ex) { CrashReporter.Log($"[UpdateService.FetchReleaseAsync] SHA256SUMS fetch failed — {ex.Message}"); }
+        }
+
+        return (version, downloadUrl, sha256);
+    }
+
+    /// <summary>Parses a GitHub asset digest ("sha256:hex") into lowercase hex, or null.</summary>
+    internal static string? ParseDigest(string? digest)
+    {
+        if (string.IsNullOrWhiteSpace(digest)) return null;
+        var m = Regex.Match(digest.Trim(), "^sha256:([0-9a-fA-F]{64})$");
+        return m.Success ? m.Groups[1].Value.ToLowerInvariant() : null;
+    }
+
+    /// <summary>Finds the hash for <paramref name="fileName"/> in sha256sum-style text ("hex  name" or "hex *name").</summary>
+    internal static string? FindSumFor(string sums, string fileName)
+    {
+        foreach (var line in sums.Split((char)10))
+        {
+            var m = Regex.Match(line.Trim(), @"^([0-9a-fA-F]{64})\s+\*?(.+)$");
+            if (m.Success && string.Equals(m.Groups[2].Value.Trim(), fileName, StringComparison.OrdinalIgnoreCase))
+                return m.Groups[1].Value.ToLowerInvariant();
+        }
+        return null;
+    }
+
+    /// <summary>True when the file's SHA-256 matches <paramref name="expected"/> (hex, any case).</summary>
+    internal static bool FileMatchesSha256(string path, string expected)
+    {
+        using var stream = File.OpenRead(path);
+        var actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
+        return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -166,7 +217,8 @@ public class UpdateService : IUpdateService
     /// </summary>
     public async Task<string?> DownloadInstallerAsync(
         string downloadUrl,
-        IProgress<(string msg, double pct)>? progress = null)
+        IProgress<(string msg, double pct)>? progress = null,
+        string? expectedSha256 = null)
     {
         try
         {
@@ -204,6 +256,21 @@ public class UpdateService : IUpdateService
                     progress?.Report(($"Downloading update... {pct:F0}%", pct));
                 }
             }
+
+            await fileStream.DisposeAsync().ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(expectedSha256))
+            {
+                progress?.Report(("Verifying update checksum...", 100));
+                if (!FileMatchesSha256(tempPath, expectedSha256))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                    CrashReporter.Log($"[UpdateService.DownloadInstallerAsync] Checksum mismatch for {tempPath} — deleted");
+                    progress?.Report(("Update checksum did not match — the download was discarded.", 0));
+                    return null;
+                }
+            }
+            else
+                CrashReporter.Log("[UpdateService.DownloadInstallerAsync] Release published no checksum; installer not verified");
 
             progress?.Report(("Download complete.", 100));
             CrashReporter.Log($"[UpdateService.DownloadInstallerAsync] Downloaded installer to {tempPath} ({totalRead:N0} bytes)");
@@ -265,6 +332,8 @@ public class UpdateInfo
     public required Version RemoteVersion  { get; init; }
     public required string  DownloadUrl    { get; init; }
     public string? DisplayVersion { get; init; }
+    /// <summary>SHA-256 (lowercase hex) GitHub published for the installer asset, when available.</summary>
+    public string? ExpectedSha256 { get; init; }
 }
 
 /// <summary>

@@ -258,6 +258,19 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Ray reconstruction DLL update (only for games that ship nvngx_dlssd.dll) -->
+                <Border x:Name="RrCard" Classes="card" IsVisible="False">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Ray reconstruction" Classes="h2" />
+                        <TextBlock x:Name="RrText" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="RrUpdateButton" Classes="subtle" Content="Update ray reconstruction" IsVisible="False" />
+                            <Button x:Name="RrRestoreButton" Classes="subtle" Content="Restore original" IsVisible="False" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- Advanced per-game overrides -->
                 <Expander Header="Advanced options — most people can skip this" Classes="card">
                     <StackPanel Spacing="12" Margin="0,8,0,0">
@@ -330,6 +343,7 @@
                         <Button x:Name="DiagnoseButton" Classes="subtle"
                                 Content="Check if it's working" HorizontalAlignment="Left" />
                         <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap" />
+                        <StackPanel x:Name="AioFixPanel" Spacing="6" IsVisible="False" />
                     </StackPanel>
                 </Border>
 

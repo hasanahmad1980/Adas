@@ -1,3 +1,12 @@
+## v3.0.8 — MFG autopilot, ray reconstruction update, 32-bit AIO, Bridge substitute, AIO fixes, verified updates (2026-09-13)
+
+- **Universal MFG unlock picks its own spot.** Adas reads which DLLs the game exe loads and installs RTXMFG under the first free one (version.dll, winmm.dll, dinput8.dll, XInput…), beside the exe, never over the game's or another mod's file. It warns if the game has no DLSS Frame Generation or the GPU isn't RTX 40, and adds a Remove button. The RTXMFG download is checked against GitHub's checksum.
+- **Update ray reconstruction.** Games that ship `nvngx_dlssd.dll` get a card to update it to the newest version or restore the original, with a warning about launcher file checks and online anti-cheat.
+- **Standalone AIO for 32-bit games.** DirectX 9 and 11 games use the author's x86 package, with AIO running in a 64-bit carrier in `host64`. Settings and verification follow the new layout.
+- **Bridge substitute (experimental).** DLSS 5 for 64-bit DirectX 11 and Vulkan games without DLSS, using NVIDIA Optical Flow for motion. Output is DLAA at your resolution; text can soften and foliage can smear. Needs `nvngx_dlss.dll` 3.1.13 or newer.
+- **AIO troubleshooting in Verify.** After "Check if it's working", AIO games get one-click switches (synchronous presentation, display-scaling fix, fullscreen virtualization, early start on D3D12). The ones AIO's own log points at are starred.
+- **Verified self-update.** Adas checks the downloaded installer against the SHA-256 published with the release and discards it on a mismatch.
+
 ## v3.0.7 — Tuning, Feeder channel, FSR FG, motion provider, preview and tips (2026-09-13)
 
 - **Tuning card.** Feeder work area slider (75% ≈ half the neural cost, 50% ≈ a quarter), FSR expand and sharpness, plus AIO neural rendering, frame generation and intensity/tone/structure. Quality / Balanced / Performance presets, your own saved profile, and "Aim for X fps" which suggests a work area from your current frame rate.

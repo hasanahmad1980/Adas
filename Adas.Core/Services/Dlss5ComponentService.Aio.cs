@@ -38,14 +38,30 @@ public sealed partial class Dlss5ComponentService
         ["AutoWindowedVirtualization"] = "1", ["SynchronousProxyPresentation"] = "0",
         ["VortGuides"] = "0",
     };
+    /// <summary>The author's 32-bit AIO package (32-bit add-on, x86 feed shaders and the host64 carrier), SHA-pinned.</summary>
+    public const string AioX86Bundle = "aio-x86-2.2.4.zip";
+    public const string AioX86BundleSha256 = "4FC48CCD5E6CA144B20D47FD049CFBC9B888D4F0FB7E87847A6D72A967491FED";
+    public const string AioX86Addon = "standalone-dlssnr.addon32";
+    public const string AioX86Config = "dlss5-aio-x86.cfg";
+    public const string AioHostFolder = "host64";
     private static readonly SemaphoreSlim AioCacheLock = new(1, 1);
     private static string AioCachePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RHI", "Adas", "DLSS5", "AIO", AioVersion);
 
     public static bool SupportsAio(Dlss5DeploymentMode mode, bool is64Bit)
-        => is64Bit && mode is Dlss5DeploymentMode.NativeDirectX12 or Dlss5DeploymentMode.NativeDirectX11
-            or Dlss5DeploymentMode.Dx11Feeder or Dlss5DeploymentMode.Dx12Feeder
-            or Dlss5DeploymentMode.Dx9Feeder or Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.NativeVulkan;
+        => is64Bit
+            ? mode is Dlss5DeploymentMode.NativeDirectX12 or Dlss5DeploymentMode.NativeDirectX11
+                or Dlss5DeploymentMode.Dx11Feeder or Dlss5DeploymentMode.Dx12Feeder
+                or Dlss5DeploymentMode.Dx9Feeder or Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.NativeVulkan
+            // The author's x86 package supports native 32-bit D3D9 and D3D11 only.
+            : mode is Dlss5DeploymentMode.Dx9Feeder or Dlss5DeploymentMode.Dx11Feeder or Dlss5DeploymentMode.NativeDirectX11;
+
+    /// <summary>True when the AIO install in <paramref name="root"/> is the 32-bit (host64 carrier) layout.</summary>
+    public static bool IsAioX86Install(string root) => File.Exists(Path.Combine(root, AioX86Addon));
+
+    /// <summary>The ReShade.ini that holds [Standalone.DLSSNR]: the host64 carrier's for 32-bit games.</summary>
+    public static string AioSettingsIniPath(string root)
+        => IsAioX86Install(root) ? Path.Combine(root, AioHostFolder, "ReShade.ini") : Path.Combine(root, "ReShade.ini");
 
     internal static bool IsAioVulkan(Dlss5DeploymentMode mode)
         => mode is Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.NativeVulkan;
@@ -110,7 +126,11 @@ public sealed partial class Dlss5ComponentService
         Dlss5Assessment assessment, IProgress<(string message, double percent)>? progress, CancellationToken cancellationToken)
     {
         if (!SupportsAio(assessment.Mode, assessment.Is64Bit))
-            throw new InvalidOperationException("Standalone AIO supports only 64-bit DirectX 9, 11, 12 and Vulkan games. Use the recommended setup for this game.");
+            throw new InvalidOperationException(assessment.Is64Bit
+                ? "Standalone AIO supports 64-bit DirectX 9, 11, 12 and Vulkan games. Use the recommended setup for this game."
+                : "Standalone AIO supports 32-bit games only on DirectX 9 and DirectX 11. Use the recommended setup for this game.");
+        if (!assessment.Is64Bit)
+            return await InstallAioX86Async(assessment, progress, cancellationToken).ConfigureAwait(false);
         var root = Path.GetFullPath(assessment.DeploymentPath!);
         var record = LoadRecord(root);
         if (record != null && record.Profile != Dlss5InstallProfile.StandaloneAio)
@@ -196,6 +216,114 @@ public sealed partial class Dlss5ComponentService
         finally { Directory.Delete(runtimeStage, recursive: true); }
     }
 
+    private async Task<Dlss5InstallResult> InstallAioX86Async(
+        Dlss5Assessment assessment, IProgress<(string message, double percent)>? progress, CancellationToken cancellationToken)
+    {
+        var root = Path.GetFullPath(assessment.DeploymentPath!);
+        var record = LoadRecord(root);
+        if (record != null && record.Profile != Dlss5InstallProfile.StandaloneAio)
+            throw new InvalidOperationException("Remove the current DLSS 5 suite with its × button first, then select standalone AIO. Adas will not stack two rendering pipelines.");
+        var host = Path.Combine(root, AioHostFolder);
+        ValidateAioConflicts(root, root, assessment.Mode, record);
+        ValidateAioX86Conflicts(root, assessment.Mode, record);
+        await Task.Yield();
+
+        progress?.Report(($"Preparing packaged 32-bit AIO {AioVersion}…", 8));
+        var bundle = GetBundledComponentDirectory();
+        var package = Path.Combine(bundle, AioX86Bundle);
+        if (!File.Exists(package) || !FileHelper.ComputeSha256(package).Equals(AioX86BundleSha256, StringComparison.OrdinalIgnoreCase))
+            throw new FileNotFoundException("The packaged 32-bit AIO release is missing or invalid. Reinstall Adas; no download is required.");
+        var reshade32 = Path.Combine(bundle, "ReShade-6.8.0-32.dll");
+        var reshade64 = Path.Combine(bundle, "ReShade-6.8.0-64.dll");
+        if (!File.Exists(reshade32) || !AddonPackService.IsAddonArchitectureCompatible(reshade32, true))
+            throw new FileNotFoundException("The packaged 32-bit ReShade 6.8 runtime is missing.");
+        if (!File.Exists(reshade64) || !AddonPackService.IsAddonArchitectureCompatible(reshade64, false))
+            throw new FileNotFoundException("The packaged 64-bit ReShade 6.8 runtime is missing.");
+        if (!HasBundledReShadeFrameworkHeaders())
+            throw new FileNotFoundException("The packaged ReShade framework headers are missing. Reinstall Adas.");
+
+        var stage = Directory.CreateTempSubdirectory("adas-aio-x86-").FullName;
+        try
+        {
+            ZipFile.ExtractToDirectory(package, stage, overwriteFiles: true);
+            if (!File.Exists(Path.Combine(stage, AioX86Addon)) || !File.Exists(Path.Combine(stage, AioHostFolder, AioAddon)))
+                throw new InvalidDataException("The packaged 32-bit AIO release is incomplete.");
+            Directory.CreateDirectory(host);
+            var runtimeStage = Path.Combine(stage, "runtimes");
+            Directory.CreateDirectory(runtimeStage);
+            var runtimeSources = StageAioRuntimes(host, bundle, runtimeStage);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            record ??= new Dlss5InstallRecord();
+            record.Mode = assessment.Mode;
+            record.Profile = Dlss5InstallProfile.StandaloneAio;
+            record.ComponentVersion = $"Standalone AIO {AioVersion} (32-bit)";
+            record.InstalledAtUtc = DateTime.UtcNow;
+            var installed = new List<string>();
+            void Install(string source, string destination)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                EnsureNoReparsePoints(root, destination);
+                InstallTrackedFile(source, destination, root, record);
+                installed.Add(destination);
+            }
+
+            progress?.Report(("Installing the 32-bit add-on and the 64-bit AIO carrier...", 45));
+            foreach (var source in Directory.EnumerateFiles(stage, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(stage, source);
+                var top = relative.Split(Path.DirectorySeparatorChar)[0];
+                if (top.Equals("licenses", StringComparison.OrdinalIgnoreCase) || top.Equals("runtimes", StringComparison.OrdinalIgnoreCase)
+                    || source.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var destination = Path.Combine(root, relative);
+                // Settings files are seeded once; a repair keeps what the user changed.
+                if ((destination.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) || destination.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase))
+                    && File.Exists(destination) && record.InstalledHashes.ContainsKey(destination))
+                    continue;
+                Install(source, destination);
+            }
+            Install(reshade32, Path.Combine(root, AioProxyName(assessment.Mode)));
+            Install(reshade64, Path.Combine(host, "dxgi.dll"));
+            foreach (var source in runtimeSources) Install(source, Path.Combine(host, Path.GetFileName(source)));
+            installed.AddRange(InstallReShadeFrameworkHeaders(bundle, root, record));
+            installed.AddRange(InstallReShadeFrameworkHeaders(bundle, host, record));
+            EnsureAioSettings(root, record, host);
+            SaveRecord(root, record);
+            var issues = Dlss5DiagnosticService.VerifyInstallation(root, assessment.Mode, false);
+            if (issues.Count > 0) throw new IOException(string.Join(Environment.NewLine, issues));
+            progress?.Report(("32-bit AIO files verified. Restart the game to test the picture.", 100));
+            return new(true, assessment.Mode, root, installed, new[]
+            {
+                "Turn off the game's own antialiasing and upscaling; Adas does not guess game-specific menu settings.",
+                "The 32-bit add-on starts the 64-bit AIO carrier (host64) automatically. Keep every file in host64 where Adas put it.",
+                "Use the AIO page in the game's ReShade Add-ons tab. Applying settings restarts only the 64-bit carrier.",
+                assessment.Mode == Dlss5DeploymentMode.Dx9Feeder
+                    ? "Older D3D9 games that stay on Ready: enable \"Allow classic D3D9 CPU bridge\" in the AIO troubleshooting options (Adas can switch it for you after Verify)."
+                    : "32-bit OpenGL and Vulkan are not supported by this package.",
+            }, $"Standalone AIO {AioVersion} (32-bit) installed with its 64-bit carrier. Restart the game.");
+        }
+        finally { Directory.Delete(stage, recursive: true); }
+    }
+
+    /// <summary>
+    /// 32-bit layout checks: a D3D9 game must not also have a local dxgi.dll proxy (the bridge needs the real DXGI),
+    /// and the host64 carrier's ReShade must not belong to another tool.
+    /// </summary>
+    internal static void ValidateAioX86Conflicts(string root, Dlss5DeploymentMode mode, Dlss5InstallRecord? record)
+    {
+        if (mode == Dlss5DeploymentMode.Dx9Feeder)
+        {
+            var dxgi = Path.Combine(root, "dxgi.dll");
+            if (File.Exists(dxgi) && !(record?.InstalledHashes.ContainsKey(dxgi) ?? false))
+                throw new InvalidOperationException("This D3D9 game has a dxgi.dll beside it. The 32-bit AIO bridge needs Windows' real DXGI; remove that wrapper first.");
+        }
+        var hostProxy = Path.Combine(root, AioHostFolder, "dxgi.dll");
+        if (File.Exists(hostProxy) && !(record?.InstalledHashes.ContainsKey(hostProxy) ?? false)
+            && !string.Equals(System.Diagnostics.FileVersionInfo.GetVersionInfo(hostProxy).ProductName, "ReShade", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("host64\\dxgi.dll belongs to another tool. Remove it before installing 32-bit AIO.");
+    }
+
     internal static void ValidateAioConflicts(string root, string addonRoot, Dlss5DeploymentMode mode, Dlss5InstallRecord? record)
     {
         foreach (var directory in new[] { root, addonRoot }.Distinct(StringComparer.OrdinalIgnoreCase))
@@ -240,7 +368,11 @@ public sealed partial class Dlss5ComponentService
                 "Intensity" or "LocalTone" or "LocalStructure" => (0d, 2d, false),
                 "SkinStructure" => (-1d, 1d, false),
                 "NrRejectionStrength" => (0d, 1d, false),
-                "Enabled" or "NeuralRendering" or "FrameGeneration" or "ShowProxyFps" or "EarlyProxyInitialization" or "NrRejectionMask" => (0d, 1d, true),
+                "Enabled" or "NeuralRendering" or "FrameGeneration" or "ShowProxyFps" or "EarlyProxyInitialization" or "NrRejectionMask"
+                    or "SynchronousProxyPresentation" or "DpiPhysicalOutputCorrection" or "WindowedVirtualization"
+                    or "WindowedInputScaling" or "HideDetachedSystemCursor" or "DetachedPresentation" or "OpaqueComposition"
+                    or "SuppressQueuePressureWarning" or "AutoWindowedVirtualization" => (0d, 1d, true),
+                "DlssRenderPreset" => (11d, 13d, true),
                 _ => throw new ArgumentException($"Unsupported AIO setting: {key}"),
             };
             if (!double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
@@ -249,11 +381,11 @@ public sealed partial class Dlss5ComponentService
             if (key == "EarlyProxyInitialization" && value == "1"
                 && record.Mode is not (Dlss5DeploymentMode.NativeDirectX12 or Dlss5DeploymentMode.Dx12Feeder))
                 throw new ArgumentException("Early output initialization is only supported on D3D12.");
-            if (key == "FrameGeneration" && value == "1" && !File.Exists(Path.Combine(root, "nvngx_dlssg.dll")))
+            if (key == "FrameGeneration" && value == "1" && !File.Exists(Path.Combine(Path.GetDirectoryName(AioSettingsIniPath(root))!, "nvngx_dlssg.dll")))
                 throw new FileNotFoundException("Frame generation requires nvngx_dlssg.dll.");
         }
         foreach (var (key, value) in settings)
-            SetTrackedIniValue(root, record, Path.Combine(root, "ReShade.ini"), AioSection, key, value);
+            SetTrackedIniValue(root, record, AioSettingsIniPath(root), AioSection, key, value);
     }
 
     private static IReadOnlyList<string> StageAioRuntimes(string root, string bundle, string stage)
@@ -282,9 +414,9 @@ public sealed partial class Dlss5ComponentService
         return result;
     }
 
-    internal static void EnsureAioSettings(string root, Dlss5InstallRecord record)
+    internal static void EnsureAioSettings(string root, Dlss5InstallRecord record, string? iniDirectory = null)
     {
-        var path = Path.Combine(root, "ReShade.ini");
+        var path = Path.Combine(iniDirectory ?? root, "ReShade.ini");
         var ini = IniTextDocument.Load(path);
         foreach (var (key, value) in AioDefaults)
             if (!ini.TryGetValue(AioSection, key, out _)) SetTrackedIniValue(root, record, path, AioSection, key, value);

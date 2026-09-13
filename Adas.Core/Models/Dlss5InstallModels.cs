@@ -18,6 +18,7 @@ internal sealed class Dlss5InstallRecord
     /// Verification uses this to require the DFC files instead of renodx-dlss5.addon64.
     /// </summary>
     public bool DeepFriedChicken { get; set; }
+    public bool BridgeSubstitute { get; set; }
     public string? ComponentVersion { get; set; }
     public DateTime InstalledAtUtc { get; set; }
     public Dictionary<string, string> InstalledHashes { get; set; } = new(StringComparer.OrdinalIgnoreCase);

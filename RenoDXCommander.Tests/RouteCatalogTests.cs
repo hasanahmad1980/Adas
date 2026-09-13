@@ -30,7 +30,7 @@ public sealed class RouteCatalogTests
         // Every profile the catalog offers appears exactly once, so "every route shown" holds. The Deep
         // Fried Chicken entry deliberately reuses the MaximumQuality profile (it swaps only the consumer),
         // so exclude it from the by-profile uniqueness check.
-        var listed = routes.Where(r => !r.DeepFriedChicken).Select(r => r.Profile).ToArray();
+        var listed = routes.Where(r => !r.DeepFriedChicken && !r.BridgeSubstitute).Select(r => r.Profile).ToArray();
         Assert.Equal(listed.Length, listed.Distinct().Count());
         foreach (var expected in new[]
                  {
@@ -107,14 +107,14 @@ public sealed class RouteCatalogTests
         var routes = Dlss5RouteCatalog.Build(Assess(Dlss5DeploymentMode.Dx11Feeder, is64: false),
             Dlss5InstallProfile.MaximumQuality);
 
-        // ShortFuse, AIO, OpenGL bridge, Neural Upstream and the OptiScaler forks all require 64-bit.
+        // ShortFuse, OpenGL bridge, Neural Upstream and the OptiScaler forks all require 64-bit.
         foreach (var profile in new[]
                  {
-                     Dlss5InstallProfile.ExperimentalUnified, Dlss5InstallProfile.StandaloneAio,
+                     Dlss5InstallProfile.ExperimentalUnified,
                      Dlss5InstallProfile.OpenGlBridge, Dlss5InstallProfile.NeuralUpstream,
                      Dlss5InstallProfile.OptiScalerNeuralRendering,
                  })
-            Assert.False(routes.Single(r => r.Profile == profile).Supported, $"{profile} must be unsupported on a 32-bit game");
+            Assert.False(routes.Single(r => r.Profile == profile && !r.BridgeSubstitute && !r.DeepFriedChicken).Supported, $"{profile} must be unsupported on a 32-bit game");
     }
 
     [Theory]
@@ -167,7 +167,7 @@ public sealed class RouteCatalogTests
         // Both entries carry the MaximumQuality profile; only the DFC one is "active", and exactly one
         // route in the whole list claims the installed marker.
         var dfc = routes.Single(r => r.DeepFriedChicken);
-        var plain = routes.Single(r => r.Profile == Dlss5InstallProfile.MaximumQuality && !r.DeepFriedChicken);
+        var plain = routes.Single(r => r.Profile == Dlss5InstallProfile.MaximumQuality && !r.DeepFriedChicken && !r.BridgeSubstitute);
         Assert.True(dfc.Installed);
         Assert.False(plain.Installed);
         Assert.Single(routes.Where(r => r.Installed));

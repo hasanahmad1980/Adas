@@ -11,7 +11,8 @@ public interface IUpdateService
 
     Task<string?> DownloadInstallerAsync(
         string downloadUrl,
-        IProgress<(string msg, double pct)>? progress = null);
+        IProgress<(string msg, double pct)>? progress = null,
+        string? expectedSha256 = null);
 
     void LaunchInstallerAndExit(string installerPath, Action closeApp);
 }

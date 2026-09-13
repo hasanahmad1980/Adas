@@ -14,7 +14,9 @@ public sealed record RouteOption(
     bool Installed = false,
     // True for the Deep Fried Chicken entry: it runs on the stable MaximumQuality plan but swaps the
     // RenoDX consumer for the user-imported DFC binaries via Dlss5ManualOverrides(DeepFriedChicken:true).
-    bool DeepFriedChicken = false);
+    bool DeepFriedChicken = false,
+    // True for the Bridge substitute entry: MaximumQuality on the native bridge with Optical Flow motion.
+    bool BridgeSubstitute = false);
 
 /// <summary>
 /// Builds the per-game route list — every route shown, recommended marked, incompatible flagged with
@@ -27,7 +29,8 @@ public static class Dlss5RouteCatalog
     public static IReadOnlyList<RouteOption> Build(Dlss5Assessment assessment, Dlss5InstallProfile recommended,
         Dlss5InstallProfile? installedProfile = null,
         bool deepFriedChickenAvailable = false,
-        bool installedDeepFriedChicken = false)
+        bool installedDeepFriedChicken = false,
+        bool installedBridgeSubstitute = false)
     {
         var mode = assessment.Mode;
         var is64 = assessment.Is64Bit;
@@ -48,13 +51,14 @@ public static class Dlss5RouteCatalog
         var list = new List<RouteOption>();
 
         void Add(Dlss5InstallProfile profile, string label, string description, bool supported, string unsupportedReason,
-            bool dfcEntry = false)
+            bool dfcEntry = false, bool substituteEntry = false)
         {
             // Deep Fried Chicken shares MaximumQuality's plan, so profile alone can't tell the two entries
             // apart — the DFC flag disambiguates which one an install is "active" for, and keeps DFC from
             // ever being the auto-recommended default.
-            bool isInstalled = installedProfile == profile && dfcEntry == installedDeepFriedChicken;
-            bool isRecommended = supported && profile == recommended && !dfcEntry;
+            bool isInstalled = installedProfile == profile && dfcEntry == installedDeepFriedChicken
+                && substituteEntry == installedBridgeSubstitute;
+            bool isRecommended = supported && profile == recommended && !dfcEntry && !substituteEntry;
             string status = isInstalled
                 ? "✓ Installed — this is what the game is using now."
                 : supported
@@ -62,7 +66,7 @@ public static class Dlss5RouteCatalog
                         ? "★ Recommended — the best choice for this game. Pick this if you're not sure."
                         : "Works, but experimental — only pick this if you know you need it."
                     : $"⚠ Not recommended — {unsupportedReason}. You can still pick it; Adas installs exactly this route.";
-            list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled, dfcEntry));
+            list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled, dfcEntry, substituteEntry));
         }
 
         Add(Dlss5InstallProfile.MaximumQuality,
@@ -87,9 +91,10 @@ public static class Dlss5RouteCatalog
 
         Add(Dlss5InstallProfile.StandaloneAio,
             $"Standalone AIO {Dlss5ComponentService.AioVersion} (experimental)",
-            "For supported 64-bit native DLSS games — standalone DLSS-NR plus DLAA/upscaling and optional frame generation. Turn the game's own DLSS/FG off.",
+            is64 ? "For supported native DLSS games — standalone DLSS-NR plus DLAA/upscaling and optional frame generation. Turn the game's own DLSS/FG off."
+                 : "32-bit DirectX 9/11 — the author's x86 package runs AIO in a 64-bit carrier beside the game.",
             aioSupported,
-            !is64 ? "Standalone AIO requires a 64-bit game"
+            !is64 ? "Standalone AIO supports 32-bit games only on DirectX 9 and 11"
                   : "Standalone AIO does not support this translated or legacy renderer");
 
         Add(Dlss5InstallProfile.OpenGlBridge,
@@ -141,6 +146,16 @@ public static class Dlss5RouteCatalog
                 ? "Deep Fried Chicken needs a native or Feeder route Adas supports for this game"
                 : "import the Deep Fried Chicken release first — Advanced overrides ▸ Import…",
             dfcEntry: true);
+
+        // Bridge substitute — the DX11/Vulkan bridge on a game with no DLSS of its own, synthesizing motion
+        // with NVIDIA Optical Flow instead of Feeder's shader motion vectors.
+        Add(Dlss5InstallProfile.MaximumQuality,
+            "Bridge substitute (experimental)",
+            "For 64-bit DirectX 11 or Vulkan games without DLSS. The bridge synthesizes motion with NVIDIA Optical Flow and applies DLSS 5 as DLAA at your output resolution. Expect softer text and some smearing on foliage; turn in-game upscalers off.",
+            Dlss5ComponentService.SupportsBridgeSubstitute(mode, is64),
+            !is64 ? "the bridge substitute requires a 64-bit game"
+                  : "the bridge substitute is for DirectX 11 or Vulkan games without native DLSS",
+            substituteEntry: true);
 
         return list;
     }

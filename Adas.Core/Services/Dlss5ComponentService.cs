@@ -615,7 +615,15 @@ public sealed partial class Dlss5ComponentService
                 force: assessment.Mode == Dlss5DeploymentMode.NativeVulkan,
                 useDeepFriedChicken: useDfc,
                 useNeuralUpstream: useNeuralUpstream);
-        if (assessment.Mode == Dlss5DeploymentMode.NativeVulkan)
+        if (overrides?.BridgeSubstitute == true
+            && assessment.Mode is Dlss5DeploymentMode.NativeDirectX11 or Dlss5DeploymentMode.NativeVulkan)
+        {
+            WriteTrackedConfig(Path.Combine(path, BridgeConfig), BridgeSubstituteConfig(assessment.Mode), path, record);
+            record.BridgeSubstitute = true;
+            if (BridgeSubstituteRuntimeWarning(Path.Combine(path, "nvngx_dlss.dll")) is { } runtimeWarning)
+                warnings.Add(runtimeWarning);
+        }
+        else if (assessment.Mode == Dlss5DeploymentMode.NativeVulkan)
             EnsureTrackedConfig(Path.Combine(path, BridgeConfig), NativeVulkanBridgeDefaults, path, record);
 
         if (!compatibilityPlan.InstallFeeder)
@@ -2747,6 +2755,81 @@ public sealed partial class Dlss5ComponentService
         }
     }
 
+    /// <summary>Writes <paramref name="values"/> over the existing cfg (other keys kept) as a tracked file.</summary>
+    private static void WriteTrackedConfig(
+        string path,
+        IReadOnlyDictionary<string, string> values,
+        string root,
+        Dlss5InstallRecord record)
+    {
+        var merged = File.Exists(path) ? ReadConfig(path) : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in values) merged[key] = value;
+        var temporary = Path.Combine(Path.GetTempPath(), $"adas-config-{Guid.NewGuid():N}.cfg");
+        try
+        {
+            WriteConfig(temporary, merged);
+            InstallTrackedFile(temporary, path, root, record);
+        }
+        finally { DeleteIfExists(temporary); }
+    }
+
+    /// <summary>Bridge keys for substitute mode (README: synth=1, source=auto, stage=3, mode=2).</summary>
+    internal static IReadOnlyDictionary<string, string> BridgeSubstituteConfig(Dlss5DeploymentMode mode)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["synth"] = "1",
+            ["source"] = "auto",
+            ["stage"] = "3",
+            ["mode"] = "2",
+        };
+        if (mode == Dlss5DeploymentMode.NativeVulkan) values["vk_mirror"] = "1";
+        return values;
+    }
+
+    /// <summary>Whether a Feeder-mode game can take the bridge substitute route instead (64-bit DX11/Vulkan).</summary>
+    public static bool SupportsBridgeSubstitute(Dlss5DeploymentMode mode, bool is64Bit)
+        => is64Bit && mode is Dlss5DeploymentMode.Dx11Feeder or Dlss5DeploymentMode.VulkanFeeder;
+
+    /// <summary>
+    /// Re-targets a Feeder assessment at the native bridge for substitute mode: DX11 Feeder → native DX11,
+    /// Vulkan Feeder → native Vulkan, and asks for the DLSS runtimes the bridge needs beside the exe.
+    /// </summary>
+    public static Dlss5Assessment ApplyBridgeSubstitute(Dlss5Assessment assessment)
+    {
+        var mode = assessment.Mode switch
+        {
+            Dlss5DeploymentMode.Dx11Feeder => Dlss5DeploymentMode.NativeDirectX11,
+            Dlss5DeploymentMode.VulkanFeeder => Dlss5DeploymentMode.NativeVulkan,
+            _ => assessment.Mode,
+        };
+        if (mode == assessment.Mode || !assessment.Is64Bit) return assessment;
+        var requirements = assessment.MissingRequirements.ToList();
+        if (!string.IsNullOrWhiteSpace(assessment.DeploymentPath))
+            foreach (var name in new[] { "nvngx_dlss.dll", "nvngx_dlssnr.dll" })
+                if (!IsUsableRuntimeFile(Path.Combine(assessment.DeploymentPath, name))
+                    && !requirements.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    requirements.Add(name);
+        return assessment with { Mode = mode, MissingRequirements = requirements };
+    }
+
+    internal static readonly Version BridgeSubstituteMinimumDlss = new(3, 1, 13);
+
+    internal static string? BridgeSubstituteRuntimeWarning(string dlssPath)
+    {
+        try
+        {
+            if (!File.Exists(dlssPath))
+                return "Substitute mode needs nvngx_dlss.dll 3.1.13 or newer beside the game exe; none was found.";
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(dlssPath);
+            var version = new Version(Math.Max(info.FileMajorPart, 0), Math.Max(info.FileMinorPart, 0), Math.Max(info.FileBuildPart, 0));
+            return version < BridgeSubstituteMinimumDlss
+                ? $"nvngx_dlss.dll is {version}; substitute mode needs 3.1.13 or newer. Update DLSS for this game if the bridge stays idle."
+                : null;
+        }
+        catch { return null; }
+    }
+
     private static void EnsureTrackedConfig(
         string path,
         IReadOnlyDictionary<string, string> defaults,
@@ -3099,7 +3182,7 @@ public sealed partial class Dlss5ComponentService
     private static string TrimDirectorySeparators(string path)
         => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-    private static bool IsPathBelow(string parent, string candidate)
+    internal static bool IsPathBelow(string parent, string candidate)
         => !candidate.Equals(TrimDirectorySeparators(parent), StringComparison.OrdinalIgnoreCase)
            && IsPathAtOrBelow(parent, candidate);
 

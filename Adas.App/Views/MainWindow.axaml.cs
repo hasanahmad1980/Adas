@@ -148,12 +148,12 @@ public partial class MainWindow : Window
 
         try
         {
-            var path = await UpdateSvc.DownloadInstallerAsync(info.DownloadUrl, progress);
+            var path = await UpdateSvc.DownloadInstallerAsync(info.DownloadUrl, progress, info.ExpectedSha256);
             if (string.IsNullOrEmpty(path))
             {
                 await DialogHost.ConfirmAsync(this, "Update failed",
-                    "The installer could not be downloaded. Please try again later or download it "
-                    + "from the Adas releases page.", primaryText: "OK", closeText: "Close");
+                    "The installer could not be downloaded, or it failed its checksum check and was discarded. "
+                    + "Please try again later or download it from the Adas releases page.", primaryText: "OK", closeText: "Close");
                 UpdateButton.IsEnabled = true;
                 return;
             }

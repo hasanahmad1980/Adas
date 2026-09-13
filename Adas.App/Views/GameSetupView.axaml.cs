@@ -48,6 +48,8 @@ public partial class GameSetupView : UserControl
         RoutesList.SelectionChanged += OnRouteSelectionChanged;
         InstallDlss5Check.IsCheckedChanged += (_, _) => UpdateSelectionState();
         DiagnoseButton.Click += OnDiagnose;
+        RrUpdateButton.Click += OnRrUpdate;
+        RrRestoreButton.Click += OnRrRestore;
         OpenFolderButton.Click += OnOpenFolder;
 
         BitnessCombo.ItemsSource = new[] { "Auto", "32-bit", "64-bit" };
@@ -109,7 +111,7 @@ public partial class GameSetupView : UserControl
     private GameCardViewModel? _populatedCard;
 
     /// <summary>The route the user explicitly clicked (profile + DFC flag), kept across refreshes.</summary>
-    private (Dlss5InstallProfile Profile, bool DeepFriedChicken)? _userRoute;
+    private (Dlss5InstallProfile Profile, bool DeepFriedChicken, bool BridgeSubstitute)? _userRoute;
 
     private string Store => Card?.Source ?? "";
 
@@ -175,9 +177,10 @@ public partial class GameSetupView : UserControl
                 var dfc = AppServices.Services.GetService<DeepFriedChickenService>();
                 routes = Dlss5RouteCatalog.Build(assessment, pick, installed?.Profile,
                     deepFriedChickenAvailable: dfc?.IsImported == true,
-                    installedDeepFriedChicken: installed?.DeepFriedChicken == true);
+                    installedDeepFriedChicken: installed?.DeepFriedChicken == true,
+                    installedBridgeSubstitute: installed?.BridgeSubstitute == true);
                 preferred = routes.FirstOrDefault(r => r.Installed)
-                            ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported && !r.DeepFriedChicken)
+                            ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported && !r.DeepFriedChicken && !r.BridgeSubstitute)
                             ?? routes.FirstOrDefault(r => r.Recommended)
                             ?? routes.FirstOrDefault();
 
@@ -221,7 +224,7 @@ public partial class GameSetupView : UserControl
             {
                 RoutesList.ItemsSource = routes;
                 RoutesList.SelectedItem = (_userRoute is { } chosen
-                                              ? routes.FirstOrDefault(r => r.Profile == chosen.Profile && r.DeepFriedChicken == chosen.DeepFriedChicken)
+                                              ? routes.FirstOrDefault(r => r.Profile == chosen.Profile && r.DeepFriedChicken == chosen.DeepFriedChicken && r.BridgeSubstitute == chosen.BridgeSubstitute)
                                               : null)
                                           ?? preferred;
             }
@@ -240,6 +243,7 @@ public partial class GameSetupView : UserControl
             RefreshTuning();
             RefreshTips(card);
             UpdateSelectionState();
+            _ = RefreshRrCardAsync(card, probe?.Is64Bit ?? !card.Is32Bit);
         }
 
         if (Dispatcher.UIThread.CheckAccess()) Apply();
@@ -376,7 +380,7 @@ public partial class GameSetupView : UserControl
     {
         if (!_populatingRoutes && RoutesList.SelectedItem is RouteOption picked)
         {
-            _userRoute = (picked.Profile, picked.DeepFriedChicken);
+            _userRoute = (picked.Profile, picked.DeepFriedChicken, picked.BridgeSubstitute);
             if (InstallDlss5Check.IsChecked != true) InstallDlss5Check.IsChecked = true;
         }
         UpdateSelectionState();
@@ -478,7 +482,7 @@ public partial class GameSetupView : UserControl
 
             // Re-resolve the route against the fresh assessment (folder/API answers can change the verdict).
             if (route is not null)
-                route = _allRoutes.FirstOrDefault(r => r.Profile == route.Profile && r.DeepFriedChicken == route.DeepFriedChicken) ?? route;
+                route = _allRoutes.FirstOrDefault(r => r.Profile == route.Profile && r.DeepFriedChicken == route.DeepFriedChicken && r.BridgeSubstitute == route.BridgeSubstitute) ?? route;
 
             // 3. Deep Fried Chicken can't be bundled — fetch the user's copy now instead of refusing.
             if (route is { DeepFriedChicken: true }
@@ -522,6 +526,7 @@ public partial class GameSetupView : UserControl
             {
                 var outcome = await Dlss5Installer.InstallAsync(main, owner, card, route.Profile, progress,
                     deepFriedChicken: route.DeepFriedChicken,
+                    bridgeSubstitute: route.BridgeSubstitute,
                     forceProfile: !route.Supported && !route.Installed,
                     deploymentPath: deploymentPath,
                     risksConfirmed: true);
@@ -1094,7 +1099,10 @@ public partial class GameSetupView : UserControl
     {
         var card = Card;
         if (card is null) return;
-        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
+        AioFixPanel.Children.Clear();
+        AioFixPanel.IsVisible = false;
+        var root = _installedRoot ?? card.InstallPath;
+        if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
         {
             DiagnoseResult.Text = "No install path resolved for this game yet.";
             return;
@@ -1102,20 +1110,158 @@ public partial class GameSetupView : UserControl
 
         try
         {
-            var record = Dlss5ComponentService.LoadRecord(card.InstallPath);
+            var record = Dlss5ComponentService.LoadRecord(root);
             if (record is null)
             {
                 DiagnoseResult.Text = "No DLSS 5 install found in this folder. Install first, then verify.";
                 return;
             }
 
-            var report = Dlss5DiagnosticService.Diagnose(card.InstallPath, record.Mode, !card.Is32Bit);
+            var report = Dlss5DiagnosticService.Diagnose(root, record.Mode, !card.Is32Bit);
             DiagnoseResult.Text = report.ToDisplayText();
+            if (record.Profile == Dlss5InstallProfile.StandaloneAio)
+                ShowAioFixes(root, record.Mode);
         }
         catch (Exception ex)
         {
             DiagnoseResult.Text = $"Diagnosis failed: {ex.Message}";
         }
+    }
+
+    /// <summary>One-click AIO troubleshooting switches; the ones the AIO log points at are listed first.</summary>
+    private void ShowAioFixes(string root, Dlss5DeploymentMode mode)
+    {
+        var suggested = Dlss5AioTroubleshooter.Suggest(Dlss5AioTroubleshooter.ReadLogTail(), mode, out var repairNeeded);
+        var header = new TextBlock
+        {
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Text = (suggested.Count > 0
+                    ? "AIO troubleshooting — the AIO log points at the ★ switches below. Each is one click and can be turned off from Tuning."
+                    : "AIO troubleshooting — if AIO isn't showing, try one switch at a time, then relaunch the game.")
+                   + (repairNeeded ? "\n⚠ The log reports a missing runtime file. Tick DLSS 5 and press Install selected to repair AIO." : ""),
+        };
+        AioFixPanel.Children.Add(header);
+        foreach (var fix in suggested.Concat(Dlss5AioTroubleshooter.All(mode).Where(f => !suggested.Contains(f))))
+        {
+            var applied = Dlss5AioTroubleshooter.IsApplied(root, fix);
+            var star = suggested.Contains(fix) ? "★ " : "";
+            var button = new Button
+            {
+                Classes = { "subtle" },
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                Content = applied ? $"✓ {fix.Title} (on)" : star + fix.Title,
+                IsEnabled = !applied,
+            };
+            ToolTip.SetTip(button, fix.Explanation);
+            button.Click += (_, _) =>
+            {
+                try
+                {
+                    Dlss5ComponentService.SaveAioUserSettings(root, new Dictionary<string, string> { [fix.Key] = fix.Value });
+                    button.Content = $"✓ {fix.Title} (on)";
+                    button.IsEnabled = false;
+                    DiagnoseResult.Text += $"\n\n✓ Turned on “{fix.Title}”. Relaunch the game, then check again.";
+                    RefreshTuning();
+                }
+                catch (Exception ex) { DiagnoseResult.Text += $"\n\n✕ Couldn't apply “{fix.Title}”: {ex.Message}"; }
+            };
+            AioFixPanel.Children.Add(button);
+        }
+        AioFixPanel.IsVisible = true;
+    }
+
+    // ── Ray reconstruction DLL update (#8) ───────────────────────────────────────────────────────
+
+    private string? _rrPath;
+    private string? _rrNewest;
+
+    private async Task RefreshRrCardAsync(GameCardViewModel card, bool is64Bit)
+    {
+        RrCard.IsVisible = false;
+        _rrPath = null;
+        var svc = AppServices.Services.GetService<IDlssStreamlineService>();
+        if (svc is null || !is64Bit || string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath)) return;
+        try
+        {
+            var detection = await Task.Run(() => svc.Detect(card.InstallPath));
+            if (!ReferenceEquals(Card, card) || detection.DlssdPath is not { } path || !File.Exists(path)) return;
+            if (svc.DlssdVersions.Count == 0)
+                try { await svc.FetchManifestAsync(); } catch { }
+            if (!ReferenceEquals(Card, card)) return;
+            var current = svc.GetFileVersion(path);
+            var newest = svc.DlssdVersions.FirstOrDefault();
+            var hasBackup = svc.HasBackup(path);
+            var canUpdate = IsNewerVersion(newest, current);
+            _rrPath = path;
+            _rrNewest = newest;
+            RrText.Text = $"This game ships ray reconstruction (nvngx_dlssd.dll {current ?? "unknown version"})."
+                          + (canUpdate ? $" {newest} is available." : newest is null ? " Adas couldn't load the version list." : " It's already the newest.")
+                          + (hasBackup ? " The original is backed up." : "");
+            RrUpdateButton.IsVisible = canUpdate;
+            RrUpdateButton.Content = $"Update to {newest}";
+            RrRestoreButton.IsVisible = hasBackup;
+            RrCard.IsVisible = true;
+        }
+        catch (Exception ex) { CrashReporter.Log($"[GameSetupView] RR detection failed: {ex.Message}"); }
+    }
+
+    internal static bool IsNewerVersion(string? candidate, string? current)
+    {
+        static Version? Parse(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            var digits = new string(text.TrimStart('v', 'V').TakeWhile(c => char.IsDigit(c) || c == '.').ToArray()).Trim('.');
+            if (!digits.Contains('.')) digits += ".0";
+            return Version.TryParse(digits, out var v) ? v : null;
+        }
+        var a = Parse(candidate);
+        if (a is null) return false;
+        var b = Parse(current);
+        return b is null || Normalize(a) > Normalize(b);
+
+        static Version Normalize(Version v) => new(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
+    }
+
+    private async void OnRrUpdate(object? sender, RoutedEventArgs e)
+    {
+        var card = Card;
+        var owner = this.GetVisualRoot() as Window;
+        var svc = AppServices.Services.GetService<IDlssStreamlineService>();
+        if (card is null || owner is null || svc is null || _rrPath is not { } path || _rrNewest is not { } newest) return;
+        if (!await DialogHost.ConfirmAsync(owner, "Update ray reconstruction?",
+                "Adas backs up the game's nvngx_dlssd.dll and replaces it with " + newest + ".\n\n"
+                + "⚠ Launchers that verify files (Steam, EA app, Battle.net) may put the original back after an update or verify.\n\n"
+                + "⚠ Don't do this in online games with anti-cheat; a changed DLL can be flagged.",
+                "Update", "Cancel"))
+            return;
+        var guard = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
+        if (!guard.CanProceed) { RrText.Text = guard.Error ?? "Cancelled."; return; }
+        RrUpdateButton.IsEnabled = false;
+        try
+        {
+            var before = svc.GetFileVersion(path);
+            await svc.SwapDlssdAsync(path, newest);
+            var after = svc.GetFileVersion(path);
+            await RefreshRrCardAsync(card, true);
+            RrText.Text = (after != before && svc.HasBackup(path)
+                ? $"✓ Ray reconstruction updated to {after}. "
+                : "✕ The update didn't complete; the game's file is unchanged. See the log. ") + RrText.Text;
+        }
+        finally { RrUpdateButton.IsEnabled = true; }
+    }
+
+    private async void OnRrRestore(object? sender, RoutedEventArgs e)
+    {
+        var card = Card;
+        var owner = this.GetVisualRoot() as Window;
+        var svc = AppServices.Services.GetService<IDlssStreamlineService>();
+        if (card is null || owner is null || svc is null || _rrPath is not { } path) return;
+        var guard = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
+        if (!guard.CanProceed) { RrText.Text = guard.Error ?? "Cancelled."; return; }
+        try { svc.Restore(path); }
+        catch (Exception ex) { RrText.Text = $"✕ Restore failed: {ex.Message}"; return; }
+        await RefreshRrCardAsync(card, true);
+        RrText.Text = "✓ Original ray reconstruction restored. " + RrText.Text;
     }
 
     // ── Per-game DLSS 5 choices: Feeder build (#4), motion vectors (#9), FSR FG (#5) ──────────────

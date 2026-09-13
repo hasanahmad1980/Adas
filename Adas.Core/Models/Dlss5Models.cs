@@ -151,4 +151,7 @@ public sealed record Dlss5ManualOverrides(
     // Feeder build to install: null = the packaged build, a tag = that GitHub release,
     // Dlss5ComponentService.NewestPrereleaseTag = the newest pre-release.
     string? FeederReleaseTag = null,
-    RenoDXCommander.Services.Dlss5MotionProvider MotionProvider = RenoDXCommander.Services.Dlss5MotionProvider.LumeniteKernel);
+    RenoDXCommander.Services.Dlss5MotionProvider MotionProvider = RenoDXCommander.Services.Dlss5MotionProvider.LumeniteKernel,
+    // Bridge substitute: run the native DX11/Vulkan bridge on a game without DLSS, synthesizing motion
+    // with NVIDIA Optical Flow (synth=1). Output is DLAA at back-buffer size.
+    bool BridgeSubstitute = false);
