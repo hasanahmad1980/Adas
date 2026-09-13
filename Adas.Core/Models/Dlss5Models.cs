@@ -147,4 +147,8 @@ public sealed record Dlss5ManualOverrides(
     bool DeepFriedChicken = false,
     // The user explicitly picked this route after being told it isn't recommended for the game:
     // install exactly what they chose instead of silently swapping to the "supported" profile.
-    bool ForceProfile = false);
+    bool ForceProfile = false,
+    // Feeder build to install: null = the packaged build, a tag = that GitHub release,
+    // Dlss5ComponentService.NewestPrereleaseTag = the newest pre-release.
+    string? FeederReleaseTag = null,
+    RenoDXCommander.Services.Dlss5MotionProvider MotionProvider = RenoDXCommander.Services.Dlss5MotionProvider.LumeniteKernel);

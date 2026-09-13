@@ -153,10 +153,22 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
+                        <StackPanel x:Name="FsrFgPanel" Spacing="2" Margin="0,2,0,0">
+                            <CheckBox x:Name="FsrFgCheck"
+                                      Content="OptiScaler option: FSR 3.1 frame generation (2x, DirectX 12 only)" />
+                            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
+                                       Text="Turns on the FSR 3.1 frame-generation files OptiScaler ships, fed by OptiScaler's upscaler — works on any RTX card. Off by default. Turn the game's own frame generation off, and expect some added input latency." />
+                            <TextBlock x:Name="FsrFgNote" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
+                                       Foreground="#E3B341" IsVisible="False" />
+                        </StackPanel>
+
                         <!-- 3. One button -->
                         <WrapPanel Orientation="Horizontal">
                             <Button x:Name="InstallButton" Classes="accent" Margin="0,0,8,8"
                                     Content="Install selected" MinWidth="150" />
+                            <Button x:Name="PreviewButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="What will happen?"
+                                    ToolTip.Tip="List every file the selected DLSS 5 route would write, back up and remove — without changing anything." />
                             <Button x:Name="RepairButton" Classes="subtle" Margin="0,0,8,8"
                                     Content="Repair DLSS 5" IsVisible="{Binding IsDlss5Installed}"
                                     ToolTip.Tip="Re-copy any missing or changed files for the installed setup." />
@@ -171,6 +183,78 @@
                         <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100" />
                         <SelectableTextBlock x:Name="InstallResult" Classes="muted" TextWrapping="Wrap"
                                              IsVisible="False" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Tuning: controls for the settings Adas already writes (Feeder cfg / AIO ini) -->
+                <Border x:Name="TuningCard" Classes="card" IsVisible="False">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Tuning" Classes="h2" />
+                        <TextBlock x:Name="TuningIntro" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                        <WrapPanel x:Name="PresetButtons" Orientation="Horizontal">
+                            <Button x:Name="PresetQualityButton" Classes="subtle" Margin="0,0,8,8" Content="Quality" />
+                            <Button x:Name="PresetBalancedButton" Classes="subtle" Margin="0,0,8,8" Content="Balanced" />
+                            <Button x:Name="PresetPerformanceButton" Classes="subtle" Margin="0,0,8,8" Content="Performance" />
+                            <Button x:Name="PresetCustomButton" Classes="subtle" Margin="0,0,8,8" Content="My profile" />
+                            <Button x:Name="SaveCustomButton" Classes="subtle" Margin="0,0,8,8" Content="Save as my profile" />
+                        </WrapPanel>
+
+                        <StackPanel x:Name="FeederTuningPanel" Spacing="6">
+                            <TextBlock x:Name="WorkAreaLabel" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                            <Slider x:Name="WorkAreaSlider" Minimum="50" Maximum="100" TickFrequency="5"
+                                    IsSnapToTickEnabled="True" Value="100" />
+                            <TextBlock x:Name="WorkAreaNote" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                            <CheckBox x:Name="FsrExpandCheck" Content="FSR 1 expand-back (crisper at 50–75%)" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Sharpness" Classes="muted" VerticalAlignment="Center" Width="80" />
+                                <Slider x:Name="SharpnessSlider" Minimum="0" Maximum="1" TickFrequency="0.05"
+                                        IsSnapToTickEnabled="True" Width="220" />
+                                <TextBlock x:Name="SharpnessValue" Classes="muted" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Aim for" Classes="muted" VerticalAlignment="Center" />
+                                <TextBox x:Name="TargetFpsBox" Width="70" Watermark="60" />
+                                <TextBlock Text="fps — I get" Classes="muted" VerticalAlignment="Center" />
+                                <TextBox x:Name="CurrentFpsBox" Width="70" Watermark="40" />
+                                <TextBlock Text="fps now" Classes="muted" VerticalAlignment="Center" />
+                                <Button x:Name="AimFpsButton" Classes="subtle" Content="Suggest" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel x:Name="AioTuningPanel" Spacing="6">
+                            <CheckBox x:Name="AioNeuralCheck" Content="Neural rendering" />
+                            <CheckBox x:Name="AioFrameGenCheck" Content="Frame generation (needs nvngx_dlssg.dll)" />
+                            <Grid ColumnDefinitions="120,*,50" RowDefinitions="Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Text="Intensity" Classes="muted" VerticalAlignment="Center" />
+                                <Slider Grid.Row="0" Grid.Column="1" x:Name="AioIntensitySlider" Minimum="0" Maximum="2"
+                                        TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                                <TextBlock Grid.Row="0" Grid.Column="2" x:Name="AioIntensityValue" Classes="muted" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="1" Text="Local tone" Classes="muted" VerticalAlignment="Center" />
+                                <Slider Grid.Row="1" Grid.Column="1" x:Name="AioToneSlider" Minimum="0" Maximum="2"
+                                        TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" x:Name="AioToneValue" Classes="muted" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="2" Text="Local structure" Classes="muted" VerticalAlignment="Center" />
+                                <Slider Grid.Row="2" Grid.Column="1" x:Name="AioStructureSlider" Minimum="0" Maximum="2"
+                                        TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                                <TextBlock Grid.Row="2" Grid.Column="2" x:Name="AioStructureValue" Classes="muted" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ApplyTuningButton" Classes="accent" Content="Apply" />
+                            <TextBlock x:Name="TuningStatus" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Hotkeys and tips for the installed setup -->
+                <Border x:Name="TipsCard" Classes="card" IsVisible="False">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Hotkeys &amp; tips" Classes="h2" />
+                        <TextBlock x:Name="TipsText" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource AdasTextSecondaryBrush}" />
                     </StackPanel>
                 </Border>
 
@@ -189,6 +273,21 @@
                                 <ComboBox x:Name="DxvkCombo" HorizontalAlignment="Stretch" />
                                 <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
                                            Text="DXVK translates DirectX to Vulkan (only used on Vulkan/translated routes). Default = Adas picks. Stable = official DXVK. Development = newest upstream build; least tested. LiliumHdr = the HDR fork that adds HDR output to DX9/11 games." />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,12,*">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="DLSS5-Feeder build" Classes="muted" />
+                                <ComboBox x:Name="FeederChannelCombo" HorizontalAlignment="Stretch" />
+                                <TextBox x:Name="FeederTagBox" Watermark="Release tag, e.g. v1.15.0" IsVisible="False" />
+                                <TextBlock x:Name="FeederChannelNote" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="Motion vectors (Feeder routes)" Classes="muted" />
+                                <ComboBox x:Name="MotionProviderCombo" HorizontalAlignment="Stretch" />
+                                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                           Text="Where the Feeder reads motion from. Automatic = LumeniteFX Kernel (what the Feeder is tuned on), or VORT Motion on OpenGL, where LumeniteFX reads nothing. Adas installs the chosen provider and places it above DLSS5_Feed. Takes effect on the next Install." />
                             </StackPanel>
                         </Grid>
 

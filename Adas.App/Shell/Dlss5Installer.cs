@@ -138,9 +138,11 @@ public static class Dlss5Installer
             return blocked;
 
         // ── Install ──────────────────────────────────────────────────────────
-        var overrides = deepFriedChicken || forceProfile
-            ? new Dlss5ManualOverrides(DeepFriedChicken: deepFriedChicken, ForceProfile: forceProfile)
-            : null;
+        // Per-game Feeder build channel and motion-vector provider (Advanced options).
+        var (feederTag, motionProvider) = Dlss5GamePreferences.ResolveInstallChoices(
+            Dlss5GamePreferences.Get(card.GameName, card.Source), assessment.Mode);
+        var overrides = new Dlss5ManualOverrides(DeepFriedChicken: deepFriedChicken, ForceProfile: forceProfile,
+            FeederReleaseTag: feederTag, MotionProvider: motionProvider);
         var channel = main.ResolveReShadeChannel(card.GameName, card.Source ?? "");
         var removedPrevious = false;
         for (var attempt = 0; ; attempt++)

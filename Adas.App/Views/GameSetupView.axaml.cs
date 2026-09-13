@@ -66,6 +66,14 @@ public partial class GameSetupView : UserControl
         ChooseFolderInlineButton.Click += OnChangeFolder;
         ResetFolderButton.Click += OnResetFolder;
         ImportDfcButton.Click += OnImportDeepFriedChicken;
+        PreviewButton.Click += OnPreview;
+        FsrFgCheck.IsCheckedChanged += OnFsrFgChanged;
+        FeederChannelCombo.ItemsSource = new[] { "Packaged (default)", "Newest pre-release", "Exact release…" };
+        MotionProviderCombo.ItemsSource = new[] { "Automatic", "LumeniteFX Kernel", "VORT Motion" };
+        FeederChannelCombo.SelectionChanged += (_, _) => OnFeederChannelChanged();
+        FeederTagBox.LostFocus += (_, _) => OnFeederChannelChanged();
+        MotionProviderCombo.SelectionChanged += (_, _) => OnMotionProviderChanged();
+        InitTuning();
 
         _tools = Enum.GetValues<SetupTool>()
             .Select(tool => new SetupToolItem(tool, _ => UpdateSelectionState(), item => _ = RemoveToolAsync(item)))
@@ -144,6 +152,8 @@ public partial class GameSetupView : UserControl
         GameStatus dlss5Status = GameStatus.NotInstalled;
         string? dlss5Label = null;
         bool hasUpscaler = false;
+        string? installedRoot = null;
+        Dlss5InstallRecord? installedRecord = null;
         var main = Main;
 
         await Task.Run(() =>
@@ -175,6 +185,8 @@ public partial class GameSetupView : UserControl
                 // badge from the record so a successful install flips it off "Available".
                 if (installed is not null)
                 {
+                    installedRoot = assessment.DeploymentPath;
+                    installedRecord = installed;
                     dlss5Status = GameStatus.Installed;
                     var active = routes.FirstOrDefault(r => r.Installed);
                     dlss5Label = "Active route: "
@@ -222,6 +234,11 @@ public partial class GameSetupView : UserControl
                 ReconcileCardWithProbe(card, probe);
             ApplyApiEvidence(card, probe);
             PopulateOverrides(card);
+            _installedRoot = installedRoot;
+            _installedRecord = installedRecord;
+            PopulateDlss5Preferences(card);
+            RefreshTuning();
+            RefreshTips(card);
             UpdateSelectionState();
         }
 
@@ -516,6 +533,10 @@ public partial class GameSetupView : UserControl
                 routeInstalled = outcome.Ran;
                 anyRan |= outcome.Ran;
                 results.Add((outcome.Ran ? "✓ DLSS 5 — " : "✕ DLSS 5 — ") + outcome.Message);
+                if (outcome.Ran)
+                    results.Add("Hotkeys & tips:\n• " + string.Join("\n• ", Dlss5ComponentService.GetPostInstallTips(
+                        _assessment?.Mode ?? Dlss5DeploymentMode.None, route.Profile,
+                        tools.Any(t => t.Tool == SetupTool.OptiScaler) || card.IsOsInstalled)));
             }
 
             // 6. Tools, in an order where each one's dependencies are already in place.
@@ -643,7 +664,13 @@ public partial class GameSetupView : UserControl
                         main.GetOsVariant(card.GameName, card.Source ?? ""));
                     if (record is null) return (false, "install did not complete — see the log.");
                     await TryPdUpscalerSwapAsync(main, card, progress);
-                    return (true, $"installed{(string.IsNullOrWhiteSpace(record.OsVariant) ? "" : $" ({record.OsVariant})")}. Press Insert in-game for its menu.");
+                    var fgNote = "";
+                    if (FsrFgCheck.IsChecked == true)
+                    {
+                        var fgProblem = ApplyFsrFrameGeneration(record.InstallPath, true);
+                        fgNote = fgProblem is null ? " FSR 3.1 frame generation is on (2x) — turn the game's own frame generation off." : $" FSR 3.1 frame generation not enabled: {fgProblem}";
+                    }
+                    return (true, $"installed{(string.IsNullOrWhiteSpace(record.OsVariant) ? "" : $" ({record.OsVariant})")}. Press Insert in-game for its menu.{fgNote}");
                 }
                 case SetupTool.Dxvk:
                     await main.InstallDxvkAsync(card);
@@ -1088,6 +1115,349 @@ public partial class GameSetupView : UserControl
         catch (Exception ex)
         {
             DiagnoseResult.Text = $"Diagnosis failed: {ex.Message}";
+        }
+    }
+
+    // ── Per-game DLSS 5 choices: Feeder build (#4), motion vectors (#9), FSR FG (#5) ──────────────
+
+    private string? _installedRoot;
+    private Dlss5InstallRecord? _installedRecord;
+    private bool _populatingPreferences;
+
+    private void PopulateDlss5Preferences(GameCardViewModel card)
+    {
+        _populatingPreferences = true;
+        try
+        {
+            var pref = Dlss5GamePreferences.Get(card.GameName, card.Source);
+            FeederChannelCombo.SelectedIndex = (int)pref.FeederChannel;
+            FeederTagBox.Text = pref.FeederReleaseTag ?? "";
+            FeederTagBox.IsVisible = pref.FeederChannel == Dlss5FeederChannel.ExactRelease;
+            MotionProviderCombo.SelectedIndex = pref.MotionProvider switch
+            {
+                Dlss5MotionProvider.LumeniteKernel => 1,
+                Dlss5MotionProvider.VortMotion => 2,
+                _ => 0,
+            };
+            FsrFgCheck.IsChecked = pref.OptiScalerFsrFrameGeneration;
+            UpdateFeederChannelNote();
+            UpdateFsrFgNote();
+        }
+        finally { _populatingPreferences = false; }
+    }
+
+    private void OnFeederChannelChanged()
+    {
+        var card = Card;
+        if (card is null || _populatingPreferences) return;
+        var channel = (Dlss5FeederChannel)Math.Max(0, FeederChannelCombo.SelectedIndex);
+        var tag = FeederTagBox.Text?.Trim();
+        FeederTagBox.IsVisible = channel == Dlss5FeederChannel.ExactRelease;
+        Dlss5GamePreferences.Update(card.GameName, card.Source, p =>
+        {
+            p.FeederChannel = channel;
+            p.FeederReleaseTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
+        });
+        UpdateFeederChannelNote();
+    }
+
+    private void UpdateFeederChannelNote()
+    {
+        var channel = (Dlss5FeederChannel)Math.Max(0, FeederChannelCombo.SelectedIndex);
+        var tag = FeederTagBox.Text?.Trim();
+        FeederChannelNote.Text = channel switch
+        {
+            Dlss5FeederChannel.NewestPrerelease => Dlss5ComponentService.DescribeFeederPairing(Dlss5ComponentService.NewestPrereleaseTag),
+            Dlss5FeederChannel.ExactRelease when Dlss5GamePreferences.IsValidReleaseTag(tag) => Dlss5ComponentService.DescribeFeederPairing(tag),
+            Dlss5FeederChannel.ExactRelease => "Type the exact tag from github.com/jlrouzies-fr/DLSS5-Feeder/releases. Until then the packaged build is used.",
+            _ => Dlss5ComponentService.DescribeFeederPairing(null),
+        } + " If a download fails, Adas installs the packaged build and says so. Takes effect on the next Install.";
+    }
+
+    private void OnMotionProviderChanged()
+    {
+        var card = Card;
+        if (card is null || _populatingPreferences) return;
+        Dlss5MotionProvider? provider = MotionProviderCombo.SelectedIndex switch
+        {
+            1 => Dlss5MotionProvider.LumeniteKernel,
+            2 => Dlss5MotionProvider.VortMotion,
+            _ => null,
+        };
+        Dlss5GamePreferences.Update(card.GameName, card.Source, p => p.MotionProvider = provider);
+    }
+
+    private void OnFsrFgChanged(object? sender, RoutedEventArgs e)
+    {
+        var card = Card;
+        if (card is null || _populatingPreferences) return;
+        var enable = FsrFgCheck.IsChecked == true;
+        Dlss5GamePreferences.Update(card.GameName, card.Source, p => p.OptiScalerFsrFrameGeneration = enable);
+        UpdateFsrFgNote();
+        if (!card.IsOsInstalled || string.IsNullOrWhiteSpace(card.InstallPath)) return;
+
+        // OptiScaler is already in the game: apply straight away (it reads the ini at launch).
+        var folder = new[] { card.InstallPath, ModInstallService.GetAddonDeployPath(card.InstallPath) }
+            .FirstOrDefault(dir => File.Exists(Path.Combine(dir, "OptiScaler.ini")));
+        var problem = folder is null
+            ? "OptiScaler.ini wasn't found in the game folder."
+            : ApplyFsrFrameGeneration(folder, enable);
+        ShowResult(problem is null
+            ? enable
+                ? "FSR 3.1 frame generation is on (2x). Turn the game's own frame generation off; it applies the next time the game starts."
+                : "FSR 3.1 frame generation is off."
+            : "FSR 3.1 frame generation: " + problem);
+    }
+
+    private void UpdateFsrFgNote()
+    {
+        var api = _probe?.GraphicsApi ?? Card?.GraphicsApi ?? GraphicsApiType.Unknown;
+        var note = FsrFgCheck.IsChecked == true && api is not (GraphicsApiType.DirectX12 or GraphicsApiType.Unknown)
+            ? $"⚠ This game looks like {GraphicsApiDetector.GetLabel(api)}. OptiScaler's FSR 3.1 frame generation only works on DirectX 12, so it will likely have no effect."
+            : null;
+        FsrFgNote.Text = note ?? "";
+        FsrFgNote.IsVisible = note is not null;
+    }
+
+    private static string? ApplyFsrFrameGeneration(string folder, bool enable)
+    {
+        try { return OptiScalerService.ApplyFsr31FrameGeneration(folder, enable); }
+        catch (Exception ex) { return ex.Message; }
+    }
+
+    // ── #13 What will happen? ──────────────────────────────────────────────
+
+    private async void OnPreview(object? sender, RoutedEventArgs e)
+    {
+        var card = Card;
+        var owner = this.FindAncestorOfType<Window>();
+        if (card is null || owner is null) return;
+        var route = SelectedRoute;
+        var assessment = _assessment;
+        var tools = _tools.Where(t => t.IsSelected).Select(t => t.Name).ToList();
+        if (route is null || assessment is null || assessment.Mode == Dlss5DeploymentMode.None
+            || string.IsNullOrWhiteSpace(assessment.DeploymentPath))
+        {
+            await DialogHost.ConfirmAsync(owner, "What will happen?",
+                route is null
+                    ? "Tick “Install DLSS 5” and pick a route to preview its files."
+                    : "Adas needs the game folder and graphics API before it can list the files. Install asks for them.",
+                "OK", "Close");
+            return;
+        }
+
+        string text;
+        try
+        {
+            var (_, provider) = Dlss5GamePreferences.ResolveInstallChoices(
+                Dlss5GamePreferences.Get(card.GameName, card.Source), assessment.Mode);
+            var root = assessment.DeploymentPath!;
+            text = await Task.Run(() => Dlss5ComponentService.FormatPreview(root,
+                Dlss5ComponentService.PreviewInstall(root, assessment.Mode, assessment.Is64Bit, route.Profile, provider, route.DeepFriedChicken)));
+            if (tools.Count > 0)
+                text = $"Also installs: {string.Join(", ", tools)} (each keeps its own backup and has a Remove button).\n\n" + text;
+            text = $"DLSS 5 “{route.Label}” in {root}\n\n" + text;
+        }
+        catch (Exception ex)
+        {
+            text = $"Couldn't build the preview: {ex.Message}";
+        }
+        await DialogHost.ConfirmAsync(owner, "What will happen?", text, "OK", "Close");
+    }
+
+    // ── #15 Hotkeys and tips ───────────────────────────────────────────────
+
+    private void RefreshTips(GameCardViewModel card)
+    {
+        if (_installedRecord is null && !card.IsOsInstalled)
+        {
+            TipsCard.IsVisible = false;
+            return;
+        }
+        var tips = _installedRecord is { } record
+            ? Dlss5ComponentService.GetPostInstallTips(record.Mode, record.Profile, card.IsOsInstalled)
+            : new[] { "Insert — open the OptiScaler menu." };
+        TipsText.Text = "• " + string.Join("\n• ", tips);
+        TipsCard.IsVisible = true;
+    }
+
+    // ── #3 Tuning ──────────────────────────────────────────────────────────
+
+    private Dlss5TuningState? _tuning;
+    private bool _populatingTuning;
+
+    private void InitTuning()
+    {
+        WorkAreaSlider.PropertyChanged += (_, e) => { if (e.Property == Slider.ValueProperty) UpdateTuningLabels(); };
+        SharpnessSlider.PropertyChanged += (_, e) => { if (e.Property == Slider.ValueProperty) UpdateTuningLabels(); };
+        foreach (var slider in new[] { AioIntensitySlider, AioToneSlider, AioStructureSlider })
+            slider.PropertyChanged += (_, e) => { if (e.Property == Slider.ValueProperty) UpdateTuningLabels(); };
+        PresetQualityButton.Click += (_, _) => ApplyPreset(Dlss5TuningPreset.Quality);
+        PresetBalancedButton.Click += (_, _) => ApplyPreset(Dlss5TuningPreset.Balanced);
+        PresetPerformanceButton.Click += (_, _) => ApplyPreset(Dlss5TuningPreset.Performance);
+        PresetCustomButton.Click += (_, _) => ApplyCustomProfile();
+        SaveCustomButton.Click += (_, _) => SaveCustomProfile();
+        AimFpsButton.Click += (_, _) => SuggestForTarget();
+        ApplyTuningButton.Click += (_, _) => ApplyTuning(null);
+    }
+
+    private void RefreshTuning()
+    {
+        var root = _installedRoot;
+        Dlss5TuningState? state = null;
+        if (root is not null)
+        {
+            try { state = Dlss5ComponentService.ReadTuning(root); }
+            catch { state = null; }
+        }
+        _tuning = state;
+        TuningCard.IsVisible = state is { HasFeeder: true } or { HasAio: true };
+        if (state is null || !TuningCard.IsVisible) return;
+
+        _populatingTuning = true;
+        try
+        {
+            FeederTuningPanel.IsVisible = state.HasFeeder;
+            AioTuningPanel.IsVisible = state.HasAio;
+            PresetButtons.IsVisible = state.HasFeeder;
+            WorkAreaSlider.Value = state.WorkResolution;
+            FsrExpandCheck.IsChecked = state.WorkUpscale == 1;
+            SharpnessSlider.Value = state.WorkSharpness;
+            if (state.HasAio)
+            {
+                double D(string key) => double.TryParse(state.Aio.GetValueOrDefault(key), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 1;
+                AioNeuralCheck.IsChecked = state.Aio.GetValueOrDefault("NeuralRendering") != "0";
+                AioFrameGenCheck.IsChecked = state.Aio.GetValueOrDefault("FrameGeneration") == "1";
+                AioFrameGenCheck.IsEnabled = state.AioFrameGenerationAvailable || AioFrameGenCheck.IsChecked == true;
+                AioIntensitySlider.Value = D("Intensity");
+                AioToneSlider.Value = D("LocalTone");
+                AioStructureSlider.Value = D("LocalStructure");
+            }
+            var card = Card;
+            var preset = card is null ? null : Dlss5GamePreferences.Get(card.GameName, card.Source).TuningPreset;
+            TuningIntro.Text = (state.HasFeeder
+                    ? state.WorkResolutionApplies
+                        ? "Work area is the Feeder's cost knob: DLSS 5 runs on a smaller copy of the frame that is then expanded back. It is not DLSS upscaling — lower looks softer."
+                        : "The work-area slider only has an effect on the Feeder's DirectX 11 transport; this game's route keeps 100%. Sharpness still applies."
+                    : "Standalone AIO settings, written to ReShade.ini.")
+                + (preset is null ? "" : $" Last applied: {preset}.")
+                + " Changes apply the next time the game starts.";
+            PresetCustomButton.IsEnabled = card is not null
+                && Dlss5GamePreferences.Get(card.GameName, card.Source).CustomTuning is { Count: > 0 };
+            TuningStatus.Text = "";
+        }
+        finally { _populatingTuning = false; }
+        UpdateTuningLabels();
+    }
+
+    private void UpdateTuningLabels()
+    {
+        var percent = (int)Math.Round(WorkAreaSlider.Value);
+        var cost = Dlss5ComponentService.RelativeWorkCost(percent);
+        WorkAreaLabel.Text = $"Work area: {percent}%";
+        WorkAreaNote.Text = percent >= 100
+            ? "Full quality — the neural pass runs on every pixel."
+            : $"About {cost:P0} of the full neural cost (≈{1 / cost:0.#}× cheaper); softer image.";
+        SharpnessValue.Text = SharpnessSlider.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        AioIntensityValue.Text = AioIntensitySlider.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        AioToneValue.Text = AioToneSlider.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        AioStructureValue.Text = AioStructureSlider.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private Dictionary<string, string> CollectFeederTuning() => new()
+    {
+        ["work_resolution"] = ((int)Math.Round(WorkAreaSlider.Value)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ["work_upscale"] = FsrExpandCheck.IsChecked == true ? "1" : "0",
+        ["work_sharpness"] = SharpnessSlider.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    private Dictionary<string, string> CollectAioTuning()
+    {
+        string F(double v) => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        var values = new Dictionary<string, string>
+        {
+            ["NeuralRendering"] = AioNeuralCheck.IsChecked == true ? "1" : "0",
+            ["Intensity"] = F(AioIntensitySlider.Value),
+            ["LocalTone"] = F(AioToneSlider.Value),
+            ["LocalStructure"] = F(AioStructureSlider.Value),
+        };
+        if (_tuning?.AioFrameGenerationAvailable == true || AioFrameGenCheck.IsChecked != true)
+            values["FrameGeneration"] = AioFrameGenCheck.IsChecked == true ? "1" : "0";
+        return values;
+    }
+
+    private void ApplyPreset(Dlss5TuningPreset preset)
+    {
+        WorkAreaSlider.Value = Dlss5ComponentService.WorkResolutionFor(preset);
+        FsrExpandCheck.IsChecked = preset != Dlss5TuningPreset.Quality;
+        ApplyTuning(preset.ToString());
+    }
+
+    private void ApplyCustomProfile()
+    {
+        var card = Card;
+        if (card is null) return;
+        var custom = Dlss5GamePreferences.Get(card.GameName, card.Source).CustomTuning;
+        if (custom is null || custom.Count == 0) { TuningStatus.Text = "No saved profile yet — set the sliders and press Save as my profile."; return; }
+        double Get(string key, double fallback) => custom.TryGetValue(key, out var text)
+            && double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : fallback;
+        WorkAreaSlider.Value = Get("work_resolution", WorkAreaSlider.Value);
+        FsrExpandCheck.IsChecked = Get("work_upscale", FsrExpandCheck.IsChecked == true ? 1 : 0) >= 1;
+        SharpnessSlider.Value = Get("work_sharpness", SharpnessSlider.Value);
+        AioIntensitySlider.Value = Get("Intensity", AioIntensitySlider.Value);
+        AioToneSlider.Value = Get("LocalTone", AioToneSlider.Value);
+        AioStructureSlider.Value = Get("LocalStructure", AioStructureSlider.Value);
+        if (custom.TryGetValue("NeuralRendering", out var nr)) AioNeuralCheck.IsChecked = nr != "0";
+        if (custom.TryGetValue("FrameGeneration", out var fg)) AioFrameGenCheck.IsChecked = fg == "1";
+        ApplyTuning("My profile");
+    }
+
+    private void SaveCustomProfile()
+    {
+        var card = Card;
+        if (card is null || _tuning is null) return;
+        var values = new Dictionary<string, string>();
+        if (_tuning.HasFeeder) foreach (var pair in CollectFeederTuning()) values[pair.Key] = pair.Value;
+        if (_tuning.HasAio) foreach (var pair in CollectAioTuning()) values[pair.Key] = pair.Value;
+        Dlss5GamePreferences.Update(card.GameName, card.Source, p => p.CustomTuning = values);
+        PresetCustomButton.IsEnabled = true;
+        TuningStatus.Text = "Saved as this game's profile.";
+    }
+
+    private void SuggestForTarget()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        if (!double.TryParse(TargetFpsBox.Text, System.Globalization.NumberStyles.Float, culture, out var target)
+            || !double.TryParse(CurrentFpsBox.Text, System.Globalization.NumberStyles.Float, culture, out var current)
+            || target <= 0 || current <= 0)
+        {
+            TuningStatus.Text = "Enter the fps you want and the fps you get now (with DLSS 5 on).";
+            return;
+        }
+        var suggested = Dlss5ComponentService.EstimateWorkResolutionForTarget(current, target, (int)Math.Round(WorkAreaSlider.Value));
+        WorkAreaSlider.Value = suggested;
+        if (suggested < 100) FsrExpandCheck.IsChecked = true;
+        TuningStatus.Text = suggested == Dlss5ComponentService.MinWorkResolution && current * 4 < target
+            ? "Even 50% (about a quarter of the cost) probably won't reach that — press Apply to use 50%, and consider a lighter route."
+            : $"Suggested work area: {suggested}%. It's an estimate — press Apply, then check in game.";
+    }
+
+    private void ApplyTuning(string? presetName)
+    {
+        var card = Card;
+        var root = _installedRoot;
+        if (card is null || root is null || _tuning is null || _populatingTuning) return;
+        try
+        {
+            if (_tuning.HasFeeder) Dlss5ComponentService.SaveFeederTuning(root, CollectFeederTuning());
+            if (_tuning.HasAio) Dlss5ComponentService.SaveAioUserSettings(root, CollectAioTuning());
+            Dlss5GamePreferences.Update(card.GameName, card.Source, p => p.TuningPreset = presetName ?? "Custom");
+            TuningStatus.Text = (presetName is null ? "Applied." : $"{presetName} applied.") + " Restart the game if it's running.";
+        }
+        catch (Exception ex)
+        {
+            TuningStatus.Text = "Couldn't apply: " + ex.Message;
         }
     }
 

@@ -1573,6 +1573,24 @@ public partial class OptiScalerService
     /// Applies all persisted FG settings to the game's OptiScaler.ini in one pass.
     /// FGNvngxReplacement is only written when fgOutput == "dlssg".
     /// </summary>
+    public const string FsrFrameGenerationLibrary = "amd_fidelityfx_framegeneration_dx12.dll";
+
+    /// <summary>
+    /// Turns OptiScaler's bundled FSR 3.1 frame generation (2x) on or off, fed from OptiScaler's own upscaler
+    /// (<c>FGInput=upscaler</c>, <c>FGOutput=fsrfg</c>). D3D12 only. Returns a problem to show, or null.
+    /// </summary>
+    public static string? ApplyFsr31FrameGeneration(string gameInstallPath, bool enable)
+    {
+        if (!File.Exists(Path.Combine(gameInstallPath, IniFileName)))
+            return "OptiScaler.ini isn't in the game folder — install OptiScaler first.";
+        if (enable && !File.Exists(Path.Combine(gameInstallPath, FsrFrameGenerationLibrary)))
+            return $"{FsrFrameGenerationLibrary} is missing next to OptiScaler — reinstall OptiScaler to restore its FSR 3.1 frame generation files.";
+        SetOptiScalerIniValue(gameInstallPath, "FrameGen", "Enabled", enable ? "true" : "false");
+        SetOptiScalerIniValue(gameInstallPath, "FrameGen", "FGInput", enable ? "upscaler" : "nofg");
+        SetOptiScalerIniValue(gameInstallPath, "FrameGen", "FGOutput", enable ? "fsrfg" : "nofg");
+        return null;
+    }
+
     public static void ApplyFgSettings(string gameInstallPath, string fgInput, string fgOutput, string fgNvngxReplacement)
     {
         if (!File.Exists(Path.Combine(gameInstallPath, IniFileName))) return;

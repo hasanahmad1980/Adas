@@ -1,3 +1,12 @@
+## v3.0.7 — Tuning, Feeder channel, FSR FG, motion provider, preview and tips (2026-09-13)
+
+- **Tuning card.** Feeder work area slider (75% ≈ half the neural cost, 50% ≈ a quarter), FSR expand and sharpness, plus AIO neural rendering, frame generation and intensity/tone/structure. Quality / Balanced / Performance presets, your own saved profile, and "Aim for X fps" which suggests a work area from your current frame rate.
+- **Feeder build channel** (Advanced): packaged, newest pre-release, or an exact release tag from jlrouzies-fr/DLSS5-Feeder. Builds before 0.8 pair with RenoDX 4.55. If the download fails, Adas installs the packaged build and tells you.
+- **FSR 3.1 frame generation through OptiScaler** — off by default, DX12 only, with a warning to turn the game's own frame generation off and expect extra latency.
+- **Motion-vector provider** (Advanced): LumeniteFX Kernel, or VORT Motion (automatic on OpenGL). The chosen one is placed above DLSS5_Feed.
+- **"What will happen?"** lists the files an install would write, back up and remove, and the settings it would change — without touching anything.
+- **Hotkeys & tips after install:** F6 toggles NR, F5 screenshot, Home opens ReShade Add-ons, Insert opens OptiScaler; borderless/windowed on the Feeder and v-sync off.
+
 ## v3.0.6 — Nothing is blocked: pick DLSS 5 + tools, one Install button (2026-09-13)
 
 - **Install is never greyed out.** GPU, anti-cheat, online-status and "not recommended" routes are warnings now — Adas lists them all in one "Install anyway?" prompt and then installs. Every route can be picked.

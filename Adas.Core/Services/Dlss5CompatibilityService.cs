@@ -474,7 +474,8 @@ public sealed class Dlss5CompatibilityService
                 if (new FileInfo(file).Length <= 2 * 1024 * 1024
                     && (File.ReadAllText(file).Contains("texMotionVectors", StringComparison.Ordinal)
                         || name.Equals("lumenite_Kernel.fx", StringComparison.OrdinalIgnoreCase)
-                        || name.Equals("lumenite_QuantMotion.fx", StringComparison.OrdinalIgnoreCase)))
+                        || name.Equals("lumenite_QuantMotion.fx", StringComparison.OrdinalIgnoreCase)
+                        || name.Equals("vort_Motion.fx", StringComparison.OrdinalIgnoreCase)))
                     return true;
             }
             catch { }

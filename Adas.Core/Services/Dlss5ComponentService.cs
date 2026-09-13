@@ -157,6 +157,8 @@ public sealed partial class Dlss5ComponentService
     {
         if (record == null) return false;
         var version = record.ComponentVersion ?? "";
+        // A Feeder build the user pinned from GitHub is never "outdated".
+        if (version.Contains("(pinned)", StringComparison.OrdinalIgnoreCase)) return false;
         return record.Profile switch
         {
             Dlss5InstallProfile.StandaloneAio => !version.Contains($"AIO {AioVersion}", StringComparison.OrdinalIgnoreCase),
@@ -410,7 +412,21 @@ public sealed partial class Dlss5ComponentService
         if (useNeuralUpstream && useDfc)
             throw new InvalidOperationException("Neural Upstream and Deep Fried Chicken are separate consumers. Select only one route.");
         StagedComponent? staged = null;
-        if (compatibilityPlan.InstallFeeder)
+        var motionProviderChoice = overrides?.MotionProvider ?? Dlss5MotionProvider.LumeniteKernel;
+        if (compatibilityPlan.InstallFeeder && overrides?.FeederReleaseTag is { } feederTag)
+        {
+            try
+            {
+                progress?.Report(($"Downloading DLSS5-Feeder {(feederTag == NewestPrereleaseTag ? "newest pre-release" : feederTag)}...", 6));
+                staged = await EnsureStagedAsync(assessment.Mode, assessment.Is64Bit, profile, cancellationToken, feederTag).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or IOException or InvalidDataException or JsonException)
+            {
+                _crashReporter.Log($"[Dlss5ComponentService] Feeder release '{feederTag}' unavailable, using the packaged build: {ex.Message}");
+                warnings.Add($"The chosen Feeder build ({feederTag}) could not be downloaded ({ex.Message}); Adas installed its packaged Feeder instead.");
+            }
+        }
+        if (compatibilityPlan.InstallFeeder && staged == null)
             staged = await EnsureStagedAsync(assessment.Mode, assessment.Is64Bit, profile, cancellationToken).ConfigureAwait(false);
         var bundledRenoDx = Path.Combine(GetBundledComponentDirectory(), Renodx5AddonService.AddonFileName);
         var selectedStableRenoDx = compatibilityPlan.RenoDxPackage switch
@@ -649,7 +665,9 @@ public sealed partial class Dlss5ComponentService
                 if (preservedLaunchPad.Count > 0)
                     warnings.Add("Legacy iMMERSE LaunchPad files were moved into .adas\\legacy-launchpad-backup because DLSS5_Feed.fx no longer uses them.");
 
-                var motionProvider = await EnsureMotionProviderStagedAsync(cancellationToken).ConfigureAwait(false);
+                var motionProvider = motionProviderChoice == Dlss5MotionProvider.VortMotion
+                    ? StageVortMotionProvider()
+                    : await EnsureMotionProviderStagedAsync(cancellationToken).ConfigureAwait(false);
                 foreach (var providerFile in motionProvider)
                 {
                     var destination = Path.Combine(path, providerFile.RelativeGamePath);
@@ -657,7 +675,7 @@ public sealed partial class Dlss5ComponentService
                     installed.Add(destination);
                 }
 
-                var presetPath = EnsureFeederPreset(path, record);
+                var presetPath = EnsureFeederPreset(path, record, motionProviderChoice);
                 installed.Add(presetPath);
 
                 if ((assessment.Mode is Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.Dx10ViaDxvkFeeder
@@ -725,7 +743,7 @@ public sealed partial class Dlss5ComponentService
         _crashReporter.Log($"[Dlss5ComponentService] Installed {assessment.Mode} v{staged.Version} for '{gameName}' at '{path}'");
 
         var completionMessage = $"{assessment.ModeLabel} installed with the {compatibilityPlan.ProfileName} compatibility profile. " +
-                                "Neural rendering, LumeniteFX Kernel, and DLSS 5 Feed were enabled automatically in ReShade with the correct provider binding. Adas verified every required file.";
+                                $"Neural rendering, {(motionProviderChoice == Dlss5MotionProvider.VortMotion ? "VORT Motion" : "LumeniteFX Kernel")}, and DLSS 5 Feed were enabled automatically in ReShade with the correct provider binding. Adas verified every required file.";
         if (assessment.Mode == Dlss5DeploymentMode.VulkanFeeder)
             completionMessage += " A per-game Vulkan fallback launcher is available under DLSS5-Vulkan-Fallback if the Feeder log says its normal vkCreateDevice hook was not reached.";
         if (assessment.Mode is Dlss5DeploymentMode.Dx9Feeder or Dlss5DeploymentMode.Dx8Feeder)
@@ -1309,18 +1327,21 @@ public sealed partial class Dlss5ComponentService
         Dlss5DeploymentMode mode,
         bool is64Bit,
         Dlss5InstallProfile profile,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? releaseTag = null)
     {
         var repo = FeederRepo;
-        var useBeta = profile == Dlss5InstallProfile.LatestFeederBeta;
+        if (releaseTag != null && releaseTag != NewestPrereleaseTag && !Dlss5GamePreferences.IsValidReleaseTag(releaseTag))
+            throw new InvalidOperationException($"'{releaseTag}' is not a valid release tag.");
+        var useBeta = releaseTag == null && profile == Dlss5InstallProfile.LatestFeederBeta;
         var required = GetRequiredComponentNames(mode, is64Bit);
-        var staging = GetComponentStagingPath(useBeta ? BundledFeederBetaVersion : null);
+        var staging = GetComponentStagingPath(releaseTag != null ? "github-" + releaseTag : useBeta ? BundledFeederBetaVersion : null);
         Directory.CreateDirectory(staging);
 
         var localFiles = required.ToDictionary(name => name, name => Path.Combine(staging, name), StringComparer.OrdinalIgnoreCase);
         var localVersionPath = Path.Combine(staging, "version.txt");
         var localVersion = File.Exists(localVersionPath) ? File.ReadAllText(localVersionPath).Trim() : "";
-        if (!useBeta
+        if (!useBeta && releaseTag == null
             && localFiles.Values.All(File.Exists)
             && localVersion.Equals("local-user-import", StringComparison.OrdinalIgnoreCase))
         {
@@ -1333,7 +1354,7 @@ public sealed partial class Dlss5ComponentService
             name => name,
             name => Path.Combine(GetBundledComponentDirectory(), GetBundledFeederAssetName(name, useBeta, is64Bit)),
             StringComparer.OrdinalIgnoreCase);
-        if (bundled.Values.All(File.Exists))
+        if (releaseTag == null && bundled.Values.All(File.Exists))
         {
             foreach (var pair in bundled)
             {
@@ -1351,14 +1372,30 @@ public sealed partial class Dlss5ComponentService
                 $"Adas is missing its packaged DLSS5-Feeder {BundledFeederBetaVersion} test-build payload. Repair or reinstall Adas; beta files are never mixed with the stable Feeder.",
                 bundled.Values.FirstOrDefault(path => !File.Exists(path)));
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{repo}/releases/latest");
+        var releaseUrl = releaseTag == null
+            ? $"https://api.github.com/repos/{repo}/releases/latest"
+            : $"https://api.github.com/repos/{repo}/releases?per_page=100";
+        using var request = new HttpRequestMessage(HttpMethod.Get, releaseUrl);
         request.Headers.Add("Accept", "application/vnd.github+json");
         request.Headers.Add("User-Agent", "Adas-RHI");
         using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-        var version = document.RootElement.GetProperty("tag_name").GetString() ?? "unknown";
-        var assets = document.RootElement.GetProperty("assets").EnumerateArray()
+        var release = releaseTag == null
+            ? document.RootElement
+            : SelectFeederRelease(document.RootElement, releaseTag)
+              ?? throw new InvalidOperationException(releaseTag == NewestPrereleaseTag
+                  ? $"{repo} has no published pre-release."
+                  : $"{repo} has no release tagged {releaseTag}.");
+        var version = release.GetProperty("tag_name").GetString() ?? "unknown";
+        if (releaseTag != null && localFiles.Values.All(File.Exists) && localVersion.Equals(version, StringComparison.Ordinal)
+            && releaseTag != NewestPrereleaseTag)
+        {
+            foreach (var pair in localFiles)
+                ValidateComponent(pair.Key, pair.Value);
+            return new(version + " (pinned)", localFiles);
+        }
+        var assets = release.GetProperty("assets").EnumerateArray()
             .Select(asset => new
             {
                 Name = asset.GetProperty("name").GetString() ?? "",
@@ -1413,7 +1450,7 @@ public sealed partial class Dlss5ComponentService
             ValidateComponent(pair.Key, pair.Value);
 
         File.WriteAllText(Path.Combine(staging, "version.txt"), version);
-        return new(version, resolved);
+        return new(releaseTag == null ? version : version + " (pinned)", resolved);
     }
 
     private async Task DownloadFileAsync(string url, string destination, CancellationToken cancellationToken)
@@ -1731,6 +1768,38 @@ public sealed partial class Dlss5ComponentService
         return files;
     }
 
+    /// <summary>Stages the packaged VORT Motion shaders (no download) as a Feeder motion-vector provider.</summary>
+    private static IReadOnlyList<StagedProviderFile> StageVortMotionProvider()
+    {
+        var archive = Path.Combine(GetBundledComponentDirectory(), AioVortBundle);
+        if (!File.Exists(archive) || !FileHelper.ComputeSha256(archive).Equals(AioVortBundleSha256, StringComparison.OrdinalIgnoreCase))
+            throw new FileNotFoundException("The packaged VORT motion bundle is missing or invalid. Reinstall Adas.", archive);
+        var stage = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "RHI", "Adas", "DLSS5", "VortMotion");
+        var marker = Path.Combine(stage, "bundle.sha256");
+        if (!File.Exists(marker) || !File.ReadAllText(marker).Trim().Equals(AioVortBundleSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            if (Directory.Exists(stage)) Directory.Delete(stage, recursive: true);
+            Directory.CreateDirectory(stage);
+            ExtractArchiveSafely(archive, stage, packageLabel: "VORT Motion");
+            File.WriteAllText(marker, AioVortBundleSha256);
+        }
+        var files = new List<StagedProviderFile>();
+        foreach (var kind in new[] { "Shaders", "Textures" })
+        {
+            var source = Path.Combine(stage, kind, "VortShaders");
+            if (!Directory.Exists(source)) continue;
+            files.AddRange(Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
+                .Where(file => kind != "Shaders" || !file.EndsWith(".fx", StringComparison.OrdinalIgnoreCase)
+                               || Path.GetFileName(file).Equals("vort_Motion.fx", StringComparison.OrdinalIgnoreCase))
+                .Select(file => new StagedProviderFile(file,
+                    Path.Combine("reshade-shaders", kind, "VortShaders", Path.GetRelativePath(source, file)))));
+        }
+        if (!files.Any(file => Path.GetFileName(file.SourcePath).Equals("vort_Motion.fx", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException("The packaged VORT motion bundle is incomplete.");
+        return files;
+    }
+
     private static bool IsValidLumeniteProvider(string root)
     {
         try { ValidateLumeniteProvider(root); return true; }
@@ -1751,7 +1820,8 @@ public sealed partial class Dlss5ComponentService
             throw new InvalidDataException("The downloaded LumeniteFX Kernel shader did not match the expected interface.");
     }
 
-    internal static string EnsureFeederPreset(string root, Dlss5InstallRecord record)
+    internal static string EnsureFeederPreset(string root, Dlss5InstallRecord record,
+        Dlss5MotionProvider motionProvider = Dlss5MotionProvider.LumeniteKernel)
     {
         var reShadeIniPath = Path.Combine(root, "ReShade.ini");
         var presetPath = Path.Combine(root, "ReShadePreset.ini");
@@ -1779,9 +1849,19 @@ public sealed partial class Dlss5ComponentService
         preset.TryGetValue("", "Techniques", out var techniques);
         preset.SetValue("", "Techniques", PutTechniquesFirst(
             techniques?.Text ?? "",
-            disableDrme: true));
+            disableDrme: true,
+            provider: motionProvider));
         preset.TryGetValue("", "TechniqueSorting", out var sorting);
-        preset.SetValue("", "TechniqueSorting", PutTechniquesFirst(sorting?.Text ?? ""));
+        preset.SetValue("", "TechniqueSorting", PutTechniquesFirst(sorting?.Text ?? "", provider: motionProvider));
+        if (motionProvider == Dlss5MotionProvider.VortMotion)
+        {
+            // Motion-vector output only: no VORT blur/TAA on top of the neural image.
+            preset.TryGetValue("vort_Motion.fx", "PreprocessorDefinitions", out var vortDefinitions);
+            var vortRequired = new[] { "V_MV_MODE=1", "V_ENABLE_MOT_BLUR=0", "V_ENABLE_TAA=0", "V_MV_DEBUG=0" };
+            var vortRetained = SplitIniList(vortDefinitions.Text).Where(value => !vortRequired.Any(item =>
+                item.Split('=')[0].Equals(value.Split('=')[0], StringComparison.OrdinalIgnoreCase)));
+            preset.SetValue("vort_Motion.fx", "PreprocessorDefinitions", string.Join(',', vortRetained.Concat(vortRequired)));
+        }
 
         var hasDefinitions = preset.TryGetValue(FeederShader, "PreprocessorDefinitions", out var existingDefinitions);
         var definitions = hasDefinitions
@@ -1789,7 +1869,7 @@ public sealed partial class Dlss5ComponentService
                 .Where(value => !value.StartsWith("DLSS5_MV_PROVIDER=", StringComparison.OrdinalIgnoreCase))
                 .ToList()
             : new List<string>();
-        definitions.Insert(0, "DLSS5_MV_PROVIDER=3");
+        definitions.Insert(0, MotionProviderDefinition(motionProvider));
         preset.SetValue(FeederShader, "PreprocessorDefinitions", string.Join(',', definitions));
 
         var temporary = Path.Combine(Path.GetTempPath(), $"adas-dlss5-preset-{Guid.NewGuid():N}.ini");
@@ -2115,15 +2195,18 @@ public sealed partial class Dlss5ComponentService
         document.Save(path);
     }
 
-    private static string PutTechniquesFirst(string value, bool disableDrme = false)
+    internal static string PutTechniquesFirst(string value, bool disableDrme = false,
+        Dlss5MotionProvider provider = Dlss5MotionProvider.LumeniteKernel)
     {
-        const string provider = "Lumenite_Kernel@lumenite_Kernel.fx";
+        // Exactly one provider may be enabled, and it must sit above DLSS5_Feed.
+        var selected = MotionProviderTechnique(provider);
         const string feeder = "DLSS5_Feed@DLSS5_Feed.fx";
         var remaining = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(item => !item.Equals(provider, StringComparison.OrdinalIgnoreCase)
+            .Where(item => !item.Equals(LumeniteProviderTechnique, StringComparison.OrdinalIgnoreCase)
+                           && !item.Equals(VortProviderTechnique, StringComparison.OrdinalIgnoreCase)
                            && !item.Equals(feeder, StringComparison.OrdinalIgnoreCase)
                            && (!disableDrme || !IsDrmeTechnique(item)));
-        return string.Join(',', new[] { provider, feeder }.Concat(remaining));
+        return string.Join(',', new[] { selected, feeder }.Concat(remaining));
     }
 
     private static bool IsDrmeTechnique(string item)
