@@ -6,7 +6,7 @@ public sealed partial class Dlss5ComponentService
 {
     internal const string OptiScalerNrVersion = "0.2.0";
     internal const string OptiScalerSplitVersion = "0.1.2 NR-before-SR English";
-    internal const string OptiScalerMultipassVersion = "0.7.7";
+    internal const string OptiScalerMultipassVersion = "0.8.3";
     private static readonly SemaphoreSlim OptiScalerNrCacheLock = new(1, 1);
 
     internal static bool IsOptiScalerNrProfile(Dlss5InstallProfile? profile)
@@ -94,8 +94,8 @@ public sealed partial class Dlss5ComponentService
                 "https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/releases/download/v0.1.2-nr-before-sr-english/OptiScaler-NR-before-SR-English-x64-20260903.zip"),
             Dlss5InstallProfile.OptiScalerPreSrMultipass => (
                 OptiScalerMultipassVersion, "optiscaler-multipass.zip",
-                "4A315A3B3EE495631BD7CB1F562F609AF577443602E507BFC7A7E6749C296258",
-                "https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/releases/download/v0.7.7/OptiScaler-DLSSNR-v0.7.7.zip"),
+                "3F2D26FB136D964A394BF50896D082156173153A2A55B88E1995277B4DABE3C8",
+                "https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/releases/download/v0.8.3/OptiScaler-NR-v0.8.3.zip"),
             _ => (
                 OptiScalerNrVersion, "optiscaler-nr.zip",
                 "8EECE7A4D7DE6DE5917F0C99AC60540B2D77022E7699BBA717B0A6D9E1829BCE",
@@ -133,7 +133,7 @@ public sealed partial class Dlss5ComponentService
                 .Select(source => (Source: source, Relative: OptiScalerNrDestination(Path.GetRelativePath(stage, source))))
                 .Where(file => file.Relative != null).ToList();
             files = files.Select(file => (file.Source, Relative: file.Relative == "dxgi.dll" ? proxyName : file.Relative)).ToList();
-            foreach (var required in new[] { proxyName, "nvngx.dll_dlssnr.dll", "OptiScaler.ini" })
+            foreach (var required in OptiScalerNrRequiredFiles(proxyName, profile))
                 if (!files.Any(file => file.Relative == required)) throw new InvalidDataException($"OptiScaler NR package missing {required}.");
             var runtimeStage = Directory.CreateDirectory(Path.Combine(stage, "runtimes")).FullName;
             foreach (var source in StageAioRuntimes(root, GetBundledComponentDirectory(), runtimeStage))
@@ -164,6 +164,7 @@ public sealed partial class Dlss5ComponentService
                 if (file.Relative == "OptiScaler.ini" && File.Exists(destination)) continue;
                 InstallTrackedFile(file.Source, destination, root, record);
             }
+            PruneSupersededOptiScalerNrFiles(root, record, files.Select(file => Path.Combine(root, file.Relative!)));
             var iniPath = Path.Combine(root, "OptiScaler.ini");
             var ini = IniTextDocument.Load(iniPath);
             // Preserve existing tuning on Repair while migrating route-critical defaults.
@@ -182,11 +183,46 @@ public sealed partial class Dlss5ComponentService
                 "Driver 616.56 or newer is required by upstream. File installation is not a GPU compatibility or image-quality test.",
             };
             if (profile == Dlss5InstallProfile.OptiScalerPreSrMultipass)
-                tips.Add("Pre-SR multipass fork: Adas enables RunBeforeSR. Pass count (1-3) and model precision (0 = FP8, 2 = NVFP4 hybrid, Blackwell only) are changed from the Insert overlay or OptiScaler.ini; FP8 is the safe cross-generation default, and higher pass counts cost roughly N× the model time. Requires your separately supplied nvngx_dlssnr.dll 310.8 runtime beside the game (RTX 50: NVIDIA-signed; RTX 20/30/40: ShortFuse compatibility build).");
+                tips.Add("Pre-SR multipass fork: Adas enables RunBeforeSR. NR now runs inside OptiScaler with no helper DLL (an obsolete nvngx.dll_dlssnr.dll from 0.7.x is removed on upgrade). Pass count (1-3) is changed from the Insert overlay or OptiScaler.ini; higher pass counts cost roughly N× the model time. Requires your separately supplied nvngx_dlssnr.dll 310.8 runtime beside the game (RTX 50: NVIDIA-signed; RTX 20/30/40: ShortFuse compatibility build, which now falls back to a direct backend if the driver rejects it).");
             return new(true, assessment.Mode, root, record.InstalledHashes.Keys.ToArray(), tips.ToArray(),
                 $"OptiScaler NR {version} installed as {proxyName}. Any replaced ReShade loader is backed up for removal; no Feeder, Bridge or RenoDX DLSS pipeline was added.");
         }
         finally { Directory.Delete(stage, recursive: true); }
+    }
+
+    /// <summary>
+    /// wilsjo2's pre-SR fork dispatches NR inside OptiScaler from 0.8 onward, so it ships no
+    /// nvngx.dll_dlssnr.dll helper. The other OptiScaler NR forks still require it.
+    /// </summary>
+    internal static bool OptiScalerNrUsesHelperDll(Dlss5InstallProfile profile)
+        => profile != Dlss5InstallProfile.OptiScalerPreSrMultipass;
+
+    internal static string[] OptiScalerNrRequiredFiles(string proxyName, Dlss5InstallProfile profile)
+        => OptiScalerNrUsesHelperDll(profile)
+            ? new[] { proxyName, "nvngx.dll_dlssnr.dll", "OptiScaler.ini" }
+            : new[] { proxyName, "OptiScaler.ini" };
+
+    /// <summary>
+    /// On Repair/upgrade, removes files a previous package version installed that the current
+    /// package no longer ships (e.g. the obsolete helper DLL and 0.7.x nvfp4 data). Only files
+    /// still matching their recorded hash are deleted; user-modified files are left in place.
+    /// </summary>
+    internal static void PruneSupersededOptiScalerNrFiles(string root, Dlss5InstallRecord record, IEnumerable<string> currentDestinations)
+    {
+        var current = new HashSet<string>(currentDestinations, StringComparer.OrdinalIgnoreCase)
+        {
+            Path.Combine(root, "OptiScaler.ini"),
+        };
+        foreach (var (path, hash) in record.InstalledHashes.ToArray())
+        {
+            if (current.Contains(path) || record.OriginalBackups.ContainsKey(path)) continue;
+            if (File.Exists(path))
+            {
+                if (!FileHelper.ComputeSha256(path).Equals(hash, StringComparison.OrdinalIgnoreCase)) continue;
+                File.Delete(path);
+            }
+            record.InstalledHashes.Remove(path);
+        }
     }
 
     internal static void ConfigureOptiScalerNrIni(

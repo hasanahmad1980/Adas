@@ -48,7 +48,7 @@ public sealed partial class Dlss5ComponentService
     internal const string BridgeVersion = "v1.4.12";
     internal const string BridgeSha256 = "4F2ACECC1026AE89AC0B92767BE66CEEA2662AD0EF88710B89C7DA7840D548D4";
     private const string BundledFeederVersion = "0.7.0";
-    internal const string BundledFeederBetaVersion = "0.15.1";
+    internal const string BundledFeederBetaVersion = "1.16.0-beta.1";
     internal const string OpenGlBridgeVersion = "1.0.5";
     internal const string NeuralUpstreamVersion = "0.3.0";
     internal const string NeuralUpstreamAddon = "nvngx.dll.addon64";

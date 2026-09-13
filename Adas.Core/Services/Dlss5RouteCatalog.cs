@@ -124,7 +124,7 @@ public static class Dlss5RouteCatalog
 
         Add(Dlss5InstallProfile.OptiScalerPreSrMultipass,
             $"NR before upscaling — multipass {Dlss5ComponentService.OptiScalerMultipassVersion} (experimental)",
-            "wilsjo2 pre-SR fork: NR before Super Resolution, 1-3 pass processing and FP8/NVFP4-hybrid precision. Needs a separately supplied nvngx_dlssnr.dll runtime.",
+            "wilsjo2 pre-SR fork: NR before Super Resolution with 1-3 pass processing, run inside OptiScaler (no helper DLL). Needs a separately supplied nvngx_dlssnr.dll runtime.",
             multipassSupported,
             !is64 ? "the pre-SR multipass fork requires a 64-bit game"
                   : "the pre-SR multipass fork requires native DirectX 12");

@@ -94,7 +94,7 @@ internal static partial class Dlss5DiagnosticService
         if (Dlss5ComponentService.IsOptiScalerNrProfile(record.Profile))
         {
             if (!is64Bit) problems.Add("OptiScaler NR cannot run inside a 32-bit game.");
-            foreach (var name in new[] { Dlss5ComponentService.OptiScalerNrProxy(mode), "nvngx.dll_dlssnr.dll", "nvngx_dlssnr.dll", "OptiScaler.ini" })
+            foreach (var name in Dlss5ComponentService.OptiScalerNrRequiredFiles(Dlss5ComponentService.OptiScalerNrProxy(mode), record.Profile).Append("nvngx_dlssnr.dll"))
                 if (!File.Exists(Path.Combine(root, name))) problems.Add($"Missing OptiScaler NR file: {name}");
             foreach (var (file, hash) in record.InstalledHashes.Where(item => item.Key.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)))
             {

@@ -5,11 +5,11 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    internal const string NeuralScreenVersion = "1.8.0";
+    internal const string NeuralScreenVersion = "1.8.2";
     private const string NeuralScreenUrl =
-        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.8.0/neuralscreen-v1.8.0-full.zip";
+        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v1.8.2/neuralscreen-v1.8.2-full.zip";
     private const string NeuralScreenSha256 =
-        "F60485325E56FCFC3AABD27BA32E438BE31EE7910B5AEEF2696BBBDD6BD99291";
+        "94014365001E2B5E1FD07DEA0C5869A8E1009802FE8D31302F6D6AA14C7EA395";
     private static readonly SemaphoreSlim NeuralScreenCacheLock = new(1, 1);
 
     /// <summary>

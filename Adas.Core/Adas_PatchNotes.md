@@ -1,3 +1,10 @@
+## v3.0.3 — NeuralScreen 1.8.2, multipass NR 0.8.3, Feeder 1.16.0-beta.1 (2026-09-13)
+
+- **NeuralScreen** re-pinned **1.8.0 → 1.8.2** (runtime-fetched, SHA-256 re-verified). Upstream turns Boost on by default (≈45.7 → 72.6 fps at 4K on a 5070 Ti in the author's measurement), lowers Local tone half a point in every profile, and makes three silent failures explain themselves.
+- **OptiScaler pre-SR multipass NR** re-pinned **0.7.7 → 0.8.3** (runtime-fetched, SHA-256 matches the author's published `.sha256`). NR now runs inside OptiScaler with **no `nvngx.dll_dlssnr.dll` helper**: Adas no longer requires it for this route, and Repair/upgrade removes the obsolete helper and 0.7.x model data it previously installed (user-modified files are left alone). Upstream adds a direct-backend fallback when the driver rejects the RTX 20/30/40 compatibility runtime, can reuse a runtime another loader already owns, and skips unreadable depth/motion frames instead of disabling NR.
+- **DLSS5-Feeder beta** re-pinned **0.15.1 → 1.16.0-beta.1** (bundled; every file hash-guarded at build time). Upstream fixes the D3D11 output handoff (#93), 32-bit Vulkan device regeneration (#91), host rebuild lifetime (#74) and OptiScaler first-call startup (#84), and adds feature-18 activation diagnostics.
+- Existing installs on the previous versions are flagged as having an update available.
+
 ## v3.0.2 — Luma-Framework 649 (2026-09-12)
 
 - **Luma-Framework** generic-UE build re-pinned **648 → 649**.
