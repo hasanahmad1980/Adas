@@ -1,3 +1,11 @@
+## v3.0.4 — Beginner-friendly DLSS 5 setup, COD2 folder fix, admin-rights prompt (2026-09-13)
+
+- **Friendlier setup screen.** A coloured banner now says in one plain sentence whether the game is ready, needs one quick step, or can't be set up — and lists only the real problems, in everyday language. Components Adas installs for you (ReShade, the RenoDX add-on, NVIDIA runtimes, dgVoodoo2, LumeniteFX…) are shown as "Adas sets these up for you", never as errors.
+- **"Choose game folder…" right where you need it.** When Adas can't tell which folder holds the game, the fix is a button in the banner instead of a buried advanced setting.
+- **Less clutter.** Options that don't work for the game are hidden behind a toggle; status labels read "★ Recommended", "Works, but experimental" and "✕ Not available". Install is greyed out with a short reason when it can't succeed, and becomes "Switch to this option" / "Reinstall" when DLSS 5 is already installed.
+- **Call of Duty 2 (and similar layouts) no longer blocked as "ambiguous".** Uninstallers, redistributables and crash reporters are ignored when locating the game, and the folder holding the main game executable wins ties.
+- **"Access denied" on Remove/Repair/Install fixed.** Games under protected folders such as `Program Files` are write-checked up front; Adas explains the problem and offers to restart as administrator. The installer's "Launch Adas" step no longer starts Adas elevated.
+
 ## v3.0.3 — NeuralScreen 1.8.2, multipass NR 0.8.3, Feeder 1.16.0-beta.1 (2026-09-13)
 
 - **NeuralScreen** re-pinned **1.8.0 → 1.8.2** (runtime-fetched, SHA-256 re-verified). Upstream turns Boost on by default (≈45.7 → 72.6 fps at 4K on a 5070 Ti in the author's measurement), lowers Local tone half a point in every profile, and makes three silent failures explain themselves.
