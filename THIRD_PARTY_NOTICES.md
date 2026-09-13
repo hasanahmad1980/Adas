@@ -4,11 +4,11 @@ Adas is based on **RHI** by RankFTW and is distributed under the repository's GN
 
 ## Experimental OptiScaler Neural Rendering packages
 
-The standard OptiScaler NR 0.2.0, NR-before-SR English 0.1.2, and pre-SR multipass 0.7.6 release archives are included in this private local package. Their sources are GPL-3.0; dependency notices and licenses (including the RenoDX attribution, FidelityFX, XeSS and DirectX notices carried in the pre-SR multipass archive) remain in the original archives and are copied alongside installed dependencies.
+The standard OptiScaler NR 0.2.0, NR-before-SR English 0.1.2, and pre-SR multipass 0.8.3 release archives are included in this private local package. Their sources are GPL-3.0; dependency notices and licenses (including the RenoDX attribution, FidelityFX, XeSS and DirectX notices carried in the pre-SR multipass archive) remain in the original archives and are copied alongside installed dependencies.
 
 - OptiScaler NR source at the packaged tag: <https://github.com/Dagherbou/OptiScaler_DLSSNR/tree/v0.2.0-dlssnr>
 - NR-before-SR source at the packaged tag: <https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/tree/v0.1.2-nr-before-sr-english>
-- Pre-SR multipass source at the packaged tag: <https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/tree/v0.7.7>
+- Pre-SR multipass source at the packaged tag: <https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/tree/v0.8.3>
 - Original OptiScaler project: <https://github.com/optiscaler/OptiScaler>
 
 NVIDIA, Intel and AMD dependency binaries retain their own terms. Inclusion in this private package does not establish permission for public redistribution; audit every dependency and corresponding-source obligation before publishing an installer. The local Adas installer includes hash-pinned AIO release files for offline use; the upstream repository did not expose redistribution terms when reviewed.
@@ -21,7 +21,7 @@ Copyright (c) 2026 Jean-Laurent ROUZIES
 
 Portions derived from DLSS5 Bridge, Copyright (c) 2026 NIGos (MIT).
 
-Adas bundles the author's matched stable `v0.7.0` release set and separately bundles the matched `0.15.1` release set. The 0.15.1 x86 add-on and x64 host use IPC protocol v9 (both halves must match) and are never mixed with stable protocol-v2 files. Only when the user selects the experimental unified RenoDX profile with stable Feeder does Adas change the null-terminated filename probe in the x64 add-on/host from `renodx-dlss5.addon64` to `renodx-dlss.addon64`; code and protocol data are unchanged.
+Adas bundles the author's matched stable `v0.7.0` release set and separately bundles the matched `1.16.0-beta.1` release set. The beta x86 add-on and x64 host speak a newer IPC protocol than stable (both halves must match) and are never mixed with stable protocol-v2 files. Only when the user selects the experimental unified RenoDX profile with stable Feeder does Adas change the null-terminated filename probe in the x64 add-on/host from `renodx-dlss5.addon64` to `renodx-dlss.addon64`; code and protocol data are unchanged.
 
 ## DLSS5 Bridge
 
@@ -72,7 +72,7 @@ Source: <https://github.com/perseval-BLR/DLSS5-NeuralScreen>
 
 Copyright (c) 2026 perseval-BLR. The application's own code is licensed under the MIT License (see the MIT text below). NeuralScreen is a standalone whole-desktop Neural Rendering overlay — not a per-game route — and processes the whole screen or one selected window on RTX 30/40/50 GPUs (RTX 40/30 via an architecture spoof to `0x1B0`).
 
-Adas does not bundle or redistribute NeuralScreen. The optional "Launch NeuralScreen" tool downloads the author's pinned `neuralscreen-v1.6.1-full.zip` release archive from the official GitHub release at run time (verified by SHA-256), extracts it into the per-user tool cache, and starts `NeuralScreen.exe`. The ~215 MB archive carries its own bundled Python runtime and NVIDIA's leaked pre-release `nvngx_dlssnr.dll` (310.8.0); that NVIDIA runtime is NVIDIA's property, is not covered by the MIT licence, and is never redistributed by Adas — it reaches the user only through the author's official release. Do not run NeuralScreen in competitive online games: a process named `nvngx.dll` plus a fullscreen overlay is exactly what anti-cheat systems look for.
+Adas does not bundle or redistribute NeuralScreen. The optional "Launch NeuralScreen" tool downloads the author's pinned `neuralscreen-v1.8.2-full.zip` release archive from the official GitHub release at run time (verified by SHA-256), extracts it into the per-user tool cache, and starts `NeuralScreen.exe`. The ~215 MB archive carries its own bundled Python runtime and NVIDIA's leaked pre-release `nvngx_dlssnr.dll` (310.8.0); that NVIDIA runtime is NVIDIA's property, is not covered by the MIT licence, and is never redistributed by Adas — it reaches the user only through the author's official release. Do not run NeuralScreen in competitive online games: a process named `nvngx.dll` plus a fullscreen overlay is exactly what anti-cheat systems look for.
 
 ## Deep Fried Chicken
 
