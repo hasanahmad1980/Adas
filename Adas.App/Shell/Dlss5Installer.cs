@@ -50,6 +50,9 @@ public static class Dlss5Installer
         if (string.IsNullOrWhiteSpace(root))
             return new Outcome(false, "No install path resolved for this game.");
 
+        if (await ElevationGuard.EnsureWritableAsync(owner, "Installation", root, card.InstallPath) is { } denied)
+            return new Outcome(false, denied);
+
         // ── Known-bad-driver pre-flight (route-aware) ────────────────────────
         // Warn before we touch anything when the installed NVIDIA driver is known to break this
         // specific route's neural consumer; the user can still continue.
@@ -111,6 +114,8 @@ public static class Dlss5Installer
         }
         catch (Exception ex)
         {
+            if (ElevationGuard.IsAccessDenied(ex) && !ElevationGuard.IsElevated)
+                return new Outcome(false, await ElevationGuard.OfferElevationAsync(owner, "Installation", root));
             return new Outcome(false, $"Installation failed: {ex.Message}");
         }
     }
@@ -133,6 +138,9 @@ public static class Dlss5Installer
         if (root is null)
             return new Outcome(false, "No DLSS 5 install was found for this game.");
 
+        if (await ElevationGuard.EnsureWritableAsync(owner, "Removal", root) is { } denied)
+            return new Outcome(false, denied);
+
         if (!await DialogHost.ConfirmAsync(owner, $"Remove DLSS 5 from {card.GameName}?",
                 "Adas will restore the game's original files from its recovery copies and remove the DLSS 5 components it installed. Your saved routes and settings are unaffected.",
                 "Remove and restore", "Cancel"))
@@ -153,6 +161,8 @@ public static class Dlss5Installer
         }
         catch (Exception ex)
         {
+            if (ElevationGuard.IsAccessDenied(ex) && !ElevationGuard.IsElevated)
+                return new Outcome(false, await ElevationGuard.OfferElevationAsync(owner, "Removal", root));
             return new Outcome(false, $"Removal failed: {ex.Message}");
         }
     }
@@ -177,6 +187,9 @@ public static class Dlss5Installer
         if (record is null)
             return new Outcome(false, "No DLSS 5 install record was found to repair.");
 
+        if (await ElevationGuard.EnsureWritableAsync(owner, "Repair", root) is { } denied)
+            return new Outcome(false, denied);
+
         if (await EnsureGameClosedAsync(owner, card) is { } blocked)
             return blocked;
 
@@ -189,6 +202,8 @@ public static class Dlss5Installer
         }
         catch (Exception ex)
         {
+            if (ElevationGuard.IsAccessDenied(ex) && !ElevationGuard.IsElevated)
+                return new Outcome(false, await ElevationGuard.OfferElevationAsync(owner, "Repair", root));
             return new Outcome(false, $"Repair failed: {ex.Message}");
         }
     }
