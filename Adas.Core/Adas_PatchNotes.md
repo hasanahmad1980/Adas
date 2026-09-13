@@ -1,3 +1,12 @@
+## v3.0.6 — Nothing is blocked: pick DLSS 5 + tools, one Install button (2026-09-13)
+
+- **Install is never greyed out.** GPU, anti-cheat, online-status and "not recommended" routes are warnings now — Adas lists them all in one "Install anyway?" prompt and then installs. Every route can be picked.
+- **Pick what you want, press one button.** The setup page has an "Install DLSS 5" route list plus an "Also install" checklist (OptiScaler, DXVK, ReShade, Display Commander). The button says what it will do ("Install DLSS 5 + OptiScaler") and installs everything in the right order. Installed tools get a Remove button.
+- **Compatibility notes on every choice**, taken from each project's own documentation: stock OptiScaler and Display Commander vs. the DLSS5-Feeder, AIO wanting the game's DLSS/FG off, OptiScaler needing a 64-bit DX11/DX12/Vulkan game with an existing upscaler, DXVK doing nothing for DX12/Vulkan/OpenGL games, ReShade already included with DLSS 5 routes, Display Commander needing ReShade and clashing with ReLimiter.
+- **Adas fixes prerequisites itself.** A missing Visual C++ runtime is downloaded and installed, the Vulkan ReShade layer is set up for Vulkan games, and an existing DLSS pipeline is replaced after one confirmation instead of stopping with "remove it first".
+- **Missing folder or API is a question, not a dead end.** If the game folder moved, Install opens a folder picker; if Adas can't tell the graphics API, it asks (APIs found in the game's files listed first).
+- **Better graphics API detection.** Adas now reads Unreal Engine logs and settings, logs from any earlier run, and renderer files the game ships (DirectX 12 Agility SDK, FSR/XeSS backends), then falls back to a clearly labelled best guess instead of "Unknown". Your Graphics API choice is now always used for installs. Graphics API and bitness sit at the top of the page with the reason for the pick.
+
 ## v3.0.5 — Install no longer greyed out on Call of Duty 2 (2026-09-13)
 
 - **Fixed: Install stayed greyed out with "Adas found more than one folder that could be the game".** Files left behind by an earlier install (for example a `host64\ReShade.ini` next to the game's own `ReShade.ini`) made two folders look equally likely, and picking the game folder re-ran the same check. The folder that contains the game's main executable now wins such ties, so Call of Duty 2 and similar games go straight to "Ready to install".
