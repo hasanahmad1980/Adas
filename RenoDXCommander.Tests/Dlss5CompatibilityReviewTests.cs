@@ -177,6 +177,36 @@ public sealed class Dlss5CompatibilityReviewTests
         }
     }
 
+    [Fact]
+    public void ResolveDeploymentPath_LeftoverHostReShadeIniDoesNotMakeRootGameAmbiguous()
+    {
+        // Call of Duty 2 after a Feeder removal: ReShade.ini in the root and in host64\, plus the uninstaller.
+        var root = Path.Combine(Path.GetTempPath(), $"adas-leftover-host-test-{Guid.NewGuid():N}");
+        var host = Path.Combine(root, "host64");
+        var uninstall = Path.Combine(root, "Uninstall");
+        Directory.CreateDirectory(host);
+        Directory.CreateDirectory(uninstall);
+
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "CoD2SP_s.exe"), new byte[2048]);
+            File.WriteAllBytes(Path.Combine(root, "CoD2MP_s.exe"), new byte[1024]);
+            File.WriteAllText(Path.Combine(root, "ReShade.ini"), "");
+            File.WriteAllText(Path.Combine(root, "renodx-upgrade.addon32"), "");
+            File.WriteAllText(Path.Combine(host, "ReShade.ini"), "");
+            File.WriteAllBytes(Path.Combine(uninstall, "unins000.exe"), new byte[512]);
+
+            var result = Dlss5CompatibilityService.ResolveDeploymentPath(root);
+
+            Assert.Equal(Dlss5PathResolutionKind.Resolved, result.Kind);
+            Assert.Equal(root, result.Path);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void WriteFakeExecutable(string path, string imports)
     {
         var bytes = new byte[8192];

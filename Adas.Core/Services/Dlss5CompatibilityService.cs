@@ -502,11 +502,10 @@ public sealed class Dlss5CompatibilityService
                 scored[dir] = scored.TryGetValue(dir, out var current) ? Math.Max(current, score) : score;
         }
 
-        // The root holds the executable FindGameExe picked (the main game binary). Let it win a tie against
-        // other folders that merely contain some .exe, so a user who points Adas at the exe folder is never
-        // told the location is ambiguous. Proxy/runtime evidence (score >= 70) elsewhere still takes priority.
-        if (executableDirectory != null && executableDirectory.Equals(root, StringComparison.OrdinalIgnoreCase))
-            scored[root] = Math.Max(scored.TryGetValue(root, out var rootScore) ? rootScore : 0, 25);
+        var rootHoldsGameExe = executableDirectory != null
+                               && executableDirectory.Equals(root, StringComparison.OrdinalIgnoreCase);
+        if (rootHoldsGameExe && !scored.ContainsKey(root))
+            scored[root] = 20;
 
         if (scored.Count == 0)
             return new(Dlss5PathResolutionKind.Missing, null, Array.Empty<string>());
@@ -516,6 +515,14 @@ public sealed class Dlss5CompatibilityService
             .Select(pair => pair.Key)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+
+        // The root holds the main game executable FindGameExe picked. When it ties with another folder (e.g.
+        // a leftover host64\ReShade.ini beside the game's own ReShade.ini, or a Tools\ folder with some .exe),
+        // the folder containing the game wins — otherwise "Choose game folder…" on that very folder would
+        // keep reporting the same ambiguity. Stronger proxy/runtime evidence elsewhere still takes priority.
+        if (candidates.Length > 1 && rootHoldsGameExe
+            && candidates.Contains(root, StringComparer.OrdinalIgnoreCase))
+            return new(Dlss5PathResolutionKind.Resolved, root, new[] { root });
 
         return candidates.Length == 1
             ? new(Dlss5PathResolutionKind.Resolved, candidates[0], candidates)
