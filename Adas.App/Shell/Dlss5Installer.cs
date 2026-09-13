@@ -39,11 +39,8 @@ public static class Dlss5Installer
 
         if (!assessment.CanInstall)
         {
-            var reasons = assessment.BlockingReasons.Concat(assessment.MissingRequirements)
-                .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToArray();
-            return new Outcome(false, reasons.Length > 0
-                ? "This route is blocked:\n• " + string.Join("\n• ", reasons)
-                : "This route is not available for this game.");
+            // Only the real problems, in plain language. Components Adas installs itself are not errors.
+            return new Outcome(false, Dlss5ReadinessText.Describe(assessment).ToMessage());
         }
 
         var root = assessment.DeploymentPath ?? card.InstallPath;

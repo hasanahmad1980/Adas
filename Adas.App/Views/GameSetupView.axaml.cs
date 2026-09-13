@@ -55,6 +55,8 @@ public partial class GameSetupView : UserControl
         ShaderModeCombo.SelectionChanged += OnShaderModeChanged;
         ChoosePacksButton.Click += OnChoosePacks;
         ChangeFolderButton.Click += OnChangeFolder;
+        ChooseFolderInlineButton.Click += OnChangeFolder;
+        ShowUnavailableToggle.IsCheckedChanged += (_, _) => ApplyRouteFilter();
         ResetFolderButton.Click += OnResetFolder;
         ImportDfcButton.Click += OnImportDeepFriedChicken;
 
@@ -68,6 +70,13 @@ public partial class GameSetupView : UserControl
     /// <summary>The deployment mode from the most recent assessment, used to key the route-aware
     /// driver pre-flight warning against the currently selected route.</summary>
     private Dlss5DeploymentMode _assessedMode = Dlss5DeploymentMode.None;
+
+    /// <summary>Plain-language reading of the latest assessment; drives the banner and the Install button.</summary>
+    private Dlss5Readiness? _readiness;
+
+    /// <summary>Every route from the latest assessment. Routes that can't work for this game are hidden
+    /// unless the user ticks "Show options that don't work for this game".</summary>
+    private IReadOnlyList<RouteOption> _allRoutes = Array.Empty<RouteOption>();
 
     private string Store => Card?.Source ?? "";
 
@@ -87,11 +96,18 @@ public partial class GameSetupView : UserControl
         var card = Card;
         if (card is null) return;
 
-        RouteSummary.Text = "Analysing…";
+        RouteSummary.Text = "Checking this game…";
+        ReadinessIcon.Text = "…";
+        ProblemsText.IsVisible = false;
+        AutoSetupText.IsVisible = false;
+        ChooseFolderInlineButton.IsVisible = false;
         RoutesList.ItemsSource = null;
         InstallResult.IsVisible = false;
+        InstallButton.IsEnabled = false;
+        _readiness = null;
 
         string summary = "";
+        Dlss5Readiness? readiness = null;
         IReadOnlyList<RouteOption> routes = Array.Empty<RouteOption>();
         RouteOption? recommended = null;
         GameStatus dlss5Status = GameStatus.NotInstalled;
@@ -140,11 +156,10 @@ public partial class GameSetupView : UserControl
                     dlss5Status = assessment.CanInstall ? GameStatus.Available : GameStatus.NotInstalled;
                 }
 
-                summary = assessment.CanInstall
-                    ? $"Detected: {assessment.ModeLabel} ({(assessment.Is64Bit ? "64-bit" : "32-bit")}). Recommended route is preselected."
-                    : "Not available for this game: "
-                      + string.Join("; ", assessment.BlockingReasons.Concat(assessment.MissingRequirements)
-                          .Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
+                readiness = Dlss5ReadinessText.Describe(assessment);
+                summary = installed is not null && readiness.State == Dlss5ReadinessState.Ready
+                    ? "DLSS 5 is installed on this game. Launch the game to use it, or pick a different option below and click Install to switch."
+                    : readiness.Headline;
             }
             catch (Exception ex) { summary = $"Assessment failed: {ex.Message}"; }
         });
@@ -153,8 +168,11 @@ public partial class GameSetupView : UserControl
         {
             if (!ReferenceEquals(Card, card)) return; // selection changed while probing
             RouteSummary.Text = summary;
-            RoutesList.ItemsSource = routes;
+            ApplyReadiness(readiness);
+            _allRoutes = routes;
+            ApplyRouteFilter();
             RoutesList.SelectedItem = recommended;
+            UpdateInstallAvailability();
             card.Dlss5Status = dlss5Status;
             card.Dlss5InstalledLabel = dlss5Label;
 
@@ -184,7 +202,7 @@ public partial class GameSetupView : UserControl
         if (Main is null || card is null) return;
         if (RoutesList.SelectedItem is not RouteOption route)
         {
-            InstallResult.Text = "Select a route first.";
+            InstallResult.Text = "Pick an option above first.";
             InstallResult.IsVisible = true;
             return;
         }
@@ -218,12 +236,81 @@ public partial class GameSetupView : UserControl
         finally
         {
             InstallProgress.IsVisible = false;
-            InstallButton.IsEnabled = true;
+            UpdateInstallAvailability();
         }
     }
 
     private void OnRouteSelectionChanged(object? sender, SelectionChangedEventArgs e)
-        => UpdateDriverWarning(RoutesList.SelectedItem as RouteOption);
+    {
+        UpdateDriverWarning(RoutesList.SelectedItem as RouteOption);
+        UpdateInstallAvailability();
+    }
+
+    /// <summary>Paints the readiness banner: icon + colour by state, the real problems, the inline
+    /// "Choose game folder…" fix, and the list of things Adas sets up automatically (never shown as errors).</summary>
+    private void ApplyReadiness(Dlss5Readiness? readiness)
+    {
+        _readiness = readiness;
+        var state = readiness?.State;
+        (ReadinessIcon.Text, ReadinessBanner.Background, ReadinessBanner.BorderBrush) = state switch
+        {
+            Dlss5ReadinessState.Ready => ("✓", Brush("#12261A"), Brush("#2E6B3F")),
+            Dlss5ReadinessState.NeedsGameFolder => ("📁", Brush("#2B2410"), Brush("#8A6D2F")),
+            Dlss5ReadinessState.Blocked => ("✕", Brush("#2A1517"), Brush("#7A2E33")),
+            _ => ("⚠", Brush("#1A2230"), Brush("#2F3B4E")),
+        };
+
+        var problems = readiness?.Problems ?? Array.Empty<string>();
+        ProblemsText.Text = problems.Count == 1 ? problems[0] : string.Join("\n", problems.Select(p => "• " + p));
+        ProblemsText.IsVisible = problems.Count > 0;
+        ChooseFolderInlineButton.IsVisible = readiness?.NeedsGameFolder == true;
+
+        AutoSetupText.Text = readiness?.AutoSetupText ?? "";
+        AutoSetupText.IsVisible = readiness is not null && readiness.State != Dlss5ReadinessState.Blocked
+                                  && !string.IsNullOrEmpty(readiness.AutoSetupText);
+    }
+
+    private static Avalonia.Media.IBrush Brush(string hex) => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex));
+
+    /// <summary>Shows only the routes that work for this game unless the user asks to see the rest.</summary>
+    private void ApplyRouteFilter()
+    {
+        var selected = RoutesList.SelectedItem as RouteOption;
+        var unavailable = _allRoutes.Count(r => !r.Supported && !r.Installed);
+        var showAll = ShowUnavailableToggle.IsChecked == true;
+        IReadOnlyList<RouteOption> visible = showAll ? _allRoutes : _allRoutes.Where(r => r.Supported || r.Installed).ToArray();
+
+        RoutesList.ItemsSource = visible;
+        if (selected is not null && visible.Contains(selected)) RoutesList.SelectedItem = selected;
+        else RoutesList.SelectedItem = visible.FirstOrDefault(r => r.Installed) ?? visible.FirstOrDefault(r => r.Recommended);
+
+        ShowUnavailableToggle.IsVisible = unavailable > 0;
+        ShowUnavailableToggle.Content = $"Show {unavailable} option{(unavailable == 1 ? "" : "s")} that don't work for this game";
+
+        var blocked = _readiness?.State is Dlss5ReadinessState.Blocked or Dlss5ReadinessState.NeedsGameFolder;
+        RoutesHeader.IsVisible = visible.Count > 0 && (!blocked || showAll);
+        RoutesList.IsVisible = visible.Count > 0 && (!blocked || showAll);
+    }
+
+    /// <summary>Install is only clickable when it can actually succeed; otherwise a hint says why.</summary>
+    private void UpdateInstallAvailability()
+    {
+        var route = RoutesList.SelectedItem as RouteOption;
+        string? hint = _readiness?.State switch
+        {
+            null => null,
+            Dlss5ReadinessState.NeedsGameFolder => "Choose the game folder above to continue.",
+            Dlss5ReadinessState.Blocked => "Install is unavailable until the problem above is fixed.",
+            _ when route is null => "Pick an option above to install.",
+            _ when !route.Supported => "That option doesn't work for this game — pick one marked ★ or \"Works\".",
+            _ => null,
+        };
+        InstallButton.IsEnabled = _readiness?.State == Dlss5ReadinessState.Ready && route is { Supported: true };
+        InstallButton.Content = route?.Installed == true ? "Reinstall"
+            : Card?.IsDlss5Installed == true ? "Switch to this option" : "Install";
+        InstallHint.Text = hint ?? "";
+        InstallHint.IsVisible = hint is not null;
+    }
 
     /// <summary>
     /// Shows the known-bad-driver pre-flight warning for the selected route, keyed to the assessed
@@ -283,7 +370,7 @@ public partial class GameSetupView : UserControl
         finally
         {
             InstallProgress.IsVisible = false;
-            InstallButton.IsEnabled = true;
+            UpdateInstallAvailability();
             RepairButton.IsEnabled = true;
             RemoveButton.IsEnabled = true;
         }

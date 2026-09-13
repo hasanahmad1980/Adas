@@ -213,7 +213,7 @@ public class PeHeaderService : IPeHeaderService
         }
     }
 
-    private static bool IsHelperExecutable(string fileName)
+    internal static bool IsHelperExecutable(string fileName)
     {
         var name = Path.GetFileNameWithoutExtension(fileName);
         return name.StartsWith("unins", StringComparison.OrdinalIgnoreCase)

@@ -152,6 +152,31 @@ public sealed class Dlss5CompatibilityReviewTests
         }
     }
 
+    [Fact]
+    public void ResolveDeploymentPath_RootGameIsNotAmbiguousWithItsUninstallerFolder()
+    {
+        // Call of Duty 2 layout: game binaries in the install root plus Uninstall/unins000.exe.
+        var root = Path.Combine(Path.GetTempPath(), $"adas-uninstaller-path-test-{Guid.NewGuid():N}");
+        var uninstall = Path.Combine(root, "Uninstall");
+        Directory.CreateDirectory(uninstall);
+
+        try
+        {
+            File.WriteAllBytes(Path.Combine(root, "CoD2SP_s.exe"), new byte[2048]);
+            File.WriteAllBytes(Path.Combine(root, "CoD2MP_s.exe"), new byte[1024]);
+            File.WriteAllBytes(Path.Combine(uninstall, "unins000.exe"), new byte[512]);
+
+            var result = Dlss5CompatibilityService.ResolveDeploymentPath(root);
+
+            Assert.Equal(Dlss5PathResolutionKind.Resolved, result.Kind);
+            Assert.Equal(root, result.Path);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static void WriteFakeExecutable(string path, string imports)
     {
         var bytes = new byte[8192];

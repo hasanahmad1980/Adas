@@ -56,12 +56,12 @@ public static class Dlss5RouteCatalog
             bool isInstalled = installedProfile == profile && dfcEntry == installedDeepFriedChicken;
             bool isRecommended = supported && profile == recommended && !dfcEntry;
             string status = isInstalled
-                ? "✓ Installed — currently active for this game."
+                ? "✓ Installed — this is what the game is using now."
                 : supported
                     ? isRecommended
-                        ? "✓ Recommended for this game's detected renderer and architecture."
-                        : "Available — experimental; use only when you specifically need this route."
-                    : $"✕ Not recommended — {unsupportedReason}";
+                        ? "★ Recommended — the best choice for this game. Pick this if you're not sure."
+                        : "Works, but experimental — only pick this if you know you need it."
+                    : $"✕ Not available — {unsupportedReason}";
             list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled, dfcEntry));
         }
 

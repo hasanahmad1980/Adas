@@ -487,7 +487,11 @@ public sealed class Dlss5CompatibilityService
             var dir = Path.GetDirectoryName(file);
             if (dir == null) continue;
 
-            var score = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? 20 : 0;
+            // Uninstallers, redistributables and crash reporters are not game binaries. Scoring them made a
+            // root-level game (e.g. CoD2SP_s.exe) tie with its Uninstall folder's unins000.exe and block the
+            // install as "ambiguous". FindGameExe already ignores these; keep this fallback consistent.
+            var score = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                        && !PeHeaderService.IsHelperExecutable(name) ? 20 : 0;
             if (name.Equals("dxgi.dll", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("opengl32.dll", StringComparison.OrdinalIgnoreCase)) score = 100;
             else if (name.StartsWith("nvngx_dlss", StringComparison.OrdinalIgnoreCase)) score = 90;
@@ -497,6 +501,12 @@ public sealed class Dlss5CompatibilityService
             if (score > 0)
                 scored[dir] = scored.TryGetValue(dir, out var current) ? Math.Max(current, score) : score;
         }
+
+        // The root holds the executable FindGameExe picked (the main game binary). Let it win a tie against
+        // other folders that merely contain some .exe, so a user who points Adas at the exe folder is never
+        // told the location is ambiguous. Proxy/runtime evidence (score >= 70) elsewhere still takes priority.
+        if (executableDirectory != null && executableDirectory.Equals(root, StringComparison.OrdinalIgnoreCase))
+            scored[root] = Math.Max(scored.TryGetValue(root, out var rootScore) ? rootScore : 0, 25);
 
         if (scored.Count == 0)
             return new(Dlss5PathResolutionKind.Missing, null, Array.Empty<string>());
