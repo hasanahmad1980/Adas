@@ -1,3 +1,7 @@
+## v3.0.5 — Install no longer greyed out on Call of Duty 2 (2026-09-13)
+
+- **Fixed: Install stayed greyed out with "Adas found more than one folder that could be the game".** Files left behind by an earlier install (for example a `host64\ReShade.ini` next to the game's own `ReShade.ini`) made two folders look equally likely, and picking the game folder re-ran the same check. The folder that contains the game's main executable now wins such ties, so Call of Duty 2 and similar games go straight to "Ready to install".
+
 ## v3.0.4 — Beginner-friendly DLSS 5 setup, COD2 folder fix, admin-rights prompt (2026-09-13)
 
 - **Friendlier setup screen.** A coloured banner now says in one plain sentence whether the game is ready, needs one quick step, or can't be set up — and lists only the real problems, in everyday language. Components Adas installs for you (ReShade, the RenoDX add-on, NVIDIA runtimes, dgVoodoo2, LumeniteFX…) are shown as "Adas sets these up for you", never as errors.
