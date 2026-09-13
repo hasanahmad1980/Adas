@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using RenoDXCommander.Models;
 
@@ -9,15 +10,19 @@ public enum Dlss5ReadinessState
 {
     /// <summary>Everything checks out — the user only has to press Install.</summary>
     Ready,
-    /// <summary>The only thing in the way is which folder holds the game; the user can fix it with a folder picker.</summary>
+    /// <summary>Adas needs to know which folder holds the game; Install opens a folder picker.</summary>
     NeedsGameFolder,
-    /// <summary>Something the user can't fix from the route list (unsupported GPU, anti-cheat, …).</summary>
-    Blocked,
+    /// <summary>Adas couldn't tell the graphics API; Install asks the user to pick one.</summary>
+    NeedsGraphicsApi,
+    /// <summary>Installable, but there are risks the user should read first (anti-cheat, GPU, …). Never a hard stop.</summary>
+    Warnings,
 }
 
 /// <summary>
-/// A beginner-friendly reading of a <see cref="Dlss5Assessment"/>: one headline, the real problems in plain
+/// A beginner-friendly reading of a <see cref="Dlss5Assessment"/>: one headline, the things to know in plain
 /// language, and — kept separate so they never read as errors — the pieces Adas downloads and sets up itself.
+/// Nothing here disables Install: folder and API questions are asked when Install is pressed, and warnings are
+/// confirmed once.
 /// </summary>
 public sealed record Dlss5Readiness(
     Dlss5ReadinessState State,
@@ -45,56 +50,75 @@ public sealed record Dlss5Readiness(
 public static class Dlss5ReadinessText
 {
     public const string ChooseFolderHint =
-        "Click \"Choose game folder…\" and select the folder that contains the game's .exe file.";
+        "Press Install (or \"Choose game folder…\") and select the folder that contains the game's .exe file.";
 
-    public static Dlss5Readiness Describe(Dlss5Assessment assessment)
+    public static Dlss5Readiness Describe(Dlss5Assessment assessment, string? installPath = null)
     {
         var autoSetup = assessment.MissingRequirements
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(FriendlyRequirement)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (assessment.CanInstall)
+            .ToList();
+        var reasons = assessment.BlockingReasons.Where(r => !string.IsNullOrWhiteSpace(r)).ToArray();
+        if (reasons.Any(IsAutoFixed))
         {
-            return new Dlss5Readiness(Dlss5ReadinessState.Ready,
-                $"Ready to install. Adas detected a {FriendlyRenderer(assessment.Mode)} game ({(assessment.Is64Bit ? "64-bit" : "32-bit")}) "
-                + "and picked the best option for you — just click Install.",
-                Array.Empty<string>(), autoSetup);
+            if (reasons.Any(r => r.StartsWith("Microsoft Visual C++", StringComparison.Ordinal)))
+                autoSetup.Insert(0, "Microsoft Visual C++ runtime");
+            if (reasons.Any(r => r.StartsWith("Install the Vulkan ReShade layer", StringComparison.Ordinal)))
+                autoSetup.Insert(0, "the Vulkan ReShade layer");
         }
+        var autoSetupItems = autoSetup.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
-        if (Dlss5CompatibilityService.CanConfirmDeploymentPath(assessment))
+        if (reasons.Any(r => r.Equals(Dlss5CompatibilityService.AmbiguousDeploymentPathReason, StringComparison.Ordinal)
+                             || r.Equals(Dlss5CompatibilityService.MissingDeploymentPathReason, StringComparison.Ordinal)))
         {
-            var ambiguous = assessment.BlockingReasons.Contains(Dlss5CompatibilityService.AmbiguousDeploymentPathReason);
+            var ambiguous = reasons.Contains(Dlss5CompatibilityService.AmbiguousDeploymentPathReason);
+            var gone = !ambiguous && !string.IsNullOrWhiteSpace(installPath) && !Directory.Exists(installPath);
             return new Dlss5Readiness(Dlss5ReadinessState.NeedsGameFolder,
-                "One quick step first: show Adas where the game is installed.",
+                gone ? "The game folder Adas remembers no longer exists." : "One quick step first: show Adas where the game is installed.",
                 new[]
                 {
                     (ambiguous
                         ? "Adas found more than one folder that could be the game."
-                        : "Adas couldn't find the game's program files.") + " " + ChooseFolderHint,
+                        : gone
+                            ? $"\"{installPath}\" is gone — the game was probably moved or uninstalled."
+                            : "Adas couldn't find the game's program files.") + " " + ChooseFolderHint,
                 },
-                autoSetup);
+                autoSetupItems);
         }
 
         var problems = new List<string>();
-        var rendererUnknown = assessment.Mode == Dlss5DeploymentMode.None;
-        foreach (var reason in assessment.BlockingReasons.Where(r => !string.IsNullOrWhiteSpace(r)))
+        foreach (var reason in reasons)
         {
+            if (IsAutoFixed(reason)) continue; // listed under auto-setup, not as a problem
             var friendly = FriendlyBlocker(reason);
-            if (friendly is null && rendererUnknown) continue; // raw detector evidence; summarised below
+            if (friendly is null && assessment.Mode == Dlss5DeploymentMode.None) continue; // raw detector evidence; summarised below
             problems.Add(friendly ?? reason);
         }
-        if (rendererUnknown)
-            problems.Add("Adas couldn't tell which graphics technology (DirectX, Vulkan or OpenGL) this game uses. "
-                         + "Launch the game once and come back, or pick it under Advanced options → Graphics API.");
-        if (problems.Count == 0)
-            problems.Add("This game isn't supported yet.");
 
-        return new Dlss5Readiness(Dlss5ReadinessState.Blocked,
-            "DLSS 5 can't be installed on this game yet.",
-            problems.Distinct().ToArray(), autoSetup);
+        if (assessment.Mode == Dlss5DeploymentMode.None)
+        {
+            problems.Insert(0, "Adas couldn't tell which graphics technology (DirectX, Vulkan or OpenGL) this game uses. "
+                               + "Pick it in \"Graphics API\" above, or just press Install and Adas will ask.");
+            return new Dlss5Readiness(Dlss5ReadinessState.NeedsGraphicsApi,
+                "Which graphics API does this game use?", problems.Distinct().ToArray(), autoSetupItems);
+        }
+
+        var renderer = $"{FriendlyRenderer(assessment.Mode)} game ({(assessment.Is64Bit ? "64-bit" : "32-bit")})";
+        if (problems.Count == 0)
+        {
+            return new Dlss5Readiness(Dlss5ReadinessState.Ready,
+                $"Ready to install. Adas detected a {renderer} and picked the best option for you — just click Install.",
+                Array.Empty<string>(), autoSetupItems);
+        }
+
+        return new Dlss5Readiness(Dlss5ReadinessState.Warnings,
+            $"Adas detected a {renderer}. You can install — read these first:",
+            problems.Distinct().ToArray(), autoSetupItems);
     }
+
+    private static bool IsAutoFixed(string reason)
+        => reason.StartsWith("Microsoft Visual C++", StringComparison.Ordinal)
+           || reason.StartsWith("Install the Vulkan ReShade layer", StringComparison.Ordinal);
 
     internal static string? FriendlyBlocker(string reason)
     {
@@ -103,18 +127,18 @@ public static class Dlss5ReadinessText
         if (reason.Equals(Dlss5CompatibilityService.MissingDeploymentPathReason, StringComparison.Ordinal))
             return "Adas couldn't find the game's program files. " + ChooseFolderHint;
         if (reason.StartsWith("This package requires an NVIDIA", StringComparison.Ordinal))
-            return "Your graphics card isn't supported. DLSS 5 needs an NVIDIA GeForce RTX 20, 30, 40 or 50-series card.";
+            return "Adas didn't find an NVIDIA GeForce RTX 20/30/40/50-series card. DLSS 5 neural rendering needs one, so it will likely do nothing on this PC.";
         if (reason.StartsWith("Detected anti-cheat software:", StringComparison.Ordinal))
-            return "This game uses anti-cheat" + Between(reason, ":", ".") + ". To keep your account safe, Adas won't change it.";
+            return "This game uses anti-cheat" + Between(reason, ":", ".") + ". Modding its files can get you banned online — only continue if you play offline.";
         if (reason.StartsWith("Detected multiplayer/online-only evidence:", StringComparison.Ordinal))
-            return "This looks like an online game" + Between(reason, ":", ". Adas") + ". Adas only changes single-player games, so you can't get banned.";
+            return "This looks like an online game" + Between(reason, ":", ". Adas") + ". Modded files can get you banned in online modes.";
         if (reason.StartsWith("Online status is not verified", StringComparison.Ordinal))
-            return "Please confirm you play this game offline / single-player.";
+            return "Only use this in single-player / offline — modded files can get you banned online.";
         if (reason.StartsWith("Microsoft Visual C++", StringComparison.Ordinal))
-            return "A free Microsoft component is missing: Visual C++ 2015–2022 Redistributable"
-                   + Between(reason, "runtime", " is missing") + ". Install it from microsoft.com, then come back. Nothing in the game was changed.";
+            return "Microsoft Visual C++ 2015–2022 runtime" + Between(reason, "runtime", " is missing")
+                   + " is missing — Adas installs it for you when you press Install.";
         if (reason.StartsWith("Install the Vulkan ReShade layer", StringComparison.Ordinal))
-            return "This Vulkan game needs ReShade set up first. Click \"ReShade\" under Extras below, then come back here.";
+            return "This Vulkan game needs the Vulkan ReShade layer — Adas sets it up for you when you press Install.";
         return null;
     }
 

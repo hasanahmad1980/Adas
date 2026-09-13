@@ -360,7 +360,7 @@ public partial class MainViewModel
 
         // Automatic selection is centralized and evidence-based. Engine type and
         // game title are descriptive metadata, not proof of the active renderer.
-        return GraphicsEnvironmentService.Detect(installPath).Api;
+        return GraphicsEnvironmentService.DetectWithBestGuess(installPath).Api;
 
 #pragma warning disable CS0162 // Retained temporarily for persisted manual/manifest migration helpers.
         // Skip WindowsApps for filesystem scanning — always access-denied

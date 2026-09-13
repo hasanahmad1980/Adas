@@ -194,7 +194,7 @@ public class UpdateOrchestrationService : IUpdateOrchestrationService
             try
             {
                 var renderer = GraphicsEnvironmentService.ApplyUserOverride(
-                    GraphicsEnvironmentService.Detect(card.InstallPath),
+                    GraphicsEnvironmentService.DetectWithBestGuess(card.InstallPath),
                     graphicsApiOverrideResolver?.Invoke(card.GameName, card.Source ?? ""));
                 if (renderer.Api == GraphicsApiType.Unknown && renderer.ReShadeProxy == null
                     && !card.DllOverrideEnabled && manifestDllResolver?.Invoke(card.GameName)?.ReShade is not { Length: > 0 })

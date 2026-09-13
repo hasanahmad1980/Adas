@@ -339,7 +339,8 @@ public sealed partial class Dlss5ComponentService
             throw new InvalidOperationException(string.Join(Environment.NewLine, assessment.BlockingReasons));
         Dlss5RuntimePrerequisites.EnsureAvailable(assessment.DeploymentPath, assessment.Is64Bit);
 
-        profile = NormalizeProfileForMode(assessment.Mode, assessment.Is64Bit, profile);
+        if (overrides?.ForceProfile != true)
+            profile = NormalizeProfileForMode(assessment.Mode, assessment.Is64Bit, profile);
 
         var existingProfile = LoadRecord(assessment.DeploymentPath)?.Profile;
         if (RequiresPipelineRemoval(existingProfile, profile))

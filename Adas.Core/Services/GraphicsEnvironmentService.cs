@@ -11,7 +11,7 @@ namespace RenoDXCommander.Services;
 internal sealed record GraphicsEnvironment(
     string? Executable, MachineType Machine, GraphicsApiType Api,
     HashSet<GraphicsApiType> SupportedApis, string? ReShadeProxy, string Evidence,
-    bool OpenXrDetected = false);
+    bool OpenXrDetected = false, bool IsBestGuess = false);
 
 internal static class GraphicsEnvironmentService
 {
@@ -76,6 +76,204 @@ internal static class GraphicsEnvironmentService
             return new(null, MachineType.Native, GraphicsApiType.Unknown, supported, null,
                 "Adas could not read the renderer evidence: " + ex.Message);
         }
+    }
+
+    /// <summary>
+    /// <see cref="Detect"/> plus every softer evidence layer, so setup always has an answer the user can see and
+    /// correct instead of a dead end. In order: Unreal Engine RHI logs and settings, the last-run Unity/ReShade
+    /// logs (any age), renderer runtimes the game ships (DirectX 12 Agility SDK, FidelityFX/XeSS backends), and
+    /// finally the executable's own imports. Anything short of a log is flagged <see cref="GraphicsEnvironment.IsBestGuess"/>.
+    /// </summary>
+    public static GraphicsEnvironment DetectWithBestGuess(string root, string? executable = null,
+        string? observationDirectory = null, string? localAppData = null, string? documents = null)
+    {
+        var environment = Detect(root, executable, observationDirectory);
+        if (environment.Executable == null || environment.Api != GraphicsApiType.Unknown)
+            return environment;
+
+        try
+        {
+            var exe = environment.Executable;
+            var (api, evidence, guess) = ReadUnrealRhi(exe, localAppData, documents);
+            if (api == GraphicsApiType.Unknown)
+            {
+                api = ReadRuntimeApi(exe, anyAge: true);
+                (evidence, guess) = ("Detected from the log of the last time this game ran.", false);
+            }
+            if (api == GraphicsApiType.Unknown)
+            {
+                (api, evidence) = ReadShippedRuntimeHints(Path.GetDirectoryName(exe)!, environment.SupportedApis);
+                guess = true;
+            }
+            if (api == GraphicsApiType.Unknown)
+            {
+                api = PickLikelyApi(exe, environment.SupportedApis);
+                evidence = environment.SupportedApis.Count > 1
+                    ? $"Best guess: this game can use {string.Join(", ", environment.SupportedApis.OrderBy(a => a).Select(GraphicsApiDetector.GetLabel))}; "
+                      + $"Adas picked {GraphicsApiDetector.GetLabel(api)}. If the game runs on something else, change Graphics API."
+                    : $"Best guess from the game's program file: {GraphicsApiDetector.GetLabel(api)}. If that's wrong, change Graphics API.";
+            }
+            if (api == GraphicsApiType.Unknown)
+                return environment;
+
+            return environment with
+            {
+                Api = api,
+                SupportedApis = new HashSet<GraphicsApiType>(environment.SupportedApis) { api },
+                ReShadeProxy = ProxyFor(api),
+                Evidence = evidence,
+                IsBestGuess = guess,
+            };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return environment;
+        }
+    }
+
+    /// <summary>The Unreal project folder for a <c>&lt;Project&gt;\Binaries\Win64\*.exe</c> layout, else null.</summary>
+    internal static string? UnrealProjectDirectory(string exe)
+    {
+        var binaries = Directory.GetParent(Path.GetDirectoryName(exe)!);
+        return binaries is { Parent: { } project } && binaries.Name.Equals("Binaries", StringComparison.OrdinalIgnoreCase)
+            ? project.FullName
+            : null;
+    }
+
+    private static (GraphicsApiType Api, string Evidence, bool Guess) ReadUnrealRhi(string exe, string? localAppData, string? documents)
+    {
+        var project = UnrealProjectDirectory(exe);
+        if (project == null) return (GraphicsApiType.Unknown, "", true);
+        var name = Path.GetFileName(project);
+        localAppData ??= Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        documents ??= Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var savedFolders = new[]
+            {
+                Path.Combine(localAppData, name, "Saved"),
+                Path.Combine(project, "Saved"),
+                Path.Combine(documents, "My Games", name, "Saved"),
+            }
+            .Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        // What the engine actually initialised last time outranks what its settings ask for.
+        foreach (var saved in savedFolders)
+        {
+            var logs = Path.Combine(saved, "Logs");
+            if (!Directory.Exists(logs)) continue;
+            var newest = Directory.EnumerateFiles(logs, "*.log")
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            if (newest == null) continue;
+            var api = UnrealRhiFromLog(ReadLog(newest, DateTime.MinValue));
+            if (api != GraphicsApiType.Unknown)
+                return (api, $"Unreal Engine log from the last time the game ran ({File.GetLastWriteTime(newest):d MMM yyyy}) shows {GraphicsApiDetector.GetLabel(api)}.", false);
+        }
+
+        foreach (var saved in savedFolders)
+        {
+            foreach (var platform in new[] { "Windows", "WindowsNoEditor", "WinGDK", "WindowsClient" })
+            {
+                foreach (var file in new[] { "GameUserSettings.ini", "Engine.ini" })
+                {
+                    var path = Path.Combine(saved, "Config", platform, file);
+                    if (!File.Exists(path)) continue;
+                    var api = UnrealRhiFromConfig(ReadLog(path, DateTime.MinValue));
+                    if (api != GraphicsApiType.Unknown)
+                        return (api, $"The game's Unreal Engine settings ({file}) select {GraphicsApiDetector.GetLabel(api)}.", true);
+                }
+            }
+        }
+
+        return (GraphicsApiType.Unknown, "", true);
+    }
+
+    /// <summary>Reads the renderer an Unreal Engine 4/5 log says it initialised.</summary>
+    internal static GraphicsApiType UnrealRhiFromLog(string log)
+    {
+        if (string.IsNullOrEmpty(log)) return GraphicsApiType.Unknown;
+
+        // UE5: "LogRHI: RHI D3D12 with Feature Level SM6 is supported and will be used."
+        var chosen = Regex.Matches(log, @"RHI\s+(D3D12|D3D11|Vulkan|OpenGL)\b[^\r\n]*?\bwill be used", RegexOptions.IgnoreCase);
+        if (chosen.Count > 0) return UnrealRhiName(chosen[^1].Groups[1].Value);
+
+        // "LogRHI: Loading RHI module D3D12RHI" — the last module loaded is the one that stuck after any fallback.
+        var loaded = Regex.Matches(log, @"Loading RHI module\s+(D3D12RHI|D3D11RHI|VulkanRHI|OpenGLDrv)", RegexOptions.IgnoreCase);
+        if (loaded.Count > 0) return UnrealRhiName(loaded[^1].Groups[1].Value);
+
+        // UE4: per-RHI log categories only appear for the RHI that is running.
+        var counts = new[]
+            {
+                (Api: GraphicsApiType.DirectX12, Count: Regex.Matches(log, @"\bLogD3D12RHI:").Count),
+                (Api: GraphicsApiType.DirectX11, Count: Regex.Matches(log, @"\bLogD3D11RHI:").Count),
+                (Api: GraphicsApiType.Vulkan, Count: Regex.Matches(log, @"\bLogVulkanRHI:").Count),
+                (Api: GraphicsApiType.OpenGL, Count: Regex.Matches(log, @"\bLogOpenGL(?:RHI)?:").Count),
+            }
+            .Where(entry => entry.Count > 0)
+            .OrderByDescending(entry => entry.Count)
+            .ToArray();
+        return counts.Length > 0 ? counts[0].Api : GraphicsApiType.Unknown;
+    }
+
+    /// <summary>Reads <c>PreferredRHI=dx12</c> (UE5 GameUserSettings) or <c>DefaultGraphicsRHI=DefaultGraphicsRHI_DX12</c>.</summary>
+    internal static GraphicsApiType UnrealRhiFromConfig(string ini)
+    {
+        if (string.IsNullOrEmpty(ini)) return GraphicsApiType.Unknown;
+        var preferred = Regex.Match(ini, @"(?im)^\s*PreferredRHI\s*=\s*(dx12|dx11|vulkan|d3d12|d3d11)\s*$");
+        if (preferred.Success) return UnrealRhiName(preferred.Groups[1].Value);
+        var standard = Regex.Match(ini, @"(?im)^\s*DefaultGraphicsRHI\s*=\s*DefaultGraphicsRHI_(DX12|DX11|Vulkan)\s*$");
+        return standard.Success ? UnrealRhiName(standard.Groups[1].Value) : GraphicsApiType.Unknown;
+    }
+
+    private static GraphicsApiType UnrealRhiName(string value) => value.ToLowerInvariant() switch
+    {
+        "d3d12" or "d3d12rhi" or "dx12" => GraphicsApiType.DirectX12,
+        "d3d11" or "d3d11rhi" or "dx11" => GraphicsApiType.DirectX11,
+        "vulkan" or "vulkanrhi" => GraphicsApiType.Vulkan,
+        "opengl" or "opengldrv" => GraphicsApiType.OpenGL,
+        _ => GraphicsApiType.Unknown,
+    };
+
+    // Renderer back-ends games ship next to the executable. Each one only exists for a single graphics API.
+    private static readonly (string RelativePath, GraphicsApiType Api)[] ShippedRuntimeHints =
+    {
+        (Path.Combine("D3D12", "D3D12Core.dll"), GraphicsApiType.DirectX12),
+        ("amd_fidelityfx_dx12.dll", GraphicsApiType.DirectX12),
+        ("ffx_fsr2_api_dx12_x64.dll", GraphicsApiType.DirectX12),
+        ("libxess_dx12.dll", GraphicsApiType.DirectX12),
+        ("amd_fidelityfx_vk.dll", GraphicsApiType.Vulkan),
+        ("ffx_fsr2_api_vk_x64.dll", GraphicsApiType.Vulkan),
+        ("libxess_dx11.dll", GraphicsApiType.DirectX11),
+    };
+
+    private static (GraphicsApiType Api, string Evidence) ReadShippedRuntimeHints(string directory, HashSet<GraphicsApiType> supported)
+    {
+        var found = ShippedRuntimeHints
+            .Where(hint => File.Exists(Path.Combine(directory, hint.RelativePath)))
+            .Where(hint => supported.Count == 0 || supported.Contains(hint.Api))
+            .ToArray();
+        var apis = found.Select(hint => hint.Api).Distinct().ToArray();
+        if (apis.Length != 1) return (GraphicsApiType.Unknown, "");
+        var file = found[0].RelativePath;
+        return (apis[0], apis[0] == GraphicsApiType.DirectX12 && file.StartsWith("D3D12", StringComparison.OrdinalIgnoreCase)
+            ? "The game ships Microsoft's DirectX 12 Agility SDK (D3D12\\D3D12Core.dll), so it renders with DirectX 12."
+            : $"The game ships a {GraphicsApiDetector.GetLabel(apis[0])}-only renderer component ({file}).");
+    }
+
+    /// <summary>The executable's import-table pick, else the most common default among the APIs it can use.</summary>
+    internal static GraphicsApiType PickLikelyApi(string exe, HashSet<GraphicsApiType> supported)
+    {
+        var imported = GraphicsApiDetector.Detect(exe);
+        if (imported != GraphicsApiType.Unknown && (supported.Count == 0 || supported.Contains(imported)))
+            return imported;
+        foreach (var api in new[]
+                 {
+                     GraphicsApiType.DirectX11, GraphicsApiType.DirectX12, GraphicsApiType.Vulkan, GraphicsApiType.DirectX9,
+                     GraphicsApiType.OpenGL, GraphicsApiType.DirectX10, GraphicsApiType.DirectX8,
+                 })
+            if (supported.Contains(api)) return api;
+        return GraphicsApiType.Unknown;
     }
 
     internal static bool IsDxgi(GraphicsApiType api) => api is GraphicsApiType.DirectX10 or GraphicsApiType.DirectX11 or GraphicsApiType.DirectX12;
@@ -170,12 +368,13 @@ internal static class GraphicsEnvironmentService
         var length = reader.ReadBlock(buffer, 0, buffer.Length);
         return new string(buffer, 0, length);
     }
-    private static GraphicsApiType ReadRuntimeApi(string exe)
+    private static GraphicsApiType ReadRuntimeApi(string exe, bool anyAge = false)
     {
         var root = Path.GetDirectoryName(exe)!;
         var since = ConfigurationFiles(exe).Prepend(exe).Select(File.GetLastWriteTimeUtc).Max();
-        // Old logs are not evidence of the current launch/configuration.
-        since = new[] { since, DateTime.UtcNow.AddDays(-1) }.Max();
+        // Old logs are not evidence of the current launch/configuration — but they are still the best
+        // record of how the game last rendered, which DetectWithBestGuess uses when nothing newer exists.
+        since = anyAge ? DateTime.MinValue : new[] { since, DateTime.UtcNow.AddDays(-1) }.Max();
         var data = Path.Combine(root, Path.GetFileNameWithoutExtension(exe) + "_Data");
         var appInfo = Path.Combine(data, "app.info");
         if (File.Exists(appInfo))

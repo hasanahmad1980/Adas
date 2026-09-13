@@ -497,7 +497,7 @@ public partial class MainViewModel
                 // Reconcile it with the same runtime/config evidence used by install.
                 if (detectedApis.Count != 1)
                 {
-                    var environment = GraphicsEnvironmentService.Detect(installPath);
+                    var environment = GraphicsEnvironmentService.DetectWithBestGuess(installPath);
                     graphicsApi = environment.Api;
                     detectedApis = environment.SupportedApis;
                     CacheGameApi(installPath, graphicsApi, detectedApis);

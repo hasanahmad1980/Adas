@@ -24,8 +24,30 @@ public static class DialogHost
         string title, string message, string primaryText = "Continue", string closeText = "Cancel")
         => ShowAsync(owner, title, message, primaryText, closeText, showOptOut: true);
 
+    /// <summary>
+    /// Single-choice picker (radio buttons). Returns the chosen index, or null when cancelled.
+    /// </summary>
+    public static async Task<int?> ChooseAsync(Window owner, string title, string message,
+        IReadOnlyList<string> options, int selectedIndex = 0, string primaryText = "Continue", string closeText = "Cancel")
+    {
+        var radios = options.Select((text, i) => new RadioButton
+        {
+            Content = text,
+            GroupName = "adas-choice",
+            IsChecked = i == selectedIndex,
+            Foreground = Brush("AdasTextPrimaryBrush", owner),
+        }).ToArray();
+        var panel = new StackPanel { Spacing = 4 };
+        foreach (var radio in radios) panel.Children.Add(radio);
+
+        var (confirmed, _) = await ShowAsync(owner, title, message, primaryText, closeText, showOptOut: false, extra: panel);
+        if (!confirmed) return null;
+        var index = Array.FindIndex(radios, r => r.IsChecked == true);
+        return index < 0 ? null : index;
+    }
+
     private static Task<(bool confirmed, bool dontShowAgain)> ShowAsync(Window owner, string title,
-        string message, string primaryText, string closeText, bool showOptOut)
+        string message, string primaryText, string closeText, bool showOptOut, Control? extra = null)
     {
         bool result = false;
         var optOut = new CheckBox
@@ -70,6 +92,7 @@ public static class DialogHost
                         Foreground = Brush("AdasTextPrimaryBrush", owner) },
                     new ScrollViewer { Content = body, MaxHeight = 380,
                         HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
+                    extra ?? new Panel { IsVisible = false },
                     optOut,
                     buttons,
                 },

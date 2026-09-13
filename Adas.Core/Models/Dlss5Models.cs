@@ -55,6 +55,8 @@ public sealed record Dlss5Probe
     public bool HasAmbiguousDeploymentPath { get; init; }
     public GraphicsApiType GraphicsApi { get; init; }
     public string GraphicsApiEvidence { get; init; } = "";
+    /// <summary>True when <see cref="GraphicsApi"/> is a best guess (settings/imports), not something the game was seen using.</summary>
+    public bool GraphicsApiIsBestGuess { get; init; }
     public IReadOnlyList<GraphicsApiType> SupportedGraphicsApis { get; init; } = Array.Empty<GraphicsApiType>();
     public IReadOnlyList<string> InstallationIssues { get; init; } = Array.Empty<string>();
     public bool OpenXrDetected { get; init; }
@@ -142,4 +144,7 @@ internal sealed record Dlss5CompatibilityPlan(
 /// </summary>
 public sealed record Dlss5ManualOverrides(
     Dlss5RenoDxPackage? RenoDxPackage = null,
-    bool DeepFriedChicken = false);
+    bool DeepFriedChicken = false,
+    // The user explicitly picked this route after being told it isn't recommended for the game:
+    // install exactly what they chose instead of silently swapping to the "supported" profile.
+    bool ForceProfile = false);

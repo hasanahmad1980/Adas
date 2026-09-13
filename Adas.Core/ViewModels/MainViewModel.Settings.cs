@@ -525,6 +525,15 @@ public partial class MainViewModel
             original = card?.DetectedGame?.InstallPath ?? card?.InstallPath ?? "";
         }
         _folderOverrides[key] = $"{folderPath}|{original}";
+        // Apply it now — otherwise every check keeps probing the old (possibly deleted) folder until a rescan.
+        foreach (var match in _allCards.Where(c =>
+                     c.GameName.Equals(gameName, StringComparison.OrdinalIgnoreCase)
+                     && (c.Source ?? "").Equals(store ?? "", StringComparison.OrdinalIgnoreCase)))
+        {
+            match.InstallPath = folderPath;
+            if (match.DetectedGame != null)
+                match.DetectedGame.InstallPath = folderPath;
+        }
         SaveNameMappings();
         SaveLibrary();
     }

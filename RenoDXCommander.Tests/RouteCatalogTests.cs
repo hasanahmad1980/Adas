@@ -56,7 +56,7 @@ public sealed class RouteCatalogTests
             else
             {
                 Assert.False(r.Recommended); // an unsupported route is never the recommendation
-                Assert.StartsWith("✕", r.StatusText);
+                Assert.StartsWith("⚠ Not recommended", r.StatusText);
             }
         }
     }
@@ -136,14 +136,14 @@ public sealed class RouteCatalogTests
     }
 
     [Fact]
-    public void DeepFriedChickenRouteIsGreyedUntilImportedThenSelectable()
+    public void DeepFriedChickenRouteIsNotRecommendedUntilImportedThenSupported()
     {
         var assess = Assess(Dlss5DeploymentMode.NativeDirectX12, true);
 
         var notImported = Dlss5RouteCatalog.Build(assess, Dlss5InstallProfile.MaximumQuality)
             .Single(r => r.DeepFriedChicken);
         Assert.False(notImported.Supported);
-        Assert.StartsWith("✕", notImported.StatusText);
+        Assert.StartsWith("⚠ Not recommended", notImported.StatusText);
         Assert.Contains("Import", notImported.StatusText, StringComparison.OrdinalIgnoreCase);
         Assert.False(notImported.Recommended); // DFC is never the auto-recommendation
 

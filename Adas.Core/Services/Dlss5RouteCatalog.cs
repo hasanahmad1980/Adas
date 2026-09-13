@@ -61,7 +61,7 @@ public static class Dlss5RouteCatalog
                     ? isRecommended
                         ? "★ Recommended — the best choice for this game. Pick this if you're not sure."
                         : "Works, but experimental — only pick this if you know you need it."
-                    : $"✕ Not available — {unsupportedReason}";
+                    : $"⚠ Not recommended — {unsupportedReason}. You can still pick it; Adas installs exactly this route.";
             list.Add(new RouteOption(profile, label, description, supported, isRecommended, status, isInstalled, dfcEntry));
         }
 

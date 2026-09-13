@@ -27,7 +27,7 @@ public sealed class RouteStatusBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is RouteOption r
-            ? new SolidColorBrush(Color.Parse(r.Installed || r.Recommended ? "#3FB950" : r.Supported ? "#E3B341" : "#F85149"))
+            ? new SolidColorBrush(Color.Parse(r.Installed || r.Recommended ? "#3FB950" : r.Supported ? "#E3B341" : "#F0883E"))
             : new SolidColorBrush(Color.Parse("#9BA6B4"));
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

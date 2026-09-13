@@ -21,11 +21,22 @@ namespace Adas.App.Views;
 /// Per-game setup pane. Its <see cref="Control.DataContext"/> is the selected
 /// <see cref="GameCardViewModel"/>; the owning <see cref="MainViewModel"/> is injected via
 /// <see cref="Main"/> so install actions run through the same engine code paths the WinUI shell used.
+/// <para>
+/// Design rule: nothing is ever greyed out. The user ticks a DLSS 5 route and/or tools, every choice shows what
+/// it works (and doesn't work) with, and one "Install selected" button runs it all — asking for the game folder
+/// or graphics API only when it truly can't continue without them, and confirming warnings once.
+/// </para>
 /// </summary>
 public partial class GameSetupView : UserControl
 {
     /// <summary>Set by the host window so buttons can invoke shared install commands.</summary>
     public MainViewModel? Main { get; set; }
+
+    private static readonly GraphicsApiType[] AllApis =
+    {
+        GraphicsApiType.DirectX12, GraphicsApiType.DirectX11, GraphicsApiType.Vulkan, GraphicsApiType.DirectX9,
+        GraphicsApiType.OpenGL, GraphicsApiType.DirectX10, GraphicsApiType.DirectX8,
+    };
 
     public GameSetupView()
     {
@@ -35,11 +46,8 @@ public partial class GameSetupView : UserControl
         RepairButton.Click += OnRepair;
         RemoveButton.Click += OnRemove;
         RoutesList.SelectionChanged += OnRouteSelectionChanged;
+        InstallDlss5Check.IsCheckedChanged += (_, _) => UpdateSelectionState();
         DiagnoseButton.Click += OnDiagnose;
-        OptiScalerButton.Click += OnOptiScaler;
-        DisplayCommanderButton.Click += OnDisplayCommander;
-        DxvkButton.Click += OnDxvk;
-        ReShadeButton.Click += OnReShade;
         OpenFolderButton.Click += OnOpenFolder;
 
         BitnessCombo.ItemsSource = new[] { "Auto", "32-bit", "64-bit" };
@@ -56,9 +64,13 @@ public partial class GameSetupView : UserControl
         ChoosePacksButton.Click += OnChoosePacks;
         ChangeFolderButton.Click += OnChangeFolder;
         ChooseFolderInlineButton.Click += OnChangeFolder;
-        ShowUnavailableToggle.IsCheckedChanged += (_, _) => ApplyRouteFilter();
         ResetFolderButton.Click += OnResetFolder;
         ImportDfcButton.Click += OnImportDeepFriedChicken;
+
+        _tools = Enum.GetValues<SetupTool>()
+            .Select(tool => new SetupToolItem(tool, _ => UpdateSelectionState(), item => _ = RemoveToolAsync(item)))
+            .ToArray();
+        ToolsList.ItemsSource = _tools;
 
         DataContextChanged += (_, _) => _ = RefreshAssessmentAsync();
     }
@@ -67,16 +79,29 @@ public partial class GameSetupView : UserControl
     /// don't write the value straight back and trigger spurious re-assessments.</summary>
     private bool _populatingOverrides;
 
-    /// <summary>The deployment mode from the most recent assessment, used to key the route-aware
-    /// driver pre-flight warning against the currently selected route.</summary>
-    private Dlss5DeploymentMode _assessedMode = Dlss5DeploymentMode.None;
+    /// <summary>True while routes are being re-bound, so the user's route choice isn't overwritten.</summary>
+    private bool _populatingRoutes;
 
-    /// <summary>Plain-language reading of the latest assessment; drives the banner and the Install button.</summary>
+    /// <summary>True while an install/remove runs — the only time the buttons are disabled.</summary>
+    private bool _busy;
+
+    private readonly SetupToolItem[] _tools;
+
+    private Dlss5Probe? _probe;
+    private Dlss5Assessment? _assessment;
+    private bool _hasUpscalerRuntime;
+
+    /// <summary>Plain-language reading of the latest assessment; drives the banner.</summary>
     private Dlss5Readiness? _readiness;
 
-    /// <summary>Every route from the latest assessment. Routes that can't work for this game are hidden
-    /// unless the user ticks "Show options that don't work for this game".</summary>
+    /// <summary>Every route from the latest assessment — all shown, none hidden.</summary>
     private IReadOnlyList<RouteOption> _allRoutes = Array.Empty<RouteOption>();
+
+    /// <summary>The card the page was last populated for; selections reset when it changes.</summary>
+    private GameCardViewModel? _populatedCard;
+
+    /// <summary>The route the user explicitly clicked (profile + DFC flag), kept across refreshes.</summary>
+    private (Dlss5InstallProfile Profile, bool DeepFriedChicken)? _userRoute;
 
     private string Store => Card?.Source ?? "";
 
@@ -87,46 +112,50 @@ public partial class GameSetupView : UserControl
     public Task RefreshAsync() => RefreshAssessmentAsync();
 
     /// <summary>
-    /// Probes/assesses the selected game off the UI thread and populates the route list — every route
-    /// shown, recommended preselected, incompatible flagged with a reason. Avalonia rebuild of the WinUI
-    /// detail-panel profile selector.
+    /// Probes/assesses the selected game off the UI thread (honouring the user's Graphics API choice) and
+    /// populates the banner, the API evidence, every route, and the tool checklist.
     /// </summary>
     private async Task RefreshAssessmentAsync()
     {
         var card = Card;
         if (card is null) return;
 
+        if (!ReferenceEquals(_populatedCard, card))
+        {
+            _populatedCard = card;
+            _userRoute = null;
+            foreach (var tool in _tools) tool.SetSelectedSilently(false);
+            InstallDlss5Check.IsChecked = !card.IsDlss5Installed;
+            InstallResult.IsVisible = false;
+        }
+
         RouteSummary.Text = "Checking this game…";
         ReadinessIcon.Text = "…";
         ProblemsText.IsVisible = false;
         AutoSetupText.IsVisible = false;
         ChooseFolderInlineButton.IsVisible = false;
-        RoutesList.ItemsSource = null;
-        InstallResult.IsVisible = false;
-        InstallButton.IsEnabled = false;
-        _readiness = null;
 
         string summary = "";
         Dlss5Readiness? readiness = null;
+        Dlss5Probe? probe = null;
+        Dlss5Assessment? assessment = null;
         IReadOnlyList<RouteOption> routes = Array.Empty<RouteOption>();
-        RouteOption? recommended = null;
+        RouteOption? preferred = null;
         GameStatus dlss5Status = GameStatus.NotInstalled;
         string? dlss5Label = null;
-        Dlss5DeploymentMode assessedMode = Dlss5DeploymentMode.None;
-        bool assessedIs64Bit = !card.Is32Bit;
-        bool haveAssessedBitness = false;
+        bool hasUpscaler = false;
+        var main = Main;
 
         await Task.Run(() =>
         {
             try
             {
                 var compat = AppServices.Services.GetService<Dlss5CompatibilityService>();
-                if (compat is null) { summary = "Compatibility service unavailable."; return; }
+                if (compat is null || main is null) { summary = "Compatibility service unavailable."; return; }
 
-                var assessment = Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true);
-                assessedMode = assessment.Mode;
-                assessedIs64Bit = assessment.Is64Bit;
-                haveAssessedBitness = true;
+                probe = Dlss5Installer.ProbeFor(main, compat, card);
+                assessment = Dlss5CompatibilityService.Assess(probe, singlePlayerConfirmed: true);
+                hasUpscaler = Dlss5ToolCompatibility.HasUpscalerRuntime(assessment.DeploymentPath ?? card.InstallPath, probe.HasNativeDlss);
 
                 // Seed from an existing install of the same mode, else auto-pick from renderer/arch.
                 var installed = assessment.DeploymentPath is { } dp ? Dlss5ComponentService.LoadRecord(dp) : null;
@@ -137,9 +166,10 @@ public partial class GameSetupView : UserControl
                 routes = Dlss5RouteCatalog.Build(assessment, pick, installed?.Profile,
                     deepFriedChickenAvailable: dfc?.IsImported == true,
                     installedDeepFriedChicken: installed?.DeepFriedChicken == true);
-                recommended = routes.FirstOrDefault(r => r.Installed)
-                              ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported)
-                              ?? routes.FirstOrDefault(r => r.Recommended);
+                preferred = routes.FirstOrDefault(r => r.Installed)
+                            ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported && !r.DeepFriedChicken)
+                            ?? routes.FirstOrDefault(r => r.Recommended)
+                            ?? routes.FirstOrDefault();
 
                 // DLSS 5 has its own on-disk record and is NOT part of the RenoDX-only `Status`; drive the
                 // badge from the record so a successful install flips it off "Available".
@@ -153,110 +183,199 @@ public partial class GameSetupView : UserControl
                 }
                 else
                 {
-                    dlss5Status = assessment.CanInstall ? GameStatus.Available : GameStatus.NotInstalled;
+                    dlss5Status = assessment.Mode != Dlss5DeploymentMode.None ? GameStatus.Available : GameStatus.NotInstalled;
                 }
 
-                readiness = Dlss5ReadinessText.Describe(assessment);
+                readiness = Dlss5ReadinessText.Describe(assessment, card.InstallPath);
                 summary = installed is not null && readiness.State == Dlss5ReadinessState.Ready
-                    ? "DLSS 5 is installed on this game. Launch the game to use it, or pick a different option below and click Install to switch."
+                    ? "DLSS 5 is installed on this game. Launch the game to use it — or tick a different route or tools below and press Install selected."
                     : readiness.Headline;
             }
-            catch (Exception ex) { summary = $"Assessment failed: {ex.Message}"; }
+            catch (Exception ex) { summary = $"Couldn't check this game: {ex.Message}. You can still pick options and install."; }
         });
 
         void Apply()
         {
             if (!ReferenceEquals(Card, card)) return; // selection changed while probing
+            _probe = probe;
+            _assessment = assessment;
+            _hasUpscalerRuntime = hasUpscaler;
             RouteSummary.Text = summary;
             ApplyReadiness(readiness);
+
             _allRoutes = routes;
-            ApplyRouteFilter();
-            RoutesList.SelectedItem = recommended;
-            UpdateInstallAvailability();
+            _populatingRoutes = true;
+            try
+            {
+                RoutesList.ItemsSource = routes;
+                RoutesList.SelectedItem = (_userRoute is { } chosen
+                                              ? routes.FirstOrDefault(r => r.Profile == chosen.Profile && r.DeepFriedChicken == chosen.DeepFriedChicken)
+                                              : null)
+                                          ?? preferred;
+            }
+            finally { _populatingRoutes = false; }
+
             card.Dlss5Status = dlss5Status;
             card.Dlss5InstalledLabel = dlss5Label;
 
-            // Reconcile the header bitness badge with the authoritative PE-header probe the route list
-            // just used. Without this the "64-bit"/"32-bit" chip keeps the card-build-time guess and can
-            // contradict the route reasons (e.g. badge says 64-bit while ShortFuse is greyed "requires a
-            // 64-bit game"). The probe echoes the card when architecture is indeterminate, so this only
-            // ever corrects a concrete mismatch.
-            if (haveAssessedBitness && card.Is32Bit != !assessedIs64Bit)
-            {
-                card.Is32Bit = !assessedIs64Bit;
-                card.NotifyAll();
-            }
-
-            _assessedMode = assessedMode;
-            UpdateDriverWarning(recommended);
+            if (probe is not null)
+                ReconcileCardWithProbe(card, probe);
+            ApplyApiEvidence(card, probe);
             PopulateOverrides(card);
+            UpdateSelectionState();
         }
 
         if (Dispatcher.UIThread.CheckAccess()) Apply();
         else await Dispatcher.UIThread.InvokeAsync(Apply);
     }
 
-    private async void OnInstall(object? sender, RoutedEventArgs e)
+    /// <summary>
+    /// Keeps the library badges (API + bitness) in line with the probe the page just used, so the header never
+    /// contradicts the route reasons.
+    /// </summary>
+    private static void ReconcileCardWithProbe(GameCardViewModel card, Dlss5Probe probe)
     {
-        var card = Card;
-        if (Main is null || card is null) return;
-        if (RoutesList.SelectedItem is not RouteOption route)
+        var changed = false;
+        if (card.Is32Bit == probe.Is64Bit)
         {
-            InstallResult.Text = "Pick an option above first.";
-            InstallResult.IsVisible = true;
+            card.Is32Bit = !probe.Is64Bit;
+            changed = true;
+        }
+        if (probe.GraphicsApi != GraphicsApiType.Unknown && card.GraphicsApi != probe.GraphicsApi)
+        {
+            card.GraphicsApi = probe.GraphicsApi;
+            card.DetectedApis = new HashSet<GraphicsApiType>(probe.SupportedGraphicsApis.Append(probe.GraphicsApi)
+                .Where(api => api != GraphicsApiType.Unknown));
+            changed = true;
+        }
+        if (changed) card.NotifyAll();
+    }
+
+    private void ApplyApiEvidence(GameCardViewModel card, Dlss5Probe? probe)
+    {
+        if (probe is null) { ApiEvidenceText.Text = ""; return; }
+        var manual = Main?.GetSingleApiOverride(card.GameName, Store) is not null;
+        var supported = probe.SupportedGraphicsApis.Where(a => a != GraphicsApiType.Unknown).ToArray();
+        var canUse = supported.Length > 1
+            ? " The game's files support: " + string.Join(", ", supported.Select(GraphicsApiDetector.GetLabel)) + "."
+            : "";
+        if (probe.GraphicsApi == GraphicsApiType.Unknown)
+        {
+            ApiEvidenceText.Text = "⚠ Adas couldn't detect the graphics API. Pick it above — or press Install and Adas will ask." + canUse;
+            ApiEvidenceText.Foreground = Brush("#E3B341");
             return;
         }
 
-        var owner = this.FindAncestorOfType<Window>();
-        if (owner is null) return;
+        var label = GraphicsApiDetector.GetLabel(probe.GraphicsApi);
+        var how = manual ? "your choice" : probe.GraphicsApiIsBestGuess ? "best guess" : "detected";
+        ApiEvidenceText.Text = $"Using {label} ({how}). {probe.GraphicsApiEvidence}".TrimEnd()
+                               + (manual ? "" : canUse)
+                               + (probe.GraphicsApiIsBestGuess && !manual ? " Wrong? Change Graphics API above." : "");
+        ApiEvidenceText.Foreground = probe.GraphicsApiIsBestGuess && !manual ? Brush("#E3B341") : Brush("#9BA6B4");
+    }
 
-        InstallButton.IsEnabled = false;
-        InstallProgress.IsVisible = true;
-        InstallProgress.Value = 0;
-        InstallResult.IsVisible = false;
+    private RouteOption? SelectedRoute => InstallDlss5Check.IsChecked == true ? RoutesList.SelectedItem as RouteOption : null;
 
-        var progress = new Progress<(string message, double percent)>(u =>
+    private ToolContext BuildToolContext()
+    {
+        var card = Card;
+        return new ToolContext(
+            _probe?.GraphicsApi ?? card?.GraphicsApi ?? GraphicsApiType.Unknown,
+            _assessment?.Is64Bit ?? !(card?.Is32Bit ?? false),
+            _assessment?.Mode ?? Dlss5DeploymentMode.None,
+            SelectedRoute?.Profile,
+            _tools.Where(t => t.IsSelected).Select(t => t.Tool).ToArray(),
+            HasNativeUpscaler: _hasUpscalerRuntime,
+            HasAntiCheat: _probe?.AntiCheatEvidence.Count > 0,
+            ReShadeInstalled: card?.IsRsInstalled == true,
+            ReLimiterInstalled: card?.IsUlInstalled == true);
+    }
+
+    /// <summary>Recomputes every compatibility note and the Install button text from the current selection.</summary>
+    private void UpdateSelectionState()
+    {
+        var card = Card;
+        if (card is null) return;
+
+        RoutesPanel.Opacity = InstallDlss5Check.IsChecked == true ? 1 : 0.55;
+        var context = BuildToolContext();
+        var route = SelectedRoute;
+
+        // Route notes: why it isn't recommended (still installable) + advice from the upstream READMEs.
+        var routeNotes = new List<string>();
+        if (route is { Supported: false, Installed: false })
+            routeNotes.Add(route.StatusText);
+        routeNotes.AddRange(Dlss5ToolCompatibility.RouteNotes(context).Select(n => "⚠ " + n.Text));
+        RouteNotesText.Text = string.Join("\n", routeNotes);
+        RouteNotesText.IsVisible = route is not null && routeNotes.Count > 0;
+        UpdateDriverWarning(route);
+
+        foreach (var item in _tools)
         {
-            InstallProgress.Value = u.percent;
-            RouteSummary.Text = u.message;
-        });
-
-        try
-        {
-            var outcome = await Dlss5Installer.InstallAsync(Main, owner, card, route.Profile, progress,
-                deepFriedChicken: route.DeepFriedChicken);
-            InstallResult.Text = outcome.Message;
-            InstallResult.IsVisible = true;
-            if (outcome.Ran)
+            item.IsInstalled = item.Tool switch
             {
-                try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
-                await RefreshAssessmentAsync();
-            }
+                SetupTool.OptiScaler => card.IsOsInstalled,
+                SetupTool.Dxvk => card.IsDxvkInstalled,
+                SetupTool.ReShade => card.IsRsInstalled,
+                SetupTool.DisplayCommander => card.IsDcInstalled,
+                _ => false,
+            };
+            var notes = Dlss5ToolCompatibility.Notes(item.Tool, context);
+            item.NotesText = string.Join("\n", notes.Select(n => n.Level switch
+            {
+                ToolNoteLevel.Good => "✓ ",
+                ToolNoteLevel.NoEffect => "– ",
+                ToolNoteLevel.Conflict => "✕ ",
+                _ => "⚠ ",
+            } + n.Text));
+            item.NotesBrush = Dlss5ToolCompatibility.Worst(notes) switch
+            {
+                ToolNoteLevel.Good => Brush("#3FB950"),
+                ToolNoteLevel.Caution => Brush("#E3B341"),
+                ToolNoteLevel.Conflict => Brush("#F0883E"),
+                _ => Brush("#9BA6B4"),
+            };
         }
-        finally
-        {
-            InstallProgress.IsVisible = false;
-            UpdateInstallAvailability();
-        }
+
+        var parts = new List<string>();
+        if (route is not null) parts.Add("DLSS 5");
+        parts.AddRange(_tools.Where(t => t.IsSelected).Select(t => t.Name));
+        InstallButton.Content = parts.Count == 0 ? "Install selected" : "Install " + string.Join(" + ", parts);
+        InstallButton.IsEnabled = !_busy;
+
+        string? hint = parts.Count == 0
+            ? "Tick “Install DLSS 5” and/or any tools above, then press Install."
+            : _readiness?.State switch
+            {
+                Dlss5ReadinessState.NeedsGameFolder => "Install will first ask you where the game is installed.",
+                Dlss5ReadinessState.NeedsGraphicsApi when route is not null => "Install will first ask which graphics API the game uses.",
+                _ => null,
+            };
+        InstallHint.Text = hint ?? "";
+        InstallHint.IsVisible = hint is not null;
     }
 
     private void OnRouteSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        UpdateDriverWarning(RoutesList.SelectedItem as RouteOption);
-        UpdateInstallAvailability();
+        if (!_populatingRoutes && RoutesList.SelectedItem is RouteOption picked)
+        {
+            _userRoute = (picked.Profile, picked.DeepFriedChicken);
+            if (InstallDlss5Check.IsChecked != true) InstallDlss5Check.IsChecked = true;
+        }
+        UpdateSelectionState();
     }
 
-    /// <summary>Paints the readiness banner: icon + colour by state, the real problems, the inline
+    /// <summary>Paints the readiness banner: icon + colour by state, the things to know, the inline
     /// "Choose game folder…" fix, and the list of things Adas sets up automatically (never shown as errors).</summary>
     private void ApplyReadiness(Dlss5Readiness? readiness)
     {
         _readiness = readiness;
-        var state = readiness?.State;
-        (ReadinessIcon.Text, ReadinessBanner.Background, ReadinessBanner.BorderBrush) = state switch
+        (ReadinessIcon.Text, ReadinessBanner.Background, ReadinessBanner.BorderBrush) = readiness?.State switch
         {
             Dlss5ReadinessState.Ready => ("✓", Brush("#12261A"), Brush("#2E6B3F")),
             Dlss5ReadinessState.NeedsGameFolder => ("📁", Brush("#2B2410"), Brush("#8A6D2F")),
-            Dlss5ReadinessState.Blocked => ("✕", Brush("#2A1517"), Brush("#7A2E33")),
+            Dlss5ReadinessState.NeedsGraphicsApi => ("?", Brush("#2B2410"), Brush("#8A6D2F")),
+            Dlss5ReadinessState.Warnings => ("⚠", Brush("#2B2410"), Brush("#8A6D2F")),
             _ => ("⚠", Brush("#1A2230"), Brush("#2F3B4E")),
         };
 
@@ -266,51 +385,10 @@ public partial class GameSetupView : UserControl
         ChooseFolderInlineButton.IsVisible = readiness?.NeedsGameFolder == true;
 
         AutoSetupText.Text = readiness?.AutoSetupText ?? "";
-        AutoSetupText.IsVisible = readiness is not null && readiness.State != Dlss5ReadinessState.Blocked
-                                  && !string.IsNullOrEmpty(readiness.AutoSetupText);
+        AutoSetupText.IsVisible = !string.IsNullOrEmpty(readiness?.AutoSetupText);
     }
 
     private static Avalonia.Media.IBrush Brush(string hex) => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex));
-
-    /// <summary>Shows only the routes that work for this game unless the user asks to see the rest.</summary>
-    private void ApplyRouteFilter()
-    {
-        var selected = RoutesList.SelectedItem as RouteOption;
-        var unavailable = _allRoutes.Count(r => !r.Supported && !r.Installed);
-        var showAll = ShowUnavailableToggle.IsChecked == true;
-        IReadOnlyList<RouteOption> visible = showAll ? _allRoutes : _allRoutes.Where(r => r.Supported || r.Installed).ToArray();
-
-        RoutesList.ItemsSource = visible;
-        if (selected is not null && visible.Contains(selected)) RoutesList.SelectedItem = selected;
-        else RoutesList.SelectedItem = visible.FirstOrDefault(r => r.Installed) ?? visible.FirstOrDefault(r => r.Recommended);
-
-        ShowUnavailableToggle.IsVisible = unavailable > 0;
-        ShowUnavailableToggle.Content = $"Show {unavailable} option{(unavailable == 1 ? "" : "s")} that don't work for this game";
-
-        var blocked = _readiness?.State is Dlss5ReadinessState.Blocked or Dlss5ReadinessState.NeedsGameFolder;
-        RoutesHeader.IsVisible = visible.Count > 0 && (!blocked || showAll);
-        RoutesList.IsVisible = visible.Count > 0 && (!blocked || showAll);
-    }
-
-    /// <summary>Install is only clickable when it can actually succeed; otherwise a hint says why.</summary>
-    private void UpdateInstallAvailability()
-    {
-        var route = RoutesList.SelectedItem as RouteOption;
-        string? hint = _readiness?.State switch
-        {
-            null => null,
-            Dlss5ReadinessState.NeedsGameFolder => "Choose the game folder above to continue.",
-            Dlss5ReadinessState.Blocked => "Install is unavailable until the problem above is fixed.",
-            _ when route is null => "Pick an option above to install.",
-            _ when !route.Supported => "That option doesn't work for this game — pick one marked ★ or \"Works\".",
-            _ => null,
-        };
-        InstallButton.IsEnabled = _readiness?.State == Dlss5ReadinessState.Ready && route is { Supported: true };
-        InstallButton.Content = route?.Installed == true ? "Reinstall"
-            : Card?.IsDlss5Installed == true ? "Switch to this option" : "Install";
-        InstallHint.Text = hint ?? "";
-        InstallHint.IsVisible = hint is not null;
-    }
 
     /// <summary>
     /// Shows the known-bad-driver pre-flight warning for the selected route, keyed to the assessed
@@ -320,9 +398,333 @@ public partial class GameSetupView : UserControl
     {
         var warning = route is null
             ? null
-            : Dlss5CompatibilityService.GetDriverPreflightWarning(_assessedMode, route.Profile);
+            : Dlss5CompatibilityService.GetDriverPreflightWarning(_assessment?.Mode ?? Dlss5DeploymentMode.None, route.Profile);
         DriverWarningText.Text = warning ?? "";
         DriverWarningBanner.IsVisible = !string.IsNullOrWhiteSpace(warning);
+    }
+
+    // ── Install selected ────────────────────────────────────────────────────
+
+    private void SetBusy(bool busy)
+    {
+        _busy = busy;
+        InstallButton.IsEnabled = !busy;
+        RepairButton.IsEnabled = !busy;
+        RemoveButton.IsEnabled = !busy;
+        InstallProgress.IsVisible = busy;
+        if (busy) InstallProgress.Value = 0;
+    }
+
+    private async void OnInstall(object? sender, RoutedEventArgs e)
+    {
+        var card = Card;
+        var main = Main;
+        var owner = this.FindAncestorOfType<Window>();
+        if (main is null || card is null || owner is null || _busy) return;
+
+        var route = SelectedRoute;
+        var tools = _tools.Where(t => t.IsSelected).ToList();
+        if (route is null && tools.Count == 0)
+        {
+            ShowResult(InstallDlss5Check.IsChecked == true
+                ? "Pick a DLSS 5 route in the list (★ is the recommended one), or tick a tool."
+                : "Tick “Install DLSS 5” and/or at least one tool, then press Install.");
+            return;
+        }
+
+        SetBusy(true);
+        InstallResult.IsVisible = false;
+        var progress = new Progress<(string message, double percent)>(u =>
+        {
+            InstallProgress.Value = u.percent;
+            RouteSummary.Text = u.message;
+        });
+        var results = new List<string>();
+        var anyRan = false;
+
+        try
+        {
+            // 1. Where is the game? (only asked when Adas really doesn't know)
+            var (folderOk, deploymentPath) = await EnsureGameFolderAsync(owner, card, route is not null);
+            if (!folderOk) { ShowResult("Cancelled — Adas needs to know where the game is installed."); return; }
+
+            // 2. Which graphics API? (only asked when detection came up empty)
+            var needsApi = route is not null
+                ? _assessment?.Mode == Dlss5DeploymentMode.None
+                : tools.Any(t => t.Tool is SetupTool.ReShade or SetupTool.Dxvk or SetupTool.DisplayCommander)
+                  && _probe?.GraphicsApi == GraphicsApiType.Unknown;
+            if (needsApi && !await AskGraphicsApiAsync(owner, card))
+            {
+                ShowResult("Cancelled — pick the game's graphics API to continue.");
+                return;
+            }
+
+            // Re-resolve the route against the fresh assessment (folder/API answers can change the verdict).
+            if (route is not null)
+                route = _allRoutes.FirstOrDefault(r => r.Profile == route.Profile && r.DeepFriedChicken == route.DeepFriedChicken) ?? route;
+
+            // 3. Deep Fried Chicken can't be bundled — fetch the user's copy now instead of refusing.
+            if (route is { DeepFriedChicken: true }
+                && AppServices.Services.GetService<DeepFriedChickenService>()?.IsImported != true)
+            {
+                if (!await ImportDeepFriedChickenAsync())
+                {
+                    ShowResult("Deep Fried Chicken isn't imported, so that route can't be installed. Import it under Advanced options, or pick another route.");
+                    return;
+                }
+                route = _allRoutes.FirstOrDefault(r => r.DeepFriedChicken) ?? route;
+            }
+
+            // 4. One confirmation listing everything worth knowing — then no more questions.
+            var context = BuildToolContext() with { Route = route?.Profile };
+            var warnings = new List<string>();
+            if (route is not null)
+            {
+                if (_readiness?.State is Dlss5ReadinessState.Warnings or Dlss5ReadinessState.NeedsGraphicsApi)
+                    warnings.AddRange(_readiness.Problems.Where(p => !p.Contains("couldn't tell which graphics technology")));
+                if (!route.Supported && !route.Installed)
+                    warnings.Add($"DLSS 5 “{route.Label}”: {route.StatusText.TrimStart('⚠', ' ')}");
+            }
+            foreach (var tool in tools)
+                warnings.AddRange(Dlss5ToolCompatibility.Notes(tool.Tool, context)
+                    .Where(n => n.Level is ToolNoteLevel.Conflict or ToolNoteLevel.NoEffect)
+                    .Select(n => $"{tool.Name}: {n.Text}"));
+            if (warnings.Count > 0
+                && !await DialogHost.ConfirmAsync(owner, "Install anyway?",
+                    "Heads up before Adas installs your selection:\n\n" + string.Join("\n\n", warnings.Distinct().Select(w => "⚠ " + w))
+                    + "\n\nThese are warnings, not blockers — you decide.",
+                    "Install anyway", "Go back"))
+            {
+                ShowResult("Cancelled — nothing was changed.");
+                return;
+            }
+
+            // 5. DLSS 5 route
+            var routeInstalled = false;
+            if (route is not null)
+            {
+                var outcome = await Dlss5Installer.InstallAsync(main, owner, card, route.Profile, progress,
+                    deepFriedChicken: route.DeepFriedChicken,
+                    forceProfile: !route.Supported && !route.Installed,
+                    deploymentPath: deploymentPath,
+                    risksConfirmed: true);
+                if (outcome is { Ran: false, Message: "Cancelled." })
+                {
+                    ShowResult("Cancelled — nothing was changed.");
+                    return;
+                }
+                routeInstalled = outcome.Ran;
+                anyRan |= outcome.Ran;
+                results.Add((outcome.Ran ? "✓ DLSS 5 — " : "✕ DLSS 5 — ") + outcome.Message);
+            }
+
+            // 6. Tools, in an order where each one's dependencies are already in place.
+            if (tools.Count > 0)
+            {
+                if (!await GuardGameClosedAsync(card, m => results.Add("✕ Tools skipped — " + m)))
+                    return;
+                foreach (var tool in tools.OrderBy(t => t.Tool))
+                {
+                    if (tool.Tool == SetupTool.ReShade && routeInstalled)
+                    {
+                        results.Add("– ReShade — already installed as part of DLSS 5.");
+                        tool.SetSelectedSilently(false);
+                        continue;
+                    }
+                    RouteSummary.Text = $"Installing {tool.Name}…";
+                    var (ok, message) = await InstallToolAsync(main, card, tool.Tool, progress);
+                    anyRan |= ok;
+                    results.Add((ok ? "✓ " : "✕ ") + tool.Name + " — " + message);
+                    if (ok) tool.SetSelectedSilently(false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            results.Add("✕ Install stopped: " + ex.Message);
+        }
+        finally
+        {
+            SetBusy(false);
+            if (results.Count > 0) ShowResult(string.Join("\n\n", results));
+            if (anyRan)
+            {
+                card.NotifyAll();
+                try { await main.RefreshAsync(); } catch { /* refresh best-effort */ }
+                if (results.Count > 0) ShowResult(string.Join("\n\n", results));
+            }
+            await RefreshAssessmentAsync();
+        }
+    }
+
+    private void ShowResult(string text)
+    {
+        InstallResult.Text = text;
+        InstallResult.IsVisible = true;
+    }
+
+    /// <summary>
+    /// Makes sure Adas knows the game folder: when the remembered folder is gone, the picked folder becomes the
+    /// game's folder; when detection found several candidates (route installs only), the picked folder is used
+    /// for this install. Returns false only when the user cancels the picker.
+    /// </summary>
+    private async Task<(bool ok, string? deploymentPath)> EnsureGameFolderAsync(Window owner, GameCardViewModel card, bool forRoute)
+    {
+        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
+        {
+            var picked = await PickFolderAsync(owner, $"{card.GameName} isn't where Adas last saw it — select the game's folder", null);
+            if (picked is null) return (false, null);
+            Main!.SetFolderOverride(card.GameName, picked, Store);
+            FolderText.Text = picked;
+            card.NotifyAll();
+            await RefreshAssessmentAsync();
+        }
+
+        if (forRoute && _readiness?.State == Dlss5ReadinessState.NeedsGameFolder)
+        {
+            var picked = await PickFolderAsync(owner, $"Select the folder that contains {card.GameName}'s .exe", card.InstallPath);
+            return picked is null ? (false, null) : (true, picked);
+        }
+        return (true, null);
+    }
+
+    private static async Task<string?> PickFolderAsync(Window owner, string title, string? startIn)
+    {
+        if (owner.StorageProvider is not { } sp) return null;
+        Avalonia.Platform.Storage.IStorageFolder? start = null;
+        if (!string.IsNullOrWhiteSpace(startIn) && Directory.Exists(startIn))
+        {
+            try { start = await sp.TryGetFolderFromPathAsync(new Uri(startIn)); } catch { /* optional */ }
+        }
+        var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            SuggestedStartLocation = start,
+        });
+        var path = folders.Count > 0 ? folders[0].Path.LocalPath : null;
+        return string.IsNullOrWhiteSpace(path) ? null : path;
+    }
+
+    /// <summary>Asks which graphics API the game uses (APIs found in its files listed first) and saves the answer.</summary>
+    private async Task<bool> AskGraphicsApiAsync(Window owner, GameCardViewModel card)
+    {
+        var supported = _probe?.SupportedGraphicsApis.Where(a => a != GraphicsApiType.Unknown).ToArray() ?? Array.Empty<GraphicsApiType>();
+        var options = supported.Concat(AllApis).Distinct().ToArray();
+        var labels = options.Select(api => GraphicsApiDetector.GetLabel(api)
+                                           + (supported.Contains(api) ? "   — found in the game's files" : "")).ToArray();
+        var choice = await DialogHost.ChooseAsync(owner, "Which graphics API does this game use?",
+            "Adas couldn't tell for sure. If you don't know, keep the first option — you can change it any time under Graphics.",
+            labels, 0, "Use this");
+        if (choice is null) return false;
+
+        Main!.SetApiOverride(card.GameName, new List<string> { options[choice.Value].ToString() }, Store);
+        card.NotifyAll();
+        await RefreshAssessmentAsync();
+        return true;
+    }
+
+    /// <summary>Installs one checklist tool through the same engine paths as the library, and reads back the result.</summary>
+    private async Task<(bool ok, string message)> InstallToolAsync(MainViewModel main, GameCardViewModel card, SetupTool tool,
+        IProgress<(string message, double percent)> progress)
+    {
+        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
+            return (false, "the game folder isn't set.");
+        try
+        {
+            switch (tool)
+            {
+                case SetupTool.OptiScaler:
+                {
+                    var svc = AppServices.Services.GetService<IOptiScalerService>();
+                    if (svc is null) return (false, "OptiScaler service unavailable.");
+                    var record = await svc.InstallAsync(card, progress,
+                        main.Settings.OsGpuType, main.Settings.OsDlssInputs, main.Settings.OsHotkey,
+                        main.GetOsVariant(card.GameName, card.Source ?? ""));
+                    if (record is null) return (false, "install did not complete — see the log.");
+                    await TryPdUpscalerSwapAsync(main, card, progress);
+                    return (true, $"installed{(string.IsNullOrWhiteSpace(record.OsVariant) ? "" : $" ({record.OsVariant})")}. Press Insert in-game for its menu.");
+                }
+                case SetupTool.Dxvk:
+                    await main.InstallDxvkAsync(card);
+                    card.NotifyAll();
+                    return card.IsDxvkInstalled
+                        ? (true, "installed.")
+                        : (false, string.IsNullOrWhiteSpace(card.DxvkActionMessage) ? "install was cancelled or did not complete." : card.DxvkActionMessage);
+                case SetupTool.ReShade:
+                    await main.InstallReShadeAsync(card);
+                    card.NotifyAll();
+                    return card.IsRsInstalled
+                        ? (true, "installed.")
+                        : (false, string.IsNullOrWhiteSpace(card.RsActionMessage) ? "install did not complete." : card.RsActionMessage);
+                case SetupTool.DisplayCommander:
+                    if (card.IsUlInstalled)
+                        return (false, "ReLimiter is installed in this game; remove it first (the two frame limiters can't run together).");
+                    await main.InstallDcAsync(card);
+                    card.NotifyAll();
+                    return card.IsDcInstalled
+                        ? (true, "installed.")
+                        : (false, string.IsNullOrWhiteSpace(card.DcActionMessage) ? "install did not complete." : card.DcActionMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+        return (false, "unknown tool.");
+    }
+
+    /// <summary>PD-Upscaler REFramework swap for compatible RE Engine titles after OptiScaler (ports the WinUI flow).</summary>
+    private static async Task TryPdUpscalerSwapAsync(MainViewModel main, GameCardViewModel card,
+        IProgress<(string message, double percent)> progress)
+    {
+        if (main.Manifest?.PdUpscalerGames is not { } pd
+            || !pd.TryGetValue(card.GameName, out var pdArtifact)
+            || !File.Exists(Path.Combine(card.InstallPath!, "dinput8.dll")))
+            return;
+        try
+        {
+            var refSvc = AppServices.Services.GetService<IREFrameworkService>();
+            if (refSvc is null) return;
+            await refSvc.InstallPdUpscalerAsync(card.GameName, card.InstallPath!, pdArtifact, progress);
+            card.RefInstalledVersion = "PD-Upscaler";
+            card.NotifyAll();
+        }
+        catch
+        {
+            // Non-fatal — OptiScaler is already installed.
+        }
+    }
+
+    private async Task RemoveToolAsync(SetupToolItem item)
+    {
+        var card = Card;
+        var main = Main;
+        if (card is null || main is null || _busy) return;
+        if (!await GuardGameClosedAsync(card, ShowResult)) return;
+
+        SetBusy(true);
+        try
+        {
+            switch (item.Tool)
+            {
+                case SetupTool.OptiScaler: AppServices.Services.GetService<IOptiScalerService>()?.Uninstall(card); break;
+                case SetupTool.Dxvk: main.UninstallDxvk(card); break;
+                case SetupTool.ReShade: main.UninstallReShade(card); break;
+                case SetupTool.DisplayCommander: main.UninstallDc(card); break;
+            }
+            card.NotifyAll();
+            ShowResult($"{item.Name} removed.");
+        }
+        catch (Exception ex)
+        {
+            ShowResult($"Removing {item.Name} failed: {ex.Message}");
+        }
+        finally
+        {
+            SetBusy(false);
+            UpdateSelectionState();
+        }
     }
 
     private void OnRepair(object? sender, RoutedEventArgs e) =>
@@ -332,22 +734,18 @@ public partial class GameSetupView : UserControl
         _ = RunMaintenanceAsync((main, owner, card, progress) => Dlss5Installer.RemoveAsync(main, owner, card, progress));
 
     /// <summary>
-    /// Shared runner for the Remove/Repair maintenance actions: disables the route buttons, drives the
-    /// install progress bar, then refreshes the library card and this pane so the badge/label update.
+    /// Shared runner for the Remove/Repair maintenance actions: drives the progress bar, then refreshes the
+    /// library card and this pane so the badge/label update.
     /// </summary>
     private async Task RunMaintenanceAsync(
         Func<MainViewModel, Window, GameCardViewModel, IProgress<(string message, double percent)>, Task<Dlss5Installer.Outcome>> action)
     {
         var card = Card;
-        if (Main is null || card is null) return;
+        if (Main is null || card is null || _busy) return;
         var owner = this.FindAncestorOfType<Window>();
         if (owner is null) return;
 
-        InstallButton.IsEnabled = false;
-        RepairButton.IsEnabled = false;
-        RemoveButton.IsEnabled = false;
-        InstallProgress.IsVisible = true;
-        InstallProgress.Value = 0;
+        SetBusy(true);
         InstallResult.IsVisible = false;
 
         var progress = new Progress<(string message, double percent)>(u =>
@@ -359,8 +757,7 @@ public partial class GameSetupView : UserControl
         try
         {
             var outcome = await action(Main, owner, card, progress);
-            InstallResult.Text = outcome.Message;
-            InstallResult.IsVisible = true;
+            ShowResult(outcome.Message);
             if (outcome.Ran)
             {
                 try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
@@ -369,15 +766,13 @@ public partial class GameSetupView : UserControl
         }
         finally
         {
-            InstallProgress.IsVisible = false;
-            UpdateInstallAvailability();
-            RepairButton.IsEnabled = true;
-            RemoveButton.IsEnabled = true;
+            SetBusy(false);
+            UpdateSelectionState();
         }
     }
 
     /// <summary>
-    /// Closes a running game before an Extras component writes DLLs Windows keeps locked. Returns true when
+    /// Closes a running game before a component writes DLLs Windows keeps locked. Returns true when
     /// it is safe to proceed; on cancel/failure it reports through <paramref name="report"/> and returns false.
     /// </summary>
     private async Task<bool> GuardGameClosedAsync(GameCardViewModel card, Action<string> report)
@@ -582,16 +977,22 @@ public partial class GameSetupView : UserControl
         }
     }
 
+    private async void OnImportDeepFriedChicken(object? sender, RoutedEventArgs e)
+    {
+        if (await ImportDeepFriedChickenAsync())
+            await RefreshAssessmentAsync();
+    }
+
     /// <summary>
     /// Imports the user-supplied Deep Fried Chicken release. Its licence forbids redistribution, so Adas
     /// never bundles it. First tries the author's release sitting in Downloads (or Downloads\DLSS5); if
-    /// none is found, prompts for the .zip or the folder the user extracted the release into. On success
-    /// the DFC route unlocks in the list above.
+    /// none is found, prompts for the .zip or the folder the user extracted the release into.
+    /// Returns true when a valid release is imported.
     /// </summary>
-    private async void OnImportDeepFriedChicken(object? sender, RoutedEventArgs e)
+    private async Task<bool> ImportDeepFriedChickenAsync()
     {
         var dfc = AppServices.Services.GetService<DeepFriedChickenService>();
-        if (dfc is null) { DfcStatusText.Text = "Deep Fried Chicken service unavailable."; return; }
+        if (dfc is null) { DfcStatusText.Text = "Deep Fried Chicken service unavailable."; return false; }
 
         ImportDfcButton.IsEnabled = false;
         try
@@ -600,15 +1001,14 @@ public partial class GameSetupView : UserControl
             if (await dfc.EnsureImportedFromDefaultLocationsAsync() && dfc.IsImported)
             {
                 UpdateDfcStatus();
-                await RefreshAssessmentAsync();
-                return;
+                return true;
             }
 
             var owner = this.FindAncestorOfType<Window>();
             if (owner?.StorageProvider is not { } sp)
             {
                 DfcStatusText.Text = "Could not open a file picker.";
-                return;
+                return false;
             }
 
             // Prefer a file picker for the official .zip; if the user cancels it, offer a folder picker for
@@ -638,7 +1038,7 @@ public partial class GameSetupView : UserControl
             if (string.IsNullOrWhiteSpace(source))
             {
                 UpdateDfcStatus();
-                return;
+                return false;
             }
 
             DfcStatusText.Text = "Verifying and importing…";
@@ -646,158 +1046,21 @@ public partial class GameSetupView : UserControl
             if (error != null)
             {
                 DfcStatusText.Text = "Import failed: " + error;
-                return;
+                return false;
             }
 
             UpdateDfcStatus();
-            await RefreshAssessmentAsync();
+            return dfc.IsImported;
         }
         catch (Exception ex)
         {
             DfcStatusText.Text = "Import failed: " + ex.Message;
+            return false;
         }
         finally
         {
             ImportDfcButton.IsEnabled = true;
         }
-    }
-
-    /// <summary>
-    /// Per-game OptiScaler (universal upscaler) install — resolves the engine service and mirrors the
-    /// WinUI InstallEventHandler flow (GPU type / DLSS inputs / hotkey from settings, per-game variant).
-    /// The PD-Upscaler REFramework swap for RE Engine titles is not yet ported.
-    /// </summary>
-    private async void OnOptiScaler(object? sender, RoutedEventArgs e)
-    {
-        if (Main is null || Card is not { } card) return;
-        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
-        {
-            ExtrasResult.Text = "No install path resolved for this game yet.";
-            ExtrasResult.IsVisible = true;
-            return;
-        }
-
-        var svc = AppServices.Services.GetService<IOptiScalerService>();
-        if (svc is null) { ExtrasResult.Text = "OptiScaler service unavailable."; ExtrasResult.IsVisible = true; return; }
-
-        if (!await GuardGameClosedAsync(card, m => { ExtrasResult.Text = m; ExtrasResult.IsVisible = true; })) return;
-
-        OptiScalerButton.IsEnabled = false;
-        ExtrasProgress.IsVisible = true;
-        ExtrasProgress.Value = 0;
-        ExtrasResult.IsVisible = false;
-        var progress = new Progress<(string message, double percent)>(u =>
-        {
-            ExtrasProgress.Value = u.percent;
-            ExtrasResult.Text = u.message;
-            ExtrasResult.IsVisible = true;
-        });
-
-        try
-        {
-            var variant = Main.GetOsVariant(card.GameName, card.Source ?? "");
-            var record = await svc.InstallAsync(card, progress,
-                Main.Settings.OsGpuType, Main.Settings.OsDlssInputs, Main.Settings.OsHotkey, variant);
-            ExtrasResult.Text = record is null
-                ? "OptiScaler install did not complete — see log."
-                : $"OptiScaler installed{(string.IsNullOrWhiteSpace(record.OsVariant) ? "" : $" ({record.OsVariant})")}.";
-            ExtrasResult.IsVisible = true;
-
-            // PD-Upscaler REFramework swap for compatible RE Engine titles (ports the WinUI flow):
-            // manifest lists the game and a dinput8.dll is already present.
-            if (record is not null
-                && Main.Manifest?.PdUpscalerGames is { } pd
-                && pd.TryGetValue(card.GameName, out var pdArtifact)
-                && File.Exists(Path.Combine(card.InstallPath!, "dinput8.dll")))
-            {
-                try
-                {
-                    var refSvc = AppServices.Services.GetService<IREFrameworkService>();
-                    if (refSvc is not null)
-                    {
-                        await refSvc.InstallPdUpscalerAsync(card.GameName, card.InstallPath!, pdArtifact, progress);
-                        card.RefInstalledVersion = "PD-Upscaler";
-                        card.NotifyAll();
-                    }
-                }
-                catch (Exception pdEx)
-                {
-                    // Non-fatal — OptiScaler is already installed.
-                    ExtrasResult.Text += $"  (PD-Upscaler swap skipped: {pdEx.Message})";
-                }
-            }
-
-            try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
-            await RefreshAssessmentAsync();
-        }
-        catch (Exception ex)
-        {
-            ExtrasResult.Text = $"OptiScaler failed: {ex.Message}";
-            ExtrasResult.IsVisible = true;
-        }
-        finally
-        {
-            ExtrasProgress.IsVisible = false;
-            OptiScalerButton.IsEnabled = true;
-        }
-    }
-
-    /// <summary>
-    /// Display Commander (the RenoDX HDR / display-control addon) toggle — installs if not present,
-    /// uninstalls if it is. Uses the engine's InstallDcAsync / UninstallDc commands.
-    /// </summary>
-    private async void OnDisplayCommander(object? sender, RoutedEventArgs e)
-    {
-        if (Main is null || Card is not { } card) return;
-        if (string.IsNullOrWhiteSpace(card.InstallPath) || !Directory.Exists(card.InstallPath))
-        {
-            ExtrasResult.Text = "No install path resolved for this game yet.";
-            ExtrasResult.IsVisible = true;
-            return;
-        }
-
-        if (!await GuardGameClosedAsync(card, m => { ExtrasResult.Text = m; ExtrasResult.IsVisible = true; })) return;
-
-        DisplayCommanderButton.IsEnabled = false;
-        try
-        {
-            if (card.DcStatus == GameStatus.Installed)
-            {
-                Main.UninstallDc(card);
-                ExtrasResult.Text = "Display Commander removed.";
-            }
-            else
-            {
-                await Main.InstallDcAsync(card);
-                ExtrasResult.Text = card.DcStatus == GameStatus.Installed
-                    ? "Display Commander installed."
-                    : card.DcActionMessage ?? "Display Commander install did not complete.";
-            }
-            ExtrasResult.IsVisible = true;
-            card.NotifyAll();
-        }
-        catch (Exception ex)
-        {
-            ExtrasResult.Text = $"Display Commander failed: {ex.Message}";
-            ExtrasResult.IsVisible = true;
-        }
-        finally { DisplayCommanderButton.IsEnabled = true; }
-    }
-
-    private async void OnDxvk(object? sender, RoutedEventArgs e)
-    {
-        if (Main is null || Card is not { } card) return;
-        if (!await GuardGameClosedAsync(card, m => card.ActionMessage = m)) return;
-        try { await Main.InstallDxvkAsync(card); }
-        catch (Exception ex) { card.ActionMessage = $"DXVK failed: {ex.Message}"; }
-    }
-
-    private async void OnReShade(object? sender, RoutedEventArgs e)
-    {
-        if (Main is null || Card is not { } card) return;
-        if (!await GuardGameClosedAsync(card, m => card.ActionMessage = m)) return;
-        try { await Main.InstallReShadeAsync(card); }
-        catch (Exception ex) { card.ActionMessage = $"ReShade failed: {ex.Message}"; }
     }
 
     private void OnDiagnose(object? sender, RoutedEventArgs e)

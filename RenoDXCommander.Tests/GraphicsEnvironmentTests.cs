@@ -172,4 +172,70 @@ public sealed class GraphicsEnvironmentTests : IDisposable
         File.WriteAllBytes(addon, bytes);
         Assert.Contains(GraphicsEnvironmentService.CheckInstallation(root), issue => issue.Contains("wrong.addon64") && issue.Contains("32-bit"));
     }
+
+    [Theory]
+    [InlineData("LogRHI: Loading RHI module D3D12RHI\nLogD3D12RHI: Found D3D12 adapter", GraphicsApiType.DirectX12)]
+    [InlineData("LogRHI: RHI D3D12 with Feature Level SM6 is supported and will be used.", GraphicsApiType.DirectX12)]
+    [InlineData("LogRHI: Loading RHI module D3D12RHI\nLogRHI: Loading RHI module D3D11RHI", GraphicsApiType.DirectX11)]
+    [InlineData("LogVulkanRHI: Display: Found 1 device(s)\nLogVulkanRHI: Using device 0", GraphicsApiType.Vulkan)]
+    [InlineData("LogInit: nothing about rendering", GraphicsApiType.Unknown)]
+    public void UnrealLogNamesTheRhiThatActuallyRan(string log, GraphicsApiType expected) =>
+        Assert.Equal(expected, GraphicsEnvironmentService.UnrealRhiFromLog(log));
+
+    [Theory]
+    [InlineData("[/Script/Engine.GameUserSettings]\nPreferredRHI=dx11\n", GraphicsApiType.DirectX11)]
+    [InlineData("[/Script/WindowsTargetPlatform.WindowsTargetSettings]\nDefaultGraphicsRHI=DefaultGraphicsRHI_Vulkan\n", GraphicsApiType.Vulkan)]
+    [InlineData("[Core.Log]\n", GraphicsApiType.Unknown)]
+    public void UnrealConfigNamesThePreferredRhi(string ini, GraphicsApiType expected) =>
+        Assert.Equal(expected, GraphicsEnvironmentService.UnrealRhiFromConfig(ini));
+
+    [Fact]
+    public void BestGuessUsesTheUnrealLogForAMultiRhiGame()
+    {
+        Exe("d3d11.dll", "D3D11CreateDevice", "d3d12.dll", "D3D12CreateDevice");
+        var bin = Path.Combine(root, "Hellbreak", "Binaries", "Win64");
+        Directory.CreateDirectory(bin);
+        var exe = Path.Combine(bin, "Hellbreak-Win64-Shipping.exe");
+        File.Move(Path.Combine(root, "game.exe"), exe);
+        var localAppData = Path.Combine(root, "lad");
+        var logs = Path.Combine(localAppData, "Hellbreak", "Saved", "Logs");
+        Directory.CreateDirectory(logs);
+        File.WriteAllText(Path.Combine(logs, "Hellbreak.log"), "LogRHI: Loading RHI module D3D12RHI\n");
+
+        var result = GraphicsEnvironmentService.DetectWithBestGuess(Path.Combine(root, "Hellbreak"), exe,
+            Path.Combine(root, "observations"), localAppData, Path.Combine(root, "docs"));
+
+        Assert.Equal(GraphicsApiType.DirectX12, result.Api);
+        Assert.False(result.IsBestGuess);
+        Assert.Contains("Unreal Engine log", result.Evidence);
+    }
+
+    [Fact]
+    public void BestGuessRecognisesTheDirectX12AgilitySdk()
+    {
+        var exe = Exe("d3d11.dll", "D3D11CreateDevice", "d3d12.dll", "D3D12CreateDevice");
+        Directory.CreateDirectory(Path.Combine(root, "D3D12"));
+        File.WriteAllBytes(Path.Combine(root, "D3D12", "D3D12Core.dll"), new byte[] { 0 });
+
+        var result = GraphicsEnvironmentService.DetectWithBestGuess(root, exe,
+            Path.Combine(root, "observations"), Path.Combine(root, "lad"), Path.Combine(root, "docs"));
+
+        Assert.Equal(GraphicsApiType.DirectX12, result.Api);
+        Assert.True(result.IsBestGuess);
+        Assert.Contains("Agility SDK", result.Evidence);
+    }
+
+    [Fact]
+    public void BestGuessNeverLeavesAMultiApiGameUnknown()
+    {
+        var exe = Exe("d3d9.dll", "Direct3DCreate9", "d3d11.dll", "D3D11CreateDevice");
+
+        Assert.Equal(GraphicsApiType.Unknown, GraphicsEnvironmentService.Detect(root, exe, Path.Combine(root, "observations")).Api);
+        var result = GraphicsEnvironmentService.DetectWithBestGuess(root, exe,
+            Path.Combine(root, "observations"), Path.Combine(root, "lad"), Path.Combine(root, "docs"));
+
+        Assert.Contains(result.Api, new[] { GraphicsApiType.DirectX9, GraphicsApiType.DirectX11 });
+        Assert.True(result.IsBestGuess);
+        Assert.NotNull(result.ReShadeProxy);
+    }
 }

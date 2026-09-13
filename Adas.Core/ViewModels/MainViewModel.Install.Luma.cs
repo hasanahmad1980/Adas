@@ -69,7 +69,7 @@ public partial class MainViewModel
         // Use the exact executable and current runtime evidence. Card badges and
         // manifests describe support; they are not installation authority.
         var renderer = await Task.Run(() => GraphicsEnvironmentService.ApplyUserOverride(
-            GraphicsEnvironmentService.Detect(card.InstallPath),
+            GraphicsEnvironmentService.DetectWithBestGuess(card.InstallPath),
             GetSingleApiOverride(card.GameName, card.Source ?? "")));
         var installTarget = renderer.Executable == null ? card.InstallPath : Path.GetDirectoryName(renderer.Executable)!;
         if (renderer.Api == GraphicsApiType.Unknown && renderer.ReShadeProxy == null

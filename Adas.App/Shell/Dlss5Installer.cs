@@ -20,13 +20,26 @@ public static class Dlss5Installer
 {
     public sealed record Outcome(bool Ran, string Message);
 
+    /// <summary>
+    /// Probes with the user's Graphics API choice applied — every probe in the shell must honour it, otherwise
+    /// the UI shows one API while install assesses another.
+    /// </summary>
+    internal static Dlss5Probe ProbeFor(MainViewModel main, Dlss5CompatibilityService compat, GameCardViewModel card)
+        => compat.Probe(card, main.GetSingleApiOverride(card.GameName, card.Source ?? ""));
+
+    /// <param name="forceProfile">The user picked a route Adas doesn't recommend for this game — install it as chosen.</param>
+    /// <param name="deploymentPath">A folder the user picked when detection found none or several.</param>
+    /// <param name="risksConfirmed">The caller already showed the warnings and the user chose to continue.</param>
     public static async Task<Outcome> InstallAsync(
         MainViewModel main,
         Window owner,
         GameCardViewModel card,
         Dlss5InstallProfile profile,
         IProgress<(string message, double percent)> progress,
-        bool deepFriedChicken = false)
+        bool deepFriedChicken = false,
+        bool forceProfile = false,
+        string? deploymentPath = null,
+        bool risksConfirmed = false)
     {
         var services = AppServices.Services;
         var compat = services.GetService<Dlss5CompatibilityService>();
@@ -34,25 +47,66 @@ public static class Dlss5Installer
         if (compat is null || components is null)
             return new Outcome(false, "Engine services are unavailable.");
 
-        var assessment = await Task.Run(() =>
-            Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true));
+        Task<(Dlss5Probe probe, Dlss5Assessment assessment, IReadOnlyList<string> accepted)> AssessAsync()
+            => Task.Run(() =>
+            {
+                var probed = ProbeFor(main, compat, card);
+                var assessed = Dlss5CompatibilityService.Assess(probed, singlePlayerConfirmed: true);
+                if (!string.IsNullOrWhiteSpace(deploymentPath))
+                    assessed = Dlss5CompatibilityService.ConfirmDeploymentPath(assessed, deploymentPath);
+                var (cleared, risks) = Dlss5CompatibilityService.AcceptRisks(assessed);
+                return (probed, cleared, risks);
+            });
 
-        if (!assessment.CanInstall)
+        var (probe, assessment, accepted) = await AssessAsync();
+
+        // Only two questions can't be skipped, and the setup page asks both before calling us.
+        if (assessment.Mode == Dlss5DeploymentMode.None)
+            return new Outcome(false, "Choose the game's Graphics API first (Graphics API box at the top).");
+        if (string.IsNullOrWhiteSpace(assessment.DeploymentPath) || assessment.BlockingReasons.Count > 0)
+            return new Outcome(false, Dlss5ReadinessText.Describe(assessment, card.InstallPath).ToMessage());
+
+        if (!risksConfirmed)
         {
-            // Only the real problems, in plain language. Components Adas installs itself are not errors.
-            return new Outcome(false, Dlss5ReadinessText.Describe(assessment).ToMessage());
+            var warnings = accepted.Select(Dlss5ReadinessText.FriendlyBlocker).OfType<string>()
+                .Where(w => !w.Contains("Adas installs it", StringComparison.Ordinal)
+                            && !w.Contains("Adas sets it up", StringComparison.Ordinal))
+                .Distinct().ToArray();
+            if (warnings.Length > 0
+                && !await DialogHost.ConfirmAsync(owner, "Install anyway?",
+                    string.Join("\n\n", warnings.Select(w => "⚠ " + w)), "Install anyway", "Cancel"))
+                return new Outcome(false, "Cancelled.");
         }
 
-        var root = assessment.DeploymentPath ?? card.InstallPath;
-        if (string.IsNullOrWhiteSpace(root))
-            return new Outcome(false, "No install path resolved for this game.");
+        // ── Prerequisites Adas can fix itself ─────────────────────────────────
+        if (probe.MissingRuntimeArchitectures.Count > 0)
+        {
+            foreach (var architecture in probe.MissingRuntimeArchitectures)
+            {
+                if (await Dlss5RuntimePrerequisites.DownloadAndInstallAsync(architecture, progress) is { } runtimeError)
+                    return new Outcome(false, runtimeError);
+            }
+            (probe, assessment, accepted) = await AssessAsync();
+        }
+
+        if (assessment.Mode is Dlss5DeploymentMode.VulkanFeeder or Dlss5DeploymentMode.NativeVulkan
+            && !probe.HasReShadeAddonSupport)
+        {
+            progress.Report(("Setting up the Vulkan ReShade layer…", 4));
+            await main.InstallReShadeAsync(card);
+            (probe, assessment, accepted) = await AssessAsync();
+            if (!probe.HasReShadeAddonSupport)
+                return new Outcome(false, "The Vulkan ReShade layer isn't set up yet"
+                    + (string.IsNullOrWhiteSpace(card.RsActionMessage) ? "." : $": {card.RsActionMessage}")
+                    + " Adas needs it for Vulkan games — try Install again (Windows asks for permission).");
+        }
+
+        var root = assessment.DeploymentPath!;
 
         if (await ElevationGuard.EnsureWritableAsync(owner, "Installation", root, card.InstallPath) is { } denied)
             return new Outcome(false, denied);
 
         // ── Known-bad-driver pre-flight (route-aware) ────────────────────────
-        // Warn before we touch anything when the installed NVIDIA driver is known to break this
-        // specific route's neural consumer; the user can still continue.
         var driverWarning = await Task.Run(() =>
             Dlss5CompatibilityService.GetDriverPreflightWarning(assessment.Mode, profile));
         if (!string.IsNullOrWhiteSpace(driverWarning)
@@ -84,36 +138,71 @@ public static class Dlss5Installer
             return blocked;
 
         // ── Install ──────────────────────────────────────────────────────────
-        try
+        var overrides = deepFriedChicken || forceProfile
+            ? new Dlss5ManualOverrides(DeepFriedChicken: deepFriedChicken, ForceProfile: forceProfile)
+            : null;
+        var channel = main.ResolveReShadeChannel(card.GameName, card.Source ?? "");
+        var removedPrevious = false;
+        for (var attempt = 0; ; attempt++)
         {
-            progress.Report(("Preparing…", 2));
-            var relocationErrors = await Task.Run(() =>
-                components.RemoveOtherManagedDeployments(card.InstallPath, root));
-            if (relocationErrors.Count > 0)
-                return new Outcome(false, "Adas could not remove the previous launcher-folder deployment:\n• "
-                    + string.Join("\n• ", relocationErrors));
+            try
+            {
+                progress.Report(("Preparing…", 2));
+                var relocationErrors = await Task.Run(() =>
+                    components.RemoveOtherManagedDeployments(card.InstallPath, root));
+                if (relocationErrors.Count > 0)
+                    return new Outcome(false, "Adas could not remove the previous launcher-folder deployment:\n• "
+                        + string.Join("\n• ", relocationErrors));
 
-            var channel = main.ResolveReShadeChannel(card.GameName, card.Source ?? "");
-            var result = await Task.Run(() => components.InstallAsync(
-                card.GameName,
-                assessment,
-                progress,
-                reShadeChannel: channel,
-                store: card.Source,
-                profile: profile,
-                cleanupApproval: cleanup,
-                overrides: deepFriedChicken ? new Dlss5ManualOverrides(DeepFriedChicken: true) : null));
+                var current = assessment;
+                var currentCleanup = cleanup;
+                var result = await Task.Run(() => components.InstallAsync(
+                    card.GameName,
+                    current,
+                    progress,
+                    reShadeChannel: channel,
+                    store: card.Source,
+                    profile: profile,
+                    cleanupApproval: currentCleanup,
+                    overrides: overrides));
 
-            var text = result.Message;
-            if (result.Warnings.Count > 0)
-                text += "\n\nSetup notes:\n• " + string.Join("\n• ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase));
-            return new Outcome(true, text);
-        }
-        catch (Exception ex)
-        {
-            if (ElevationGuard.IsAccessDenied(ex) && !ElevationGuard.IsElevated)
-                return new Outcome(false, await ElevationGuard.OfferElevationAsync(owner, "Installation", root));
-            return new Outcome(false, $"Installation failed: {ex.Message}");
+                var text = result.Message;
+                if (removedPrevious)
+                    text = "Removed the previous DLSS pipeline, then installed.\n" + text;
+                if (result.Warnings.Count > 0)
+                    text += "\n\nSetup notes:\n• " + string.Join("\n• ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase));
+                return new Outcome(true, text);
+            }
+            catch (InvalidOperationException ex) when (attempt == 0
+                && ex.Message.StartsWith("Recovered the previous interrupted switch", StringComparison.Ordinal))
+            {
+                // The engine rolled back a half-finished switch; the game is consistent again, so just retry.
+                (probe, assessment, accepted) = await AssessAsync();
+            }
+            catch (InvalidOperationException ex) when (attempt == 0
+                && ex.Message.StartsWith("Remove the ", StringComparison.Ordinal))
+            {
+                // Two pipelines can't be stacked. Instead of making the user find a × button, offer to do it.
+                if (!await DialogHost.ConfirmAsync(owner, "Replace the current DLSS setup?",
+                        "This game already has a different DLSS pipeline installed. Adas will remove it (restoring the original files) and then install your selection.\n\n"
+                        + ex.Message, "Replace it", "Cancel"))
+                    return new Outcome(false, "Cancelled.");
+                progress.Report(("Removing the previous DLSS pipeline…", 3));
+                var errors = await Task.Run(() => components.Uninstall(root));
+                if (errors.Count > 0)
+                    return new Outcome(false, "Could not remove the previous DLSS pipeline:\n• "
+                        + string.Join("\n• ", errors.Distinct(StringComparer.OrdinalIgnoreCase)));
+                removedPrevious = true;
+                (probe, assessment, accepted) = await AssessAsync();
+                try { cleanup = await Task.Run(() => Dlss5ComponentService.GetCleanupPlan(root, assessment.Mode, profile)); }
+                catch (Exception cleanupEx) { return new Outcome(false, $"Could not review conflicting components: {cleanupEx.Message}"); }
+            }
+            catch (Exception ex)
+            {
+                if (ElevationGuard.IsAccessDenied(ex) && !ElevationGuard.IsElevated)
+                    return new Outcome(false, await ElevationGuard.OfferElevationAsync(owner, "Installation", root));
+                return new Outcome(false, $"Installation failed: {ex.Message}");
+            }
         }
     }
 
@@ -131,7 +220,7 @@ public static class Dlss5Installer
             return new Outcome(false, "Engine services are unavailable.");
 
         // Resolve the folder that actually holds the install record (install root or addon deploy path).
-        var root = await Task.Run(() => ResolveInstalledRoot(compat, card));
+        var root = await Task.Run(() => ResolveInstalledRoot(main, compat, card));
         if (root is null)
             return new Outcome(false, "No DLSS 5 install was found for this game.");
 
@@ -176,7 +265,7 @@ public static class Dlss5Installer
         if (compat is null)
             return new Outcome(false, "Engine services are unavailable.");
 
-        var root = await Task.Run(() => ResolveInstalledRoot(compat, card));
+        var root = await Task.Run(() => ResolveInstalledRoot(main, compat, card));
         if (root is null)
             return new Outcome(false, "No DLSS 5 install was found for this game.");
 
@@ -206,9 +295,9 @@ public static class Dlss5Installer
     }
 
     /// <summary>Resolves the folder that holds this game's DLSS 5 install record, or null if none.</summary>
-    private static string? ResolveInstalledRoot(Dlss5CompatibilityService compat, GameCardViewModel card)
+    private static string? ResolveInstalledRoot(MainViewModel main, Dlss5CompatibilityService compat, GameCardViewModel card)
     {
-        var assessment = Dlss5CompatibilityService.Assess(compat.Probe(card), singlePlayerConfirmed: true);
+        var assessment = Dlss5CompatibilityService.Assess(ProbeFor(main, compat, card), singlePlayerConfirmed: true);
         foreach (var candidate in new[]
                  {
                      assessment.DeploymentPath,

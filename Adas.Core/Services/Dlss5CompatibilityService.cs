@@ -67,8 +67,8 @@ public sealed class Dlss5CompatibilityService
             : new Dlss5PathResolution(Dlss5PathResolutionKind.Resolved, Path.GetDirectoryName(emulator.Executable), new[] { Path.GetDirectoryName(emulator.Executable)! });
         var path = resolution.Path;
         var environment = emulator == null
-            ? GraphicsEnvironmentService.Detect(path ?? game.InstallPath)
-            : GraphicsEnvironmentService.Detect(path!, emulator.Executable);
+            ? GraphicsEnvironmentService.DetectWithBestGuess(path ?? game.InstallPath)
+            : GraphicsEnvironmentService.DetectWithBestGuess(path!, emulator.Executable);
         if (emulator == null)
             environment = GraphicsEnvironmentService.ApplyUserOverride(environment, userApiOverride);
         var selectedApi = emulator == null ? environment.Api : Dlss5EmulatorService.LoadRenderer(emulator) ?? GraphicsApiType.Unknown;
@@ -136,6 +136,7 @@ public sealed class Dlss5CompatibilityService
             HasAmbiguousDeploymentPath = resolution.Kind == Dlss5PathResolutionKind.Ambiguous,
             GraphicsApi = selectedApi,
             GraphicsApiEvidence = environment.Evidence,
+            GraphicsApiIsBestGuess = emulator == null && environment.IsBestGuess,
             SupportedGraphicsApis = environment.SupportedApis.ToArray(),
             InstallationIssues = path == null ? Array.Empty<string>() : GraphicsEnvironmentService.CheckInstallation(path, emulator == null ? userApiOverride : null),
             OpenXrDetected = environment.OpenXrDetected,
@@ -339,6 +340,33 @@ public sealed class Dlss5CompatibilityService
         }
 
         return new Dlss5Assessment(mode, probe.DeploymentPath, blocks, missing, singlePlayerConfirmed, probe.Is64Bit);
+    }
+
+    /// <summary>
+    /// Reasons the user may knowingly override: the GPU check, anti-cheat/online evidence, a missing Visual C++
+    /// runtime (Adas installs it) and the Vulkan ReShade layer (Adas sets it up). Only "which folder" and "which
+    /// graphics API" stay hard, because the install physically cannot run without them.
+    /// </summary>
+    internal static bool IsOverridableReason(string reason)
+        => reason.StartsWith("This package requires an NVIDIA", StringComparison.Ordinal)
+           || reason.StartsWith("Detected anti-cheat software:", StringComparison.Ordinal)
+           || reason.StartsWith("Detected multiplayer/online-only evidence:", StringComparison.Ordinal)
+           || reason.StartsWith("Online status is not verified", StringComparison.Ordinal)
+           || reason.StartsWith("Microsoft Visual C++", StringComparison.Ordinal)
+           || reason.StartsWith("Install the Vulkan ReShade layer", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The user read the warnings and chose to install anyway. Returns the assessment without the overridable
+    /// reasons, and those reasons so the caller can show/log what was accepted.
+    /// </summary>
+    internal static (Dlss5Assessment Assessment, IReadOnlyList<string> Accepted) AcceptRisks(Dlss5Assessment assessment)
+    {
+        var accepted = assessment.BlockingReasons.Where(IsOverridableReason).ToArray();
+        return (assessment with
+        {
+            BlockingReasons = assessment.BlockingReasons.Where(reason => !IsOverridableReason(reason)).ToArray(),
+            SinglePlayerConfirmed = true,
+        }, accepted);
     }
 
     internal static Dlss5Assessment ConfirmDeploymentPath(Dlss5Assessment assessment, string deploymentPath)

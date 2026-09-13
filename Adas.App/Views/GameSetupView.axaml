@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:RenoDXCommander.ViewModels"
              xmlns:svc="using:RenoDXCommander.Services"
+             xmlns:views="using:Adas.App.Views"
              x:Class="Adas.App.Views.GameSetupView"
              x:DataType="vm:GameCardViewModel">
 
@@ -55,12 +56,31 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- DLSS 5 route selector -->
+                <!-- Graphics API: the one thing every install depends on, always visible and editable -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Graphics" Classes="h2" />
+                        <Grid ColumnDefinitions="*,12,*">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="Graphics API" Classes="muted" />
+                                <ComboBox x:Name="ApiCombo" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="Bitness" Classes="muted" />
+                                <ComboBox x:Name="BitnessCombo" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="ApiEvidenceText" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                   Text="Detecting…" />
+                    </StackPanel>
+                </Border>
+
+                <!-- DLSS 5 + tools: pick what you want, one Install button. Nothing here is ever greyed out. -->
                 <Border Classes="card">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="Set up DLSS 5" Classes="h2" />
+                        <TextBlock Text="Set up" Classes="h2" />
 
-                        <!-- Plain-language readiness banner: headline, real problems, one-click fix -->
+                        <!-- Plain-language readiness banner: headline, things to know, one-click fix -->
                         <Border x:Name="ReadinessBanner" CornerRadius="6" Padding="12,10" BorderThickness="1"
                                 Background="#1A2230" BorderBrush="#2F3B4E">
                             <Grid ColumnDefinitions="Auto,*">
@@ -79,43 +99,73 @@
                             </Grid>
                         </Border>
 
-                        <TextBlock x:Name="RoutesHeader" Text="How to install" Classes="muted" FontWeight="SemiBold" />
-                        <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="svc:RouteOption">
-                                    <StackPanel Spacing="2" Margin="0,3">
-                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
-                                                   Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <CheckBox x:Name="ShowUnavailableToggle" IsVisible="False" FontSize="12"
-                                  Content="Show options that don't work for this game" />
-
-                        <Border x:Name="DriverWarningBanner" IsVisible="False"
-                                CornerRadius="6" Padding="10,8" Background="#3A2A00"
-                                BorderBrush="#8A6D2F" BorderThickness="1">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="⚠" Foreground="#F0B429" VerticalAlignment="Top" />
-                                <TextBlock x:Name="DriverWarningText" TextWrapping="Wrap"
-                                           Foreground="#F5D77E" FontSize="12" />
-                            </StackPanel>
-                        </Border>
-
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="InstallButton" Classes="accent"
-                                    Content="Install" MinWidth="120" />
-                            <Button x:Name="RepairButton" Classes="subtle"
-                                    Content="Repair" IsVisible="{Binding IsDlss5Installed}"
-                                    ToolTip.Tip="Re-copy any missing or changed files for the installed setup." />
-                            <Button x:Name="RemoveButton" Classes="subtle"
-                                    Content="Remove" IsVisible="{Binding IsDlss5Installed}"
-                                    ToolTip.Tip="Uninstall DLSS 5 from this game and restore the original files." />
+                        <!-- 1. DLSS 5 route -->
+                        <CheckBox x:Name="InstallDlss5Check" IsChecked="True" FontWeight="SemiBold"
+                                  Content="Install DLSS 5" />
+                        <StackPanel x:Name="RoutesPanel" Spacing="6" Margin="26,0,0,0">
+                            <TextBlock x:Name="RoutesHeader" Text="Route — ★ is what Adas recommends; you can pick any"
+                                       Classes="muted" FontSize="12" />
+                            <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="svc:RouteOption">
+                                        <StackPanel Spacing="2" Margin="0,3">
+                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock x:Name="RouteNotesText" FontSize="12" TextWrapping="Wrap" IsVisible="False"
+                                       Foreground="#E3B341" />
+                            <Border x:Name="DriverWarningBanner" IsVisible="False"
+                                    CornerRadius="6" Padding="10,8" Background="#3A2A00"
+                                    BorderBrush="#8A6D2F" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="⚠" Foreground="#F0B429" VerticalAlignment="Top" />
+                                    <TextBlock x:Name="DriverWarningText" TextWrapping="Wrap"
+                                               Foreground="#F5D77E" FontSize="12" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
+
+                        <!-- 2. Tools -->
+                        <TextBlock Text="Also install" FontWeight="SemiBold" Margin="0,6,0,0"
+                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                        <ItemsControl x:Name="ToolsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="views:SetupToolItem">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding CheckBoxText}" />
+                                            <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12"
+                                                       TextWrapping="Wrap" Margin="26,0,0,0" />
+                                            <TextBlock Text="{Binding NotesText}" FontSize="12" TextWrapping="Wrap"
+                                                       Margin="26,0,0,0" Foreground="{Binding NotesBrush}"
+                                                       IsVisible="{Binding NotesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="subtle" Content="Remove" VerticalAlignment="Top"
+                                                Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- 3. One button -->
+                        <WrapPanel Orientation="Horizontal">
+                            <Button x:Name="InstallButton" Classes="accent" Margin="0,0,8,8"
+                                    Content="Install selected" MinWidth="150" />
+                            <Button x:Name="RepairButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="Repair DLSS 5" IsVisible="{Binding IsDlss5Installed}"
+                                    ToolTip.Tip="Re-copy any missing or changed files for the installed setup." />
+                            <Button x:Name="RemoveButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="Remove DLSS 5" IsVisible="{Binding IsDlss5Installed}"
+                                    ToolTip.Tip="Uninstall DLSS 5 from this game and restore the original files." />
+                            <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
+                                    Content="Open game folder" />
+                        </WrapPanel>
                         <TextBlock x:Name="InstallHint" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
 
                         <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100" />
@@ -127,22 +177,14 @@
                 <!-- Advanced per-game overrides -->
                 <Expander Header="Advanced options — most people can skip this" Classes="card">
                     <StackPanel Spacing="12" Margin="0,8,0,0">
-                        <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto">
+                        <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto">
                             <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
-                                <TextBlock Text="Bitness" Classes="muted" />
-                                <ComboBox x:Name="BitnessCombo" HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4">
-                                <TextBlock Text="Graphics API" Classes="muted" />
-                                <ComboBox x:Name="ApiCombo" HorizontalAlignment="Stretch" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,10,0,0">
                                 <TextBlock Text="ReShade channel" Classes="muted" />
                                 <ComboBox x:Name="ReShadeCombo" HorizontalAlignment="Stretch" />
                                 <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
                                            Text="Which ReShade build to install. Default = Adas picks (the signed stable build — leave this unless you have a reason). Stable = force the official release. Nightly = newest unsigned build; more fixes, less tested. Custom = a build you provide." />
                             </StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="2" Spacing="4" Margin="0,10,0,0">
+                            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4">
                                 <TextBlock Text="DXVK variant" Classes="muted" />
                                 <ComboBox x:Name="DxvkCombo" HorizontalAlignment="Stretch" />
                                 <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
@@ -153,7 +195,7 @@
                         <StackPanel Spacing="4">
                             <TextBlock Text="Deep Fried Chicken" Classes="muted" />
                             <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
-                                       Text="An alternative neural consumer by Alexander, used in place of RenoDX. Its licence forbids redistribution, so Adas can't bundle it — import the author's official release (.zip or the extracted folder) once. It's verified and cached, then it appears as a route above." />
+                                       Text="An alternative neural consumer by Alexander, used in place of RenoDX. Its licence forbids redistribution, so Adas can't bundle it — import the author's official release (.zip or the extracted folder) once. It's verified and cached, then it appears as a DLSS 5 route above (or just pick that route and press Install — Adas asks for it)." />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button x:Name="ImportDfcButton" Classes="subtle" Content="Import…" />
                                 <TextBlock x:Name="DfcStatusText" Classes="muted" FontSize="11"
@@ -192,27 +234,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Extras / components -->
-                <Border Classes="card">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Extras" Classes="h2" />
-                        <WrapPanel>
-                            <Button x:Name="OptiScalerButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="OptiScaler" />
-                            <Button x:Name="DisplayCommanderButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Display Commander (HDR)" />
-                            <Button x:Name="DxvkButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="DXVK" />
-                            <Button x:Name="ReShadeButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="ReShade" />
-                            <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Open game folder" />
-                        </WrapPanel>
-                        <ProgressBar x:Name="ExtrasProgress" IsVisible="False" Maximum="100" />
-                        <SelectableTextBlock x:Name="ExtrasResult" Classes="muted" TextWrapping="Wrap"
-                                             IsVisible="False" />
-                    </StackPanel>
-                </Border>
 
             </StackPanel>
         </ScrollViewer>
