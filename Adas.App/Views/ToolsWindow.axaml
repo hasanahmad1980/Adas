@@ -24,7 +24,7 @@
                 <StackPanel Spacing="10">
                     <TextBlock Text="Full-Screen Wrapper for DLSS5" Classes="h2" />
                     <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="ThioJoe's signed single-exe tool: applies DLSS 5 to the whole screen or one window using Windows screen capture, with a click-through output window on top. It changes no game files, and has full model controls plus side-by-side screenshot and video capture. It only sees the final image, so results look different from a game with native DLSS 5. Needs an RTX 50 GPU and driver 616.64 or newer. Adas downloads the official release and supplies nvngx_dlssnr.dll." />
+                               Text="ThioJoe's signed single-exe tool: applies DLSS 5 to the whole screen or one window using Windows screen capture, with a click-through output window on top. It changes no game files, and has full model controls plus side-by-side screenshot and video capture. It only sees the final image, so results look different from a game with native DLSS 5. The wrapper needs driver 616.64+; it targets RTX 50, and on RTX 40/30/20 Adas injects an experimental compatibility shim so DLSS 5 still runs. Adas downloads the official release and supplies a signed nvngx_dlssnr.dll." />
                     <Button x:Name="WrapperButton" Classes="subtle" Content="Launch Full-Screen Wrapper"
                             HorizontalAlignment="Left" />
                 </StackPanel>

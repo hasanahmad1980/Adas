@@ -42,15 +42,21 @@ public sealed partial class Dlss5ComponentService
     // Microsoft root) and the signer is NVIDIA — the leaked/altered builds fail this. Same predicate.
     private static bool IsWrapperTrustedNvidia(string path) => DlssNrRepairService.IsTrustedNvidiaSigned(path);
 
-    /// <summary>Warnings before launching ThioJoe's wrapper: it needs an RTX 50 GPU and driver 616.64 or newer.</summary>
+    /// <summary>
+    /// Warnings before launching ThioJoe's wrapper. The wrapper itself is RTX-50-only and needs
+    /// driver 616.64+; on RTX 40/30/20 Adas offers an experimental in-process arch-spoof so the
+    /// tool can still create DLSS 5, which is surfaced here so the user can decline it.
+    /// </summary>
     public static IReadOnlyList<string> FullScreenWrapperWarnings(string? gpuName, string? driverVersion)
     {
         var warnings = new List<string>();
-        if (string.IsNullOrWhiteSpace(gpuName)
-            || !System.Text.RegularExpressions.Regex.IsMatch(gpuName, @"RTX\s*50\d\d", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            warnings.Add(string.IsNullOrWhiteSpace(gpuName)
-                ? "No RTX 50-series GPU was detected. The wrapper's author lists an RTX 50 card as required."
-                : $"Detected GPU '{gpuName}' is not RTX 50-series. The wrapper's author lists an RTX 50 card as required.");
+        if (ArchSpoofNeeded(gpuName))
+            warnings.Add($"Detected GPU '{gpuName}' is not RTX 50-series, which the wrapper normally requires. "
+                + "Adas will inject an experimental compatibility shim into the wrapper so it can still run DLSS 5. "
+                + "This is unofficial and some antivirus tools may flag the injection.");
+        else if (string.IsNullOrWhiteSpace(gpuName))
+            warnings.Add("No NVIDIA GPU was detected. The wrapper needs an NVIDIA RTX card; on RTX 40/30/20 "
+                + "Adas will inject an experimental compatibility shim so it can still run DLSS 5.");
         if (Version.TryParse(driverVersion, out var driver) && driver < Version.Parse(FullScreenWrapperMinimumDriver))
             warnings.Add($"Driver {driverVersion} is older than {FullScreenWrapperMinimumDriver}, which the wrapper requires.");
         return warnings;
@@ -64,7 +70,7 @@ public sealed partial class Dlss5ComponentService
     /// nvngx_dlss.dll when available for the super resolution options.
     /// </summary>
     public async Task<string> LaunchFullScreenWrapperAsync(IDlssStreamlineService? streamline,
-        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<string>? progress = null, string? gpuName = null, CancellationToken cancellationToken = default)
     {
         var toolDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -145,11 +151,13 @@ public sealed partial class Dlss5ComponentService
         }
         finally { FullScreenWrapperCacheLock.Release(); }
 
-        Process.Start(new ProcessStartInfo(executable)
-        {
-            UseShellExecute = true,
-            WorkingDirectory = toolDirectory,
-        });
+        // On RTX 40/30/20 the wrapper can't create DLSS 5 Neural Rendering (nvngx_dlssnr.dll refuses
+        // below Blackwell), so inject the in-process arch-spoof shim — the same trick NeuralScreen's
+        // worker uses on itself. On RTX 50 nothing is injected and this is a plain start.
+        var spoof = ArchSpoofNeeded(gpuName);
+        if (spoof && !File.Exists(ArchSpoofShimPath))
+            notes.Add("The arch-spoof shim is missing from this build, so DLSS 5 may report an unsupported GPU on non-RTX-50 cards.");
+        StartWithOptionalArchSpoof(executable, toolDirectory, spoof);
         return string.Join(" ", notes);
     }
 

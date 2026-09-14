@@ -82,7 +82,7 @@ public partial class ToolsWindow : Window
             }
             Output.Text = "Preparing Full-Screen Wrapper for DLSS5…";
             var progress = new Progress<string>(m => Output.Text = m);
-            var note = await svc.LaunchFullScreenWrapperAsync(AppServices.Services.GetService<IDlssStreamlineService>(), progress);
+            var note = await svc.LaunchFullScreenWrapperAsync(AppServices.Services.GetService<IDlssStreamlineService>(), progress, Dlss5CompatibilityService.DetectedGpuName);
             Output.Text = "Full-Screen Wrapper launched. It applies to the primary monitor by default; pick a window in its View tab."
                           + (string.IsNullOrEmpty(note) ? "" : " " + note);
         }

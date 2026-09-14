@@ -14,4 +14,15 @@ public sealed class FullScreenWrapperTests
     [InlineData("NVIDIA GeForce RTX 5080", null, 0)]
     public void WarnsOnGpuAndDriver(string? gpu, string? driver, int expected)
         => Assert.Equal(expected, Dlss5ComponentService.FullScreenWrapperWarnings(gpu, driver).Count);
+
+    [Theory]
+    [InlineData("NVIDIA GeForce RTX 4080", true)]
+    [InlineData("NVIDIA GeForce RTX 3070", true)]
+    [InlineData("NVIDIA GeForce RTX 2060", true)]
+    [InlineData("NVIDIA GeForce RTX 5070 Ti", false)]
+    [InlineData("NVIDIA GeForce RTX 5090", false)]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    public void ArchSpoofNeededForBelowBlackwell(string? gpu, bool expected)
+        => Assert.Equal(expected, Dlss5ComponentService.ArchSpoofNeeded(gpu));
 }

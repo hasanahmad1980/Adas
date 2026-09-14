@@ -1,3 +1,8 @@
+## Adas 3.0.12 — Full-Screen Wrapper on RTX 40/30/20
+
+- The Full-Screen Wrapper now runs DLSS 5 on **RTX 40/30/20** cards, not just RTX 50. `nvngx_dlssnr.dll` refuses to create Neural Rendering below Blackwell, so on those cards Adas starts the wrapper suspended and injects an in-process **arch-spoof shim** — the same technique NeuralScreen uses on itself — that reports Blackwell to the DLL for your primary GPU only. No file on disk is modified; on RTX 50 nothing is injected.
+- The launch confirm now explains the shim and notes that some antivirus tools may flag the injection. On RTX 50 the wrapper launches unchanged.
+
 ## Adas 3.0.10 — Full-Screen Wrapper for DLSS5
 
 - **Tools → Full-Screen Wrapper for DLSS5**: launches ThioJoe's Full-Screen-DLSS5-Wrapper, which applies DLSS 5 to the whole screen or one window with Windows screen capture and a click-through output window. No game files are changed.
