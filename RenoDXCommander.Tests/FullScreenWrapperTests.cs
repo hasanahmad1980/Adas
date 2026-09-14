@@ -23,6 +23,6 @@ public sealed class FullScreenWrapperTests
     [InlineData("NVIDIA GeForce RTX 5090", false)]
     [InlineData(null, false)]
     [InlineData("", false)]
-    public void ArchSpoofNeededForBelowBlackwell(string? gpu, bool expected)
-        => Assert.Equal(expected, Dlss5ComponentService.ArchSpoofNeeded(gpu));
+    public void IsBelowBlackwellForNonRtx50(string? gpu, bool expected)
+        => Assert.Equal(expected, Dlss5ComponentService.IsBelowBlackwell(gpu));
 }

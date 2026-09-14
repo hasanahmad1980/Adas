@@ -1,3 +1,9 @@
+## Adas 3.0.14 — Full-Screen Wrapper: honest RTX 50 requirement, no more injection
+
+- DLSS 5 **Neural Rendering** ships only a Blackwell (RTX 50) compute kernel, so it genuinely cannot run on RTX 40/30/20 — no arch trick can change that, because the DLL contains no Ada/Ampere/Turing GPU code to fall back to. Testing on a 4080 confirmed the spoof passes every software gate and then the driver refuses to load Blackwell machine code onto Ada silicon.
+- Removed the experimental arch-spoof **injection** from the Full-Screen Wrapper entirely (and the bundled shim DLL). It couldn't make Neural Rendering work below Blackwell and only risked antivirus false-positives. The wrapper now launches plainly.
+- The wrapper's pre-launch notice now states the truth up front: Neural Rendering needs an RTX 50-series GPU; on other cards the wrapper opens but Neural Rendering won't initialize. DLSS **Super Resolution** upgrades are unaffected and still work on RTX 40/30/20.
+
 ## Adas 3.0.13 — Full-Screen Wrapper: no more hang getting the DLL
 
 - Fixed the Full-Screen Wrapper hanging on **"Getting a signed nvngx_dlssnr.dll…"**. Adas was asking for the manifest's *newest* NR build — often an unsigned dev/SF build the wrapper rejects — and could stall on a large download. It now scans the DLSS 5 cache for a copy already on disk that the wrapper will accept (signed by NVIDIA, trusted by Windows) and uses that instantly, downloading only as a last resort. Same for `nvngx_dlss.dll`.

@@ -59,20 +59,29 @@ public sealed partial class Dlss5ComponentService
     }
 
     /// <summary>
-    /// Warnings before launching ThioJoe's wrapper. The wrapper itself is RTX-50-only and needs
-    /// driver 616.64+; on RTX 40/30/20 Adas offers an experimental in-process arch-spoof so the
-    /// tool can still create DLSS 5, which is surfaced here so the user can decline it.
+    /// True for RTX 40/30/20 (or an unknown/absent NVIDIA GPU) rather than RTX 50. DLSS 5 Neural
+    /// Rendering ships only a Blackwell (sm_120) compute kernel, so below-Blackwell cards can't run
+    /// it — no arch spoof helps, because there is no Ada/Ampere/Turing machine code to fall back to.
+    /// </summary>
+    public static bool IsBelowBlackwell(string? gpuName)
+        => !string.IsNullOrWhiteSpace(gpuName)
+           && !System.Text.RegularExpressions.Regex.IsMatch(gpuName, @"RTX\s*50\d\d",
+               System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Warnings before launching ThioJoe's wrapper. Its DLSS 5 Neural Rendering needs an RTX 50-series
+    /// GPU and driver 616.64+; on RTX 40/30/20 the wrapper starts but Neural Rendering cannot initialize.
     /// </summary>
     public static IReadOnlyList<string> FullScreenWrapperWarnings(string? gpuName, string? driverVersion)
     {
         var warnings = new List<string>();
-        if (ArchSpoofNeeded(gpuName))
-            warnings.Add($"Detected GPU '{gpuName}' is not RTX 50-series, which the wrapper normally requires. "
-                + "Adas will inject an experimental compatibility shim into the wrapper so it can still run DLSS 5. "
-                + "This is unofficial and some antivirus tools may flag the injection.");
+        if (IsBelowBlackwell(gpuName))
+            warnings.Add($"Detected GPU '{gpuName}' is not RTX 50-series. DLSS 5 Neural Rendering ships only a "
+                + "Blackwell compute kernel, so it cannot run on this card — the wrapper will open but Neural "
+                + "Rendering will not initialize. (DLSS Super Resolution upgrades are unaffected.)");
         else if (string.IsNullOrWhiteSpace(gpuName))
-            warnings.Add("No NVIDIA GPU was detected. The wrapper needs an NVIDIA RTX card; on RTX 40/30/20 "
-                + "Adas will inject an experimental compatibility shim so it can still run DLSS 5.");
+            warnings.Add("No NVIDIA GPU was detected. The wrapper's DLSS 5 Neural Rendering requires an "
+                + "RTX 50-series card; on other cards it will open but Neural Rendering will not initialize.");
         if (Version.TryParse(driverVersion, out var driver) && driver < Version.Parse(FullScreenWrapperMinimumDriver))
             warnings.Add($"Driver {driverVersion} is older than {FullScreenWrapperMinimumDriver}, which the wrapper requires.");
         return warnings;
@@ -175,13 +184,14 @@ public sealed partial class Dlss5ComponentService
         }
         finally { FullScreenWrapperCacheLock.Release(); }
 
-        // On RTX 40/30/20 the wrapper can't create DLSS 5 Neural Rendering (nvngx_dlssnr.dll refuses
-        // below Blackwell), so inject the in-process arch-spoof shim — the same trick NeuralScreen's
-        // worker uses on itself. On RTX 50 nothing is injected and this is a plain start.
-        var spoof = ArchSpoofNeeded(gpuName);
-        if (spoof && !File.Exists(ArchSpoofShimPath))
-            notes.Add("The arch-spoof shim is missing from this build, so DLSS 5 may report an unsupported GPU on non-RTX-50 cards.");
-        StartWithOptionalArchSpoof(executable, toolDirectory, spoof);
+        // Neural Rendering only runs on RTX 50 (the DLL ships a Blackwell-only cubin), so there is no
+        // injection trick that helps below Blackwell — start the wrapper plainly and let it surface its
+        // own state. The pre-launch warnings already told the user what to expect on their GPU.
+        using (var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(executable)
+        {
+            UseShellExecute = true,
+            WorkingDirectory = toolDirectory,
+        })) { }
         return string.Join(" ", notes);
     }
 
