@@ -22,6 +22,16 @@
 
             <Border Classes="card">
                 <StackPanel Spacing="10">
+                    <TextBlock Text="Full-Screen Wrapper for DLSS5" Classes="h2" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                               Text="ThioJoe's signed single-exe tool: applies DLSS 5 to the whole screen or one window using Windows screen capture, with a click-through output window on top. It changes no game files, and has full model controls plus side-by-side screenshot and video capture. It only sees the final image, so results look different from a game with native DLSS 5. Needs an RTX 50 GPU and driver 616.64 or newer. Adas downloads the official release and supplies nvngx_dlssnr.dll." />
+                    <Button x:Name="WrapperButton" Classes="subtle" Content="Launch Full-Screen Wrapper"
+                            HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+                <StackPanel Spacing="10">
                     <TextBlock Text="Universal MFG unlock" Classes="h2" />
                     <TextBlock Classes="muted" TextWrapping="Wrap"
                                Text="Unlocks DLSS Multi Frame Generation on RTX 40 cards for games that ship their own DLSS Frame Generation. Adas places it beside the game exe under a DLL name the exe imports and nothing else uses, so it never overwrites the game's or another mod's files. In game, press Backspace for the menu." />

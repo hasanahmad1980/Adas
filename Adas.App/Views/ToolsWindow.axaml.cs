@@ -30,6 +30,7 @@ public partial class ToolsWindow : Window
         _main = main;
 
         NeuralScreenButton.Click += OnNeuralScreen;
+        WrapperButton.Click += OnFullScreenWrapper;
         MfgButton.Click += OnMfg;
         MfgRemoveButton.Click += OnMfgRemove;
         DiagButton.Click += OnDiagnostics;
@@ -61,6 +62,32 @@ public partial class ToolsWindow : Window
         }
         catch (Exception ex) { Output.Text = $"NeuralScreen failed: {ex.Message}"; }
         finally { NeuralScreenButton.IsEnabled = true; }
+    }
+
+    private async void OnFullScreenWrapper(object? sender, RoutedEventArgs e)
+    {
+        var svc = AppServices.Services.GetService<Dlss5ComponentService>();
+        if (svc is null) { Output.Text = "DLSS 5 service unavailable."; return; }
+        WrapperButton.IsEnabled = false;
+        try
+        {
+            var warnings = await Task.Run(() => Dlss5ComponentService.FullScreenWrapperWarnings(
+                Dlss5CompatibilityService.DetectedGpuName, Dlss5CompatibilityService.DetectedDriverVersion));
+            if (warnings.Count > 0
+                && !await Shell.DialogHost.ConfirmAsync(this, "Launch Full-Screen Wrapper?",
+                    string.Join("\n\n", warnings.Select(w => "⚠ " + w)), "Launch anyway", "Cancel"))
+            {
+                Output.Text = "Cancelled.";
+                return;
+            }
+            Output.Text = "Preparing Full-Screen Wrapper for DLSS5…";
+            var progress = new Progress<string>(m => Output.Text = m);
+            var note = await svc.LaunchFullScreenWrapperAsync(AppServices.Services.GetService<IDlssStreamlineService>(), progress);
+            Output.Text = "Full-Screen Wrapper launched. It applies to the primary monitor by default; pick a window in its View tab."
+                          + (string.IsNullOrEmpty(note) ? "" : " " + note);
+        }
+        catch (Exception ex) { Output.Text = $"Full-Screen Wrapper failed: {ex.Message}"; }
+        finally { WrapperButton.IsEnabled = true; }
     }
 
     private RtxMfgUnlockService.MfgPlacement? _mfgPlan;

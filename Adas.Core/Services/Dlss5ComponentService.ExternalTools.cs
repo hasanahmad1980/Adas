@@ -22,6 +22,120 @@ public sealed partial class Dlss5ComponentService
     /// </summary>
     public async Task LaunchNeuralScreenAsync(CancellationToken cancellationToken = default)
     {
+        var toolDirectory = await EnsureNeuralScreenAsync(cancellationToken).ConfigureAwait(false);
+        Process.Start(new ProcessStartInfo(Path.Combine(toolDirectory, "NeuralScreen.exe"))
+        {
+            UseShellExecute = true,
+            WorkingDirectory = toolDirectory,
+        });
+    }
+
+    internal const string FullScreenWrapperVersion = "1.1.0";
+    private const string FullScreenWrapperUrl =
+        "https://github.com/ThioJoe/Full-Screen-DLSS5-Wrapper/releases/download/v1.1.0/FullScreenWrapperForDLSS5.exe";
+    private const string FullScreenWrapperSha256 =
+        "974EA3A6A79675A5FFCB7A91C565F14CDC247790A85C7431C548CECA9420AB49";
+    internal const string FullScreenWrapperMinimumDriver = "616.64";
+    private static readonly SemaphoreSlim FullScreenWrapperCacheLock = new(1, 1);
+
+    /// <summary>Warnings before launching ThioJoe's wrapper: it needs an RTX 50 GPU and driver 616.64 or newer.</summary>
+    public static IReadOnlyList<string> FullScreenWrapperWarnings(string? gpuName, string? driverVersion)
+    {
+        var warnings = new List<string>();
+        if (string.IsNullOrWhiteSpace(gpuName)
+            || !System.Text.RegularExpressions.Regex.IsMatch(gpuName, @"RTX\s*50\d\d", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            warnings.Add(string.IsNullOrWhiteSpace(gpuName)
+                ? "No RTX 50-series GPU was detected. The wrapper's author lists an RTX 50 card as required."
+                : $"Detected GPU '{gpuName}' is not RTX 50-series. The wrapper's author lists an RTX 50 card as required.");
+        if (Version.TryParse(driverVersion, out var driver) && driver < Version.Parse(FullScreenWrapperMinimumDriver))
+            warnings.Add($"Driver {driverVersion} is older than {FullScreenWrapperMinimumDriver}, which the wrapper requires.");
+        return warnings;
+    }
+
+    /// <summary>
+    /// Launches ThioJoe's Full-Screen Wrapper for DLSS5: a signed single exe that captures the screen (or one
+    /// window) with Windows screen capture and shows a click-through DLSS 5 output window on top. It touches no
+    /// game files. Adas downloads the pinned release exe (never bundled; the repo has no licence), checks its
+    /// SHA-256, and places nvngx_dlssnr.dll beside it from the NeuralScreen package or Adas's DLSS cache, plus
+    /// nvngx_dlss.dll when available for the super resolution options.
+    /// </summary>
+    public async Task<string> LaunchFullScreenWrapperAsync(IDlssStreamlineService? streamline,
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var toolDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "RHI", "Adas", "ExternalTools", $"FullScreenWrapper-{FullScreenWrapperVersion}");
+        var executable = Path.Combine(toolDirectory, "FullScreenWrapperForDLSS5.exe");
+        var notes = new List<string>();
+
+        await FullScreenWrapperCacheLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Directory.CreateDirectory(toolDirectory);
+            if (!File.Exists(executable) || !FileHelper.ComputeSha256(executable).Equals(FullScreenWrapperSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                progress?.Report("Downloading Full-Screen Wrapper for DLSS5…");
+                var download = executable + ".download";
+                try
+                {
+                    await DownloadFileAsync(FullScreenWrapperUrl, download, cancellationToken).ConfigureAwait(false);
+                    if (!FileHelper.ComputeSha256(download).Equals(FullScreenWrapperSha256, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException($"The wrapper download did not match the official v{FullScreenWrapperVersion} SHA-256. Nothing was launched.");
+                    File.Move(download, executable, overwrite: true);
+                }
+                finally { DeleteIfExists(download); }
+            }
+
+            var nr = Path.Combine(toolDirectory, "nvngx_dlssnr.dll");
+            if (!IsUsableRuntimeFile(nr))
+            {
+                progress?.Report("Getting nvngx_dlssnr.dll…");
+                string? source = null;
+                try
+                {
+                    var neuralScreen = await EnsureNeuralScreenAsync(cancellationToken).ConfigureAwait(false);
+                    source = Directory.EnumerateFiles(neuralScreen, "nvngx_dlssnr.dll", SearchOption.AllDirectories).FirstOrDefault(IsUsableRuntimeFile);
+                }
+                catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] NeuralScreen runtime unavailable: {ex.Message}"); }
+                if (source is null && streamline is not null)
+                {
+                    try
+                    {
+                        if (streamline.DlssnrVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
+                        source = await streamline.EnsureNewestDlssnrCachedAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] DLSS cache runtime unavailable: {ex.Message}"); }
+                }
+                if (source is null)
+                    throw new FileNotFoundException("Adas couldn't get nvngx_dlssnr.dll for the wrapper. Put a copy in " + toolDirectory + " and try again.");
+                File.Copy(source, nr, overwrite: true);
+            }
+
+            var sr = Path.Combine(toolDirectory, "nvngx_dlss.dll");
+            if (!File.Exists(sr) && streamline is not null)
+            {
+                try
+                {
+                    if (streamline.DlssVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
+                    if (await streamline.EnsureNewestDlssCachedAsync().ConfigureAwait(false) is { } dlss && File.Exists(dlss))
+                        File.Copy(dlss, sr, overwrite: true);
+                }
+                catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] nvngx_dlss.dll unavailable: {ex.Message}"); }
+            }
+            if (!File.Exists(sr)) notes.Add("nvngx_dlss.dll wasn't available, so the super resolution options are off.");
+        }
+        finally { FullScreenWrapperCacheLock.Release(); }
+
+        Process.Start(new ProcessStartInfo(executable)
+        {
+            UseShellExecute = true,
+            WorkingDirectory = toolDirectory,
+        });
+        return string.Join(" ", notes);
+    }
+
+    private async Task<string> EnsureNeuralScreenAsync(CancellationToken cancellationToken)
+    {
         var toolDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RHI", "Adas", "ExternalTools", $"NeuralScreen-{NeuralScreenVersion}");
@@ -50,12 +164,7 @@ public sealed partial class Dlss5ComponentService
             }
         }
         finally { NeuralScreenCacheLock.Release(); }
-
-        Process.Start(new ProcessStartInfo(executable)
-        {
-            UseShellExecute = true,
-            WorkingDirectory = toolDirectory,
-        });
+        return toolDirectory;
     }
 
     private const string OneClickUrl =

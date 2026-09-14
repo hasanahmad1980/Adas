@@ -1,3 +1,9 @@
+## Adas 3.0.10 — Full-Screen Wrapper for DLSS5
+
+- **Tools → Full-Screen Wrapper for DLSS5**: launches ThioJoe's Full-Screen-DLSS5-Wrapper, which applies DLSS 5 to the whole screen or one window with Windows screen capture and a click-through output window. No game files are changed.
+- Adas downloads the official v1.1.0 release, checks its SHA-256, and supplies `nvngx_dlssnr.dll` (and `nvngx_dlss.dll` when available for super resolution options).
+- Warns (never blocks) when the GPU isn't RTX 50-series or the driver is older than 616.64.
+
 ## v3.0.9 — "Did it work?" results from other players (2026-09-13)
 
 - **See what worked for other players before you install.** The route list shows how many players reported each route working on this game ("👥 Other players: worked 12 of 14"), and the banner names the route most reported working. Tick "Only RTX 4090" (your card) to count only players with the same GPU.
