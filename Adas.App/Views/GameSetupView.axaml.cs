@@ -48,6 +48,9 @@ public partial class GameSetupView : UserControl
         RoutesList.SelectionChanged += OnRouteSelectionChanged;
         InstallDlss5Check.IsCheckedChanged += (_, _) => UpdateSelectionState();
         DiagnoseButton.Click += OnDiagnose;
+        ShareWorkedButton.Click += (_, _) => _ = ShareResultAsync(true);
+        ShareFailedButton.Click += (_, _) => _ = ShareResultAsync(false);
+        CommunityGpuOnlyCheck.IsCheckedChanged += (_, _) => ApplyCommunityResults();
         RrUpdateButton.Click += OnRrUpdate;
         RrRestoreButton.Click += OnRrRestore;
         OpenFolderButton.Click += OnOpenFolder;
@@ -244,6 +247,7 @@ public partial class GameSetupView : UserControl
             RefreshTips(card);
             UpdateSelectionState();
             _ = RefreshRrCardAsync(card, probe?.Is64Bit ?? !card.Is32Bit);
+            _ = RefreshCommunityResultsAsync(card);
         }
 
         if (Dispatcher.UIThread.CheckAccess()) Apply();
@@ -1168,6 +1172,100 @@ public partial class GameSetupView : UserControl
             AioFixPanel.Children.Add(button);
         }
         AioFixPanel.IsVisible = true;
+    }
+
+    // ── "Did it work?" results from other players (#2) ──────────────────────────────────────────
+
+    private async Task RefreshCommunityResultsAsync(GameCardViewModel card)
+    {
+        var svc = AppServices.Services.GetService<CommunityResultsService>();
+        if (svc is null) { CommunityHeader.IsVisible = false; return; }
+        var ok = await svc.RefreshAsync();
+        if (!ReferenceEquals(Card, card)) return;
+        if (!ok)
+        {
+            CommunityHeader.Text = "Results from other players couldn't be loaded.";
+            CommunityGpuOnlyCheck.IsVisible = false;
+            return;
+        }
+        ApplyCommunityResults();
+    }
+
+    private void ApplyCommunityResults()
+    {
+        var card = Card;
+        var svc = AppServices.Services.GetService<CommunityResultsService>();
+        if (card is null || svc is null || _allRoutes.Count == 0) return;
+        var gpu = CommunityResultsService.GpuFamily(Dlss5CompatibilityService.DetectedGpuName);
+        var gpuOnly = CommunityGpuOnlyCheck.IsChecked == true && gpu.Length > 0;
+        var summaries = svc.Summarize(card.GameName, gpuOnly ? gpu : null);
+        var anyForGame = gpuOnly ? svc.Summarize(card.GameName).Count > 0 : summaries.Count > 0;
+        CommunityGpuOnlyCheck.IsVisible = anyForGame && gpu.Length > 0;
+        CommunityGpuOnlyCheck.Content = $"Only {gpu}";
+
+        var best = summaries.FirstOrDefault(s => s.Worked > s.Failed);
+        var updated = _allRoutes.Select(route =>
+        {
+            var s = summaries.FirstOrDefault(x => x.Route == CommunityResultsService.RouteKey(route));
+            var text = s is null ? null
+                : $"👥 Other players{(gpuOnly ? $" on {gpu}" : "")}: worked {s.Worked} of {s.Total}"
+                  + (ReferenceEquals(s, best) ? " — most reported working" : "");
+            return route with { CommunityText = text };
+        }).ToList();
+
+        var selected = RoutesList.SelectedItem as RouteOption;
+        _allRoutes = updated;
+        _populatingRoutes = true;
+        try
+        {
+            RoutesList.ItemsSource = updated;
+            RoutesList.SelectedItem = selected is null ? null
+                : updated.FirstOrDefault(r => r.Profile == selected.Profile && r.DeepFriedChicken == selected.DeepFriedChicken
+                                              && r.BridgeSubstitute == selected.BridgeSubstitute);
+        }
+        finally { _populatingRoutes = false; }
+
+        var total = summaries.Sum(s => s.Total);
+        CommunityHeader.Text = total == 0
+            ? gpuOnly ? $"No results from other {gpu} players for this game yet." : "No results from other players for this game yet."
+            : $"👥 {total} report{(total == 1 ? "" : "s")} from other players{(gpuOnly ? $" on {gpu}" : "")}"
+              + (best is null ? "." : $" — most reported working: {updated.FirstOrDefault(r => CommunityResultsService.RouteKey(r) == best.Route)?.Label ?? best.Route}.");
+        UpdateSelectionState();
+    }
+
+    private async Task ShareResultAsync(bool worked)
+    {
+        var card = Card;
+        var owner = this.GetVisualRoot() as Window;
+        if (card is null || owner is null) return;
+        var route = _allRoutes.FirstOrDefault(r => r.Installed);
+        if (route is null || _installedRecord is null)
+        {
+            DiagnoseResult.Text = "Install a DLSS 5 route and play the game first, then share how it went.";
+            return;
+        }
+        var version = AppServices.Services.GetService<IUpdateService>()?.CurrentVersion;
+        var report = new CommunityReport(
+            card.GameName,
+            CommunityResultsService.RouteKey(route),
+            _probe?.GraphicsApi is { } api && api != GraphicsApiType.Unknown ? GraphicsApiDetector.GetLabel(api) : _installedRecord.Mode.ToString(),
+            _probe?.Is64Bit ?? !card.Is32Bit,
+            Dlss5CompatibilityService.DetectedGpuName,
+            Dlss5CompatibilityService.DetectedDriverVersion,
+            version is null ? "" : $"{version.Major}.{version.Minor}.{Math.Max(version.Build, 0)}",
+            worked);
+        if (!await DialogHost.ConfirmAsync(owner, "Share this result?",
+                "Adas will open a GitHub issue in your browser with only this:\n\n"
+                + CommunityResultsService.DescribeReport(report)
+                + "\n\nYou need a GitHub account. Check it and press Create to share it; close the page to cancel. The issue is public.",
+                "Open GitHub", "Cancel"))
+            return;
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = CommunityResultsService.BuildReportUrl(report), UseShellExecute = true });
+            DiagnoseResult.Text = "Opened GitHub. Press Create there to share your result. Counts in Adas update within a few hours.";
+        }
+        catch (Exception ex) { DiagnoseResult.Text = $"Couldn't open the browser: {ex.Message}"; }
     }
 
     // ── Ray reconstruction DLL update (#8) ───────────────────────────────────────────────────────

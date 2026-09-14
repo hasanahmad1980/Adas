@@ -16,7 +16,9 @@ public sealed record RouteOption(
     // RenoDX consumer for the user-imported DFC binaries via Dlss5ManualOverrides(DeepFriedChicken:true).
     bool DeepFriedChicken = false,
     // True for the Bridge substitute entry: MaximumQuality on the native bridge with Optical Flow motion.
-    bool BridgeSubstitute = false);
+    bool BridgeSubstitute = false,
+    // "Other players: worked 12 of 14" — filled in by the setup page from community results.
+    string? CommunityText = null);
 
 /// <summary>
 /// Builds the per-game route list — every route shown, recommended marked, incompatible flagged with

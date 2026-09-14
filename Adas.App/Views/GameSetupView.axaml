@@ -105,6 +105,11 @@
                         <StackPanel x:Name="RoutesPanel" Spacing="6" Margin="26,0,0,0">
                             <TextBlock x:Name="RoutesHeader" Text="Route — ★ is what Adas recommends; you can pick any"
                                        Classes="muted" FontSize="12" />
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock x:Name="CommunityHeader" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                           VerticalAlignment="Center" Text="Checking results from other players…" />
+                                <CheckBox x:Name="CommunityGpuOnlyCheck" Content="Only my GPU" FontSize="12" IsVisible="False" />
+                            </StackPanel>
                             <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="svc:RouteOption">
@@ -114,6 +119,9 @@
                                             <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
                                             <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
                                                        Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
+                                            <TextBlock Text="{Binding CommunityText}" FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="#58A6FF"
+                                                       IsVisible="{Binding CommunityText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -344,6 +352,12 @@
                                 Content="Check if it's working" HorizontalAlignment="Left" />
                         <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap" />
                         <StackPanel x:Name="AioFixPanel" Spacing="6" IsVisible="False" />
+                        <TextBlock Text="Help other players: share whether it worked. Adas opens a filled-in GitHub issue that you check and submit yourself; nothing is sent automatically."
+                                   Classes="muted" TextWrapping="Wrap" FontSize="12" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ShareWorkedButton" Classes="subtle" Content="👍 It worked — share" />
+                            <Button x:Name="ShareFailedButton" Classes="subtle" Content="👎 It didn't — share" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

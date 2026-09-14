@@ -1,3 +1,9 @@
+## v3.0.9 — "Did it work?" results from other players (2026-09-13)
+
+- **See what worked for other players before you install.** The route list shows how many players reported each route working on this game ("👥 Other players: worked 12 of 14"), and the banner names the route most reported working. Tick "Only RTX 4090" (your card) to count only players with the same GPU.
+- **Share your own result in two clicks.** After playing, press "It worked — share" or "It didn't — share" in Verify. Adas shows exactly what will be shared (game, route, graphics API, bitness, GPU model, driver, Adas version; no file paths or account names), then opens a filled-in GitHub issue that you check and submit yourself. Nothing is sent automatically.
+- **No server.** Reports are GitHub issues; a GitHub Action counts them into `community/results.json` every few hours, counting each GitHub account once per game, route and GPU.
+
 ## v3.0.8 — MFG autopilot, ray reconstruction update, 32-bit AIO, Bridge substitute, AIO fixes, verified updates (2026-09-13)
 
 - **Universal MFG unlock picks its own spot.** Adas reads which DLLs the game exe loads and installs RTXMFG under the first free one (version.dll, winmm.dll, dinput8.dll, XInput…), beside the exe, never over the game's or another mod's file. It warns if the game has no DLSS Frame Generation or the GPU isn't RTX 40, and adds a Remove button. The RTXMFG download is checked against GitHub's checksum.

@@ -86,6 +86,7 @@ public static class AdasEngineServices
         services.AddSingleton<DofFixService>();
         services.AddSingleton<MfgUnlockService>();
         services.AddSingleton<RtxMfgUnlockService>();
+        services.AddSingleton<CommunityResultsService>();
         services.AddSingleton<DiagnosticsBundleService>();
         services.AddSingleton<AutoUpdateService>();
         services.AddSingleton<DlssEnablerService>();

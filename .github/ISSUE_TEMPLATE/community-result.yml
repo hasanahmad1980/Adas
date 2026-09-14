@@ -1,0 +1,40 @@
+name: DLSS 5 result
+description: Share whether a DLSS 5 route worked on a game. Adas fills this in; counts appear in Adas for other players.
+title: "[Result] "
+labels: ["community-result"]
+body:
+  - type: markdown
+    attributes:
+      value: "Adas filled these fields in. Check them, then press **Create**. Only the fields below are shared, and this issue is public."
+  - type: input
+    id: game
+    attributes: { label: Game }
+    validations: { required: true }
+  - type: input
+    id: route
+    attributes: { label: Route, description: "Adas route key, e.g. MaximumQuality or StandaloneAio" }
+    validations: { required: true }
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options: ["It worked", "It didn't work"]
+    validations: { required: true }
+  - type: input
+    id: api
+    attributes: { label: Graphics API }
+  - type: input
+    id: bitness
+    attributes: { label: Bitness }
+  - type: input
+    id: gpu
+    attributes: { label: GPU }
+  - type: input
+    id: driver
+    attributes: { label: Driver }
+  - type: input
+    id: adas
+    attributes: { label: Adas version }
+  - type: textarea
+    id: notes
+    attributes: { label: Notes (optional) }

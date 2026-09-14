@@ -1,0 +1,40 @@
+name: Count community results
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed, deleted, labeled, unlabeled]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: community-results
+  cancel-in-progress: false
+
+jobs:
+  count:
+    if: github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'community-result') || github.event.action == 'unlabeled' || github.event.action == 'deleted'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Download result issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api --paginate "repos/${{ github.repository }}/issues?labels=community-result&state=all&per_page=100" > issues.json
+      - name: Count
+        run: python3 tools/aggregate-community-results.py issues.json community/results.json
+      - name: Commit
+        run: |
+          if git diff --quiet -- community/results.json; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add community/results.json
+          git commit -m "chore(community): update DLSS 5 results"
+          git pull --rebase origin main
+          git push origin HEAD:main
