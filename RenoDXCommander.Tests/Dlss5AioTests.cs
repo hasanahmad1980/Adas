@@ -130,7 +130,7 @@ public sealed class Dlss5AioTests
         {
             var path = Path.Combine(root, Dlss5ComponentService.FeederAddon);
             File.WriteAllText(path, "existing feeder");
-            Assert.Throws<InvalidOperationException>(() => Dlss5ComponentService.ValidateAioConflicts(
+            Assert.Throws<Dlss5ConflictingPipelineException>(() => Dlss5ComponentService.ValidateAioConflicts(
                 root, root, Dlss5DeploymentMode.Dx11Feeder, null));
             Assert.True(File.Exists(path));
         }

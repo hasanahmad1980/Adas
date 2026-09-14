@@ -51,6 +51,40 @@ public sealed class Dlss5ComponentReviewTests
     }
 
     [Fact]
+    public void InstallOperation_CapturesGraphicsApiOverrideAndKeepsItAcrossCardRefresh()
+    {
+        var root = CreateTemporaryDirectory("adas-dlss5-api-override");
+        try
+        {
+            var card = new GameCardViewModel
+            {
+                GameName = "API test game",
+                InstallPath = root,
+                Source = "Store",
+                Is32Bit = false,
+            };
+
+            // Capture with the user's explicit Graphics API choice, exactly as the installer does.
+            var operation = Dlss5GameOperation.Capture(card, GraphicsApiType.DirectX12);
+
+            // A background refresh mutates the card; the frozen operation must not follow it.
+            card.GameName = "Something else";
+            card.InstallPath = CreateTemporaryDirectory("adas-dlss5-api-override-2");
+
+            Assert.Equal(GraphicsApiType.DirectX12, operation.ApiOverride);
+            Assert.Equal("API test game", operation.GameName);
+            Assert.Equal(Path.GetFullPath(root), operation.InstallPath);
+
+            // The parameterless capture leaves the override unresolved (null) — no accidental default.
+            Assert.Null(Dlss5GameOperation.Capture(card).ApiOverride);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public void ExperimentalUnifiedFeederRequiresEarlyLoadHooks()
     {
         var assessment = new Dlss5Assessment(

@@ -27,6 +27,13 @@ public static class Dlss5Installer
     internal static Dlss5Probe ProbeFor(MainViewModel main, Dlss5CompatibilityService compat, GameCardViewModel card)
         => compat.Probe(card, main.GetSingleApiOverride(card.GameName, card.Source ?? ""));
 
+    /// <summary>
+    /// Probes against a captured operation snapshot — used throughout a running operation so a
+    /// background card refresh (paths, store key, API choice) cannot change what we assess or install.
+    /// </summary>
+    internal static Dlss5Probe ProbeFor(Dlss5CompatibilityService compat, Dlss5GameOperation op)
+        => compat.Probe(op, op.ApiOverride);
+
     /// <param name="forceProfile">The user picked a route Adas doesn't recommend for this game — install it as chosen.</param>
     /// <param name="deploymentPath">A folder the user picked when detection found none or several.</param>
     /// <param name="risksConfirmed">The caller already showed the warnings and the user chose to continue.</param>
@@ -48,10 +55,15 @@ public static class Dlss5Installer
         if (compat is null || components is null)
             return new Outcome(false, "Engine services are unavailable.");
 
+        // Freeze the game's identity, paths and Graphics API choice for the whole operation. Background
+        // discovery may refresh the card mid-flow; every guard, message and engine call below reads this
+        // snapshot instead of the live card, so the operation can't silently retarget another game.
+        var op = Dlss5GameOperation.Capture(card, main.GetSingleApiOverride(card.GameName, card.Source ?? ""));
+
         Task<(Dlss5Probe probe, Dlss5Assessment assessment, IReadOnlyList<string> accepted)> AssessAsync()
             => Task.Run(() =>
             {
-                var probed = ProbeFor(main, compat, card);
+                var probed = ProbeFor(compat, op);
                 var assessed = Dlss5CompatibilityService.Assess(probed, singlePlayerConfirmed: true);
                 if (!string.IsNullOrWhiteSpace(deploymentPath))
                     assessed = Dlss5CompatibilityService.ConfirmDeploymentPath(assessed, deploymentPath);
@@ -66,7 +78,7 @@ public static class Dlss5Installer
         if (assessment.Mode == Dlss5DeploymentMode.None)
             return new Outcome(false, "Choose the game's Graphics API first (Graphics API box at the top).");
         if (string.IsNullOrWhiteSpace(assessment.DeploymentPath) || assessment.BlockingReasons.Count > 0)
-            return new Outcome(false, Dlss5ReadinessText.Describe(assessment, card.InstallPath).ToMessage());
+            return new Outcome(false, Dlss5ReadinessText.Describe(assessment, op.InstallPath).ToMessage());
 
         if (!risksConfirmed)
         {
@@ -105,7 +117,7 @@ public static class Dlss5Installer
 
         var root = assessment.DeploymentPath!;
 
-        if (await ElevationGuard.EnsureWritableAsync(owner, "Installation", root, card.InstallPath) is { } denied)
+        if (await ElevationGuard.EnsureWritableAsync(owner, "Installation", root, op.InstallPath) is { } denied)
             return new Outcome(false, denied);
 
         // ── Known-bad-driver pre-flight (route-aware) ────────────────────────
@@ -136,16 +148,16 @@ public static class Dlss5Installer
         }
 
         // ── Close a running game so its add-on files unlock ──────────────────
-        if (await EnsureGameClosedAsync(owner, card) is { } blocked)
+        if (await EnsureGameClosedAsync(owner, op) is { } blocked)
             return blocked;
 
         // ── Install ──────────────────────────────────────────────────────────
         // Per-game Feeder build channel and motion-vector provider (Advanced options).
         var (feederTag, motionProvider) = Dlss5GamePreferences.ResolveInstallChoices(
-            Dlss5GamePreferences.Get(card.GameName, card.Source), assessment.Mode);
+            Dlss5GamePreferences.Get(op.GameName, op.Source), assessment.Mode);
         var overrides = new Dlss5ManualOverrides(DeepFriedChicken: deepFriedChicken, ForceProfile: forceProfile,
             FeederReleaseTag: feederTag, MotionProvider: motionProvider, BridgeSubstitute: bridgeSubstitute);
-        var channel = main.ResolveReShadeChannel(card.GameName, card.Source ?? "");
+        var channel = main.ResolveReShadeChannel(op.GameName, op.Source);
         var removedPrevious = false;
         for (var attempt = 0; ; attempt++)
         {
@@ -153,7 +165,7 @@ public static class Dlss5Installer
             {
                 progress.Report(("Preparing…", 2));
                 var relocationErrors = await Task.Run(() =>
-                    components.RemoveOtherManagedDeployments(card.InstallPath, root));
+                    components.RemoveOtherManagedDeployments(op.InstallPath, root));
                 if (relocationErrors.Count > 0)
                     return new Outcome(false, "Adas could not remove the previous launcher-folder deployment:\n• "
                         + string.Join("\n• ", relocationErrors));
@@ -161,11 +173,11 @@ public static class Dlss5Installer
                 var current = assessment;
                 var currentCleanup = cleanup;
                 var result = await Task.Run(() => components.InstallAsync(
-                    card.GameName,
+                    op.GameName,
                     current,
                     progress,
                     reShadeChannel: channel,
-                    store: card.Source,
+                    store: op.Source,
                     profile: profile,
                     cleanupApproval: currentCleanup,
                     overrides: overrides));
@@ -177,14 +189,12 @@ public static class Dlss5Installer
                     text += "\n\nSetup notes:\n• " + string.Join("\n• ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase));
                 return new Outcome(true, text);
             }
-            catch (InvalidOperationException ex) when (attempt == 0
-                && ex.Message.StartsWith("Recovered the previous interrupted switch", StringComparison.Ordinal))
+            catch (Dlss5RecoveredInterruptedSwitchException) when (attempt == 0)
             {
                 // The engine rolled back a half-finished switch; the game is consistent again, so just retry.
                 (probe, assessment, accepted) = await AssessAsync();
             }
-            catch (InvalidOperationException ex) when (attempt == 0
-                && ex.Message.StartsWith("Remove the ", StringComparison.Ordinal))
+            catch (Dlss5ConflictingPipelineException ex) when (attempt == 0)
             {
                 // Two pipelines can't be stacked. Instead of making the user find a × button, offer to do it.
                 if (!await DialogHost.ConfirmAsync(owner, "Replace the current DLSS setup?",
@@ -223,20 +233,22 @@ public static class Dlss5Installer
         if (compat is null || components is null)
             return new Outcome(false, "Engine services are unavailable.");
 
+        var op = Dlss5GameOperation.Capture(card, main.GetSingleApiOverride(card.GameName, card.Source ?? ""));
+
         // Resolve the folder that actually holds the install record (install root or addon deploy path).
-        var root = await Task.Run(() => ResolveInstalledRoot(main, compat, card));
+        var root = await Task.Run(() => ResolveInstalledRoot(compat, op));
         if (root is null)
             return new Outcome(false, "No DLSS 5 install was found for this game.");
 
         if (await ElevationGuard.EnsureWritableAsync(owner, "Removal", root) is { } denied)
             return new Outcome(false, denied);
 
-        if (!await DialogHost.ConfirmAsync(owner, $"Remove DLSS 5 from {card.GameName}?",
+        if (!await DialogHost.ConfirmAsync(owner, $"Remove DLSS 5 from {op.GameName}?",
                 "Adas will restore the game's original files from its recovery copies and remove the DLSS 5 components it installed. Your saved routes and settings are unaffected.",
                 "Remove and restore", "Cancel"))
             return new Outcome(false, "Cancelled.");
 
-        if (await EnsureGameClosedAsync(owner, card) is { } blocked)
+        if (await EnsureGameClosedAsync(owner, op) is { } blocked)
             return blocked;
 
         try
@@ -247,7 +259,7 @@ public static class Dlss5Installer
             if (errors.Count > 0)
                 return new Outcome(true, "Removed with some issues:\n• "
                     + string.Join("\n• ", errors.Distinct(StringComparer.OrdinalIgnoreCase)));
-            return new Outcome(true, $"DLSS 5 removed from {card.GameName}; original files restored.");
+            return new Outcome(true, $"DLSS 5 removed from {op.GameName}; original files restored.");
         }
         catch (Exception ex)
         {
@@ -269,7 +281,9 @@ public static class Dlss5Installer
         if (compat is null)
             return new Outcome(false, "Engine services are unavailable.");
 
-        var root = await Task.Run(() => ResolveInstalledRoot(main, compat, card));
+        var op = Dlss5GameOperation.Capture(card, main.GetSingleApiOverride(card.GameName, card.Source ?? ""));
+
+        var root = await Task.Run(() => ResolveInstalledRoot(compat, op));
         if (root is null)
             return new Outcome(false, "No DLSS 5 install was found for this game.");
 
@@ -280,7 +294,7 @@ public static class Dlss5Installer
         if (await ElevationGuard.EnsureWritableAsync(owner, "Repair", root) is { } denied)
             return new Outcome(false, denied);
 
-        if (await EnsureGameClosedAsync(owner, card) is { } blocked)
+        if (await EnsureGameClosedAsync(owner, op) is { } blocked)
             return blocked;
 
         try
@@ -288,7 +302,7 @@ public static class Dlss5Installer
             progress.Report(("Repairing…", 20));
             await Task.Run(() => Dlss5ComponentService.RepairReShadeConfiguration(root, record));
             progress.Report(("Done.", 100));
-            return new Outcome(true, $"Repaired the ReShade/DLSS 5 configuration for {card.GameName}.");
+            return new Outcome(true, $"Repaired the ReShade/DLSS 5 configuration for {op.GameName}.");
         }
         catch (Exception ex)
         {
@@ -299,14 +313,14 @@ public static class Dlss5Installer
     }
 
     /// <summary>Resolves the folder that holds this game's DLSS 5 install record, or null if none.</summary>
-    private static string? ResolveInstalledRoot(MainViewModel main, Dlss5CompatibilityService compat, GameCardViewModel card)
+    private static string? ResolveInstalledRoot(Dlss5CompatibilityService compat, Dlss5GameOperation op)
     {
-        var assessment = Dlss5CompatibilityService.Assess(ProbeFor(main, compat, card), singlePlayerConfirmed: true);
+        var assessment = Dlss5CompatibilityService.Assess(ProbeFor(compat, op), singlePlayerConfirmed: true);
         foreach (var candidate in new[]
                  {
                      assessment.DeploymentPath,
-                     card.InstallPath,
-                     string.IsNullOrWhiteSpace(card.InstallPath) ? null : ModInstallService.GetAddonDeployPath(card.InstallPath),
+                     op.InstallPath,
+                     string.IsNullOrWhiteSpace(op.InstallPath) ? null : ModInstallService.GetAddonDeployPath(op.InstallPath),
                  })
         {
             if (!string.IsNullOrWhiteSpace(candidate) && Dlss5ComponentService.LoadRecord(candidate) is not null)
@@ -319,9 +333,9 @@ public static class Dlss5Installer
     /// Ensures the game is not running before touching its locked add-on files. Returns a cancel/failure
     /// <see cref="Outcome"/> to bubble up, or null when it is safe to proceed. Shared by install/remove/repair.
     /// </summary>
-    private static async Task<Outcome?> EnsureGameClosedAsync(Window owner, GameCardViewModel card)
+    private static async Task<Outcome?> EnsureGameClosedAsync(Window owner, Dlss5GameOperation op)
     {
-        var result = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
+        var result = await GameCloseGuard.EnsureClosedAsync(owner, op.GameName, op.InstallPath);
         if (result.CanProceed) return null;
         return new Outcome(false, result.WasCancelled ? "Cancelled." : result.Error!);
     }

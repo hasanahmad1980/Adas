@@ -205,7 +205,7 @@ public partial class ShaderPackService
             }
             else
             {
-            using var archive = ArchiveFactory.Open(cachePath);
+            using var archive = ArchiveFactory.OpenArchive(cachePath);
             foreach (var entry in archive.Entries)
             {
                 if (entry.IsDirectory) continue;
@@ -366,7 +366,7 @@ public partial class ShaderPackService
             }
             else
             {
-            using var archive = ArchiveFactory.Open(cachePath);
+            using var archive = ArchiveFactory.OpenArchive(cachePath);
             foreach (var entry in archive.Entries)
             {
                 if (entry.IsDirectory) continue;

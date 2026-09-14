@@ -93,6 +93,8 @@ public static class AdasEngineServices
         services.AddSingleton<Renodx5AddonService>();
         services.AddSingleton<DeepFriedChickenService>();
         services.AddSingleton<Dlss5CompatibilityService>();
+        // Focused per-game setup assessment view-model (transient: one generation gate per pane).
+        services.AddTransient<RenoDXCommander.ViewModels.GameSetupViewModel>();
         services.AddSingleton<Dlss5ComponentService>();
         services.AddSingleton<GameCleanupService>();
         services.AddSingleton<DlssNrRepairService>();

@@ -68,7 +68,7 @@ public sealed partial class Dlss5ComponentService
                 || Path.GetFileName(file).Equals(ObsoleteBridgeAddon, StringComparison.OrdinalIgnoreCase)
                 || Path.GetFileName(file).Equals(AioAddon, StringComparison.OrdinalIgnoreCase)
                 || Path.GetFileName(file).Equals("deep-fried-chicken.addon64", StringComparison.OrdinalIgnoreCase));
-            if (conflict != null) throw new InvalidOperationException($"Remove the other neural rendering pipeline first: {Path.GetFileName(conflict)}.");
+            if (conflict != null) throw new Dlss5ConflictingPipelineException($"Remove the other neural rendering pipeline first: {Path.GetFileName(conflict)}.");
         }
         var proxy = Path.Combine(root, OptiScalerNrProxy(mode));
         if (File.Exists(proxy) && !(record?.InstalledHashes.ContainsKey(proxy) ?? false)

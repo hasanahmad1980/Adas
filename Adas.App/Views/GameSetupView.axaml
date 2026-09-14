@@ -62,12 +62,16 @@
                         <TextBlock Text="Graphics" Classes="h2" />
                         <Grid ColumnDefinitions="*,12,*">
                             <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="Graphics API" Classes="muted" />
-                                <ComboBox x:Name="ApiCombo" HorizontalAlignment="Stretch" />
+                                <TextBlock x:Name="ApiComboLabel" Text="Graphics API" Classes="muted" />
+                                <ComboBox x:Name="ApiCombo" HorizontalAlignment="Stretch" TabIndex="1"
+                                          AutomationProperties.LabeledBy="{Binding #ApiComboLabel}"
+                                          AutomationProperties.Name="Graphics API" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4">
-                                <TextBlock Text="Bitness" Classes="muted" />
-                                <ComboBox x:Name="BitnessCombo" HorizontalAlignment="Stretch" />
+                                <TextBlock x:Name="BitnessComboLabel" Text="Bitness" Classes="muted" />
+                                <ComboBox x:Name="BitnessCombo" HorizontalAlignment="Stretch" TabIndex="2"
+                                          AutomationProperties.LabeledBy="{Binding #BitnessComboLabel}"
+                                          AutomationProperties.Name="Process bitness" />
                             </StackPanel>
                         </Grid>
                         <TextBlock x:Name="ApiEvidenceText" Classes="muted" FontSize="12" TextWrapping="Wrap"
@@ -82,17 +86,21 @@
 
                         <!-- Plain-language readiness banner: headline, things to know, one-click fix -->
                         <Border x:Name="ReadinessBanner" CornerRadius="6" Padding="12,10" BorderThickness="1"
-                                Background="#1A2230" BorderBrush="#2F3B4E">
+                                Background="#1A2230" BorderBrush="#2F3B4E"
+                                AutomationProperties.LiveSetting="Polite"
+                                AutomationProperties.Name="Setup readiness">
                             <Grid ColumnDefinitions="Auto,*">
                                 <TextBlock x:Name="ReadinessIcon" Grid.Column="0" Text="…" FontSize="18"
-                                           Margin="0,0,10,0" VerticalAlignment="Top" />
+                                           Margin="0,0,10,0" VerticalAlignment="Top"
+                                           AutomationProperties.AccessibilityView="Raw" />
                                 <StackPanel Grid.Column="1" Spacing="6">
                                     <TextBlock x:Name="RouteSummary" Text="Checking this game…" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
                                     <TextBlock x:Name="ProblemsText" TextWrapping="Wrap" IsVisible="False"
                                                Foreground="{DynamicResource AdasTextSecondaryBrush}" />
                                     <Button x:Name="ChooseFolderInlineButton" Classes="accent" IsVisible="False"
-                                            Content="Choose game folder…" HorizontalAlignment="Left" />
+                                            Content="Choose game folder…" HorizontalAlignment="Left" TabIndex="3"
+                                            AutomationProperties.Name="Choose game folder" />
                                     <TextBlock x:Name="AutoSetupText" Classes="muted" FontSize="12" TextWrapping="Wrap"
                                                IsVisible="False" />
                                 </StackPanel>
@@ -101,16 +109,19 @@
 
                         <!-- 1. DLSS 5 route -->
                         <CheckBox x:Name="InstallDlss5Check" IsChecked="True" FontWeight="SemiBold"
-                                  Content="Install DLSS 5" />
+                                  Content="Install DLSS 5" TabIndex="4"
+                                  AutomationProperties.Name="Install DLSS 5" />
                         <StackPanel x:Name="RoutesPanel" Spacing="6" Margin="26,0,0,0">
                             <TextBlock x:Name="RoutesHeader" Text="Route — ★ is what Adas recommends; you can pick any"
                                        Classes="muted" FontSize="12" />
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <TextBlock x:Name="CommunityHeader" Classes="muted" FontSize="12" TextWrapping="Wrap"
                                            VerticalAlignment="Center" Text="Checking results from other players…" />
-                                <CheckBox x:Name="CommunityGpuOnlyCheck" Content="Only my GPU" FontSize="12" IsVisible="False" />
+                                <CheckBox x:Name="CommunityGpuOnlyCheck" Content="Only my GPU" FontSize="12" IsVisible="False"
+                                          AutomationProperties.Name="Show community results for my GPU only" />
                             </StackPanel>
-                            <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0">
+                            <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0" TabIndex="5"
+                                     AutomationProperties.Name="DLSS 5 route — starred is recommended; any can be selected">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="svc:RouteOption">
                                         <StackPanel Spacing="2" Margin="0,3">
@@ -162,7 +173,8 @@
                         </ItemsControl>
 
                         <StackPanel x:Name="FsrFgPanel" Spacing="2" Margin="0,2,0,0">
-                            <CheckBox x:Name="FsrFgCheck"
+                            <CheckBox x:Name="FsrFgCheck" TabIndex="6"
+                                      AutomationProperties.Name="OptiScaler option: FSR 3.1 frame generation, 2x, DirectX 12 only"
                                       Content="OptiScaler option: FSR 3.1 frame generation (2x, DirectX 12 only)" />
                             <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
                                        Text="Turns on the FSR 3.1 frame-generation files OptiScaler ships, fed by OptiScaler's upscaler — works on any RTX card. Off by default. Turn the game's own frame generation off, and expect some added input latency." />
@@ -171,26 +183,35 @@
                         </StackPanel>
 
                         <!-- 3. One button -->
-                        <WrapPanel Orientation="Horizontal">
+                        <WrapPanel x:Name="ActionArea" Orientation="Horizontal"
+                                   AutomationProperties.Name="Setup actions">
                             <Button x:Name="InstallButton" Classes="accent" Margin="0,0,8,8"
-                                    Content="Install selected" MinWidth="150" />
+                                    Content="Install selected" MinWidth="150" TabIndex="7"
+                                    AutomationProperties.Name="Install selected DLSS 5 route and tools" />
                             <Button x:Name="PreviewButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="What will happen?"
+                                    Content="What will happen?" TabIndex="8"
+                                    AutomationProperties.Name="Preview every file the selected route would change"
                                     ToolTip.Tip="List every file the selected DLSS 5 route would write, back up and remove — without changing anything." />
                             <Button x:Name="RepairButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Repair DLSS 5" IsVisible="{Binding IsDlss5Installed}"
+                                    Content="Repair DLSS 5" IsVisible="{Binding IsDlss5Installed}" TabIndex="9"
+                                    AutomationProperties.Name="Repair the installed DLSS 5 setup"
                                     ToolTip.Tip="Re-copy any missing or changed files for the installed setup." />
                             <Button x:Name="RemoveButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Remove DLSS 5" IsVisible="{Binding IsDlss5Installed}"
+                                    Content="Remove DLSS 5" IsVisible="{Binding IsDlss5Installed}" TabIndex="10"
+                                    AutomationProperties.Name="Remove DLSS 5 and restore original files"
                                     ToolTip.Tip="Uninstall DLSS 5 from this game and restore the original files." />
                             <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Open game folder" />
+                                    Content="Open game folder" TabIndex="11"
+                                    AutomationProperties.Name="Open the game folder in Explorer" />
                         </WrapPanel>
                         <TextBlock x:Name="InstallHint" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
 
-                        <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100" />
+                        <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100"
+                                     AutomationProperties.Name="Install progress" />
                         <SelectableTextBlock x:Name="InstallResult" Classes="muted" TextWrapping="Wrap"
-                                             IsVisible="False" />
+                                             IsVisible="False"
+                                             AutomationProperties.LiveSetting="Assertive"
+                                             AutomationProperties.Name="Install result" />
                     </StackPanel>
                 </Border>
 
@@ -273,8 +294,10 @@
                         <TextBlock x:Name="RrText" TextWrapping="Wrap"
                                    Foreground="{DynamicResource AdasTextSecondaryBrush}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="RrUpdateButton" Classes="subtle" Content="Update ray reconstruction" IsVisible="False" />
-                            <Button x:Name="RrRestoreButton" Classes="subtle" Content="Restore original" IsVisible="False" />
+                            <Button x:Name="RrUpdateButton" Classes="subtle" Content="Update ray reconstruction" IsVisible="False"
+                                    AutomationProperties.Name="Update ray reconstruction DLL" />
+                            <Button x:Name="RrRestoreButton" Classes="subtle" Content="Restore original" IsVisible="False"
+                                    AutomationProperties.Name="Restore the original ray reconstruction DLL" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -349,14 +372,19 @@
                         <TextBlock Text="Installed it? Play the game for a minute, close it, then click below to check that DLSS 5 is really working."
                                    Classes="muted" TextWrapping="Wrap" />
                         <Button x:Name="DiagnoseButton" Classes="subtle"
-                                Content="Check if it's working" HorizontalAlignment="Left" />
-                        <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap" />
+                                Content="Check if it's working" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Check whether DLSS 5 is actually running" />
+                        <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap"
+                                             AutomationProperties.LiveSetting="Polite"
+                                             AutomationProperties.Name="Diagnosis result" />
                         <StackPanel x:Name="AioFixPanel" Spacing="6" IsVisible="False" />
                         <TextBlock Text="Help other players: share whether it worked. Adas opens a filled-in GitHub issue that you check and submit yourself; nothing is sent automatically."
                                    Classes="muted" TextWrapping="Wrap" FontSize="12" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="ShareWorkedButton" Classes="subtle" Content="👍 It worked — share" />
-                            <Button x:Name="ShareFailedButton" Classes="subtle" Content="👎 It didn't — share" />
+                            <Button x:Name="ShareWorkedButton" Classes="subtle" Content="👍 It worked — share"
+                                    AutomationProperties.Name="Share that it worked" />
+                            <Button x:Name="ShareFailedButton" Classes="subtle" Content="👎 It didn't — share"
+                                    AutomationProperties.Name="Share that it didn't work" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

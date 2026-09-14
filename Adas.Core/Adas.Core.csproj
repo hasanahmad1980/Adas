@@ -10,7 +10,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <NoWarn>NU1902</NoWarn>
     <UseWinUI>false</UseWinUI>
     <EnableMsixTooling>false</EnableMsixTooling>
   </PropertyGroup>
@@ -66,6 +65,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageReference Include="NvAPIWrapper.Net" Version="0.8.1.101" />
-    <PackageReference Include="SharpCompress" Version="0.37.2" />
+    <!-- 0.48.0 clears GHSA-6c8g-7p36-r338 (archive directory-traversal); a minor bump within 0.x. -->
+    <PackageReference Include="SharpCompress" Version="0.48.0" />
   </ItemGroup>
 </Project>

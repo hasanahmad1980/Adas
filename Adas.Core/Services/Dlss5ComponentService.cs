@@ -346,16 +346,16 @@ public sealed partial class Dlss5ComponentService
 
         var existingProfile = LoadRecord(assessment.DeploymentPath)?.Profile;
         if (RequiresPipelineRemoval(existingProfile, profile))
-            throw new InvalidOperationException("Remove the current DLSS suite with its × button before switching rendering pipelines.");
+            throw new Dlss5ConflictingPipelineException("Remove the current DLSS suite with its × button before switching rendering pipelines.");
         if (!IsOptiScalerNrProfile(profile) && File.Exists(Path.Combine(assessment.DeploymentPath, "nvngx.dll_dlssnr.dll")))
-            throw new InvalidOperationException("Remove the OptiScaler NR pipeline before installing a different DLSS suite.");
+            throw new Dlss5ConflictingPipelineException("Remove the OptiScaler NR pipeline before installing a different DLSS suite.");
         if (IsOptiScalerNrProfile(profile))
             return await InstallOptiScalerNrAsync(assessment, profile, progress, cancellationToken).ConfigureAwait(false);
         if (profile == Dlss5InstallProfile.StandaloneAio)
             return await InstallAioAsync(assessment, progress, cancellationToken).ConfigureAwait(false);
         if (LoadRecord(assessment.DeploymentPath)?.Profile == Dlss5InstallProfile.StandaloneAio
             || File.Exists(Path.Combine(ModInstallService.GetAddonDeployPath(assessment.DeploymentPath), AioAddon)))
-            throw new InvalidOperationException("Remove the standalone AIO suite with its × button before installing a different DLSS route. The two pipelines must not run together.");
+            throw new Dlss5ConflictingPipelineException("Remove the standalone AIO suite with its × button before installing a different DLSS route. The two pipelines must not run together.");
 
         var path = assessment.DeploymentPath;
         var installed = new List<string>();

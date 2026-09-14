@@ -1,0 +1,41 @@
+name: CI (build & test)
+
+# Builds the Avalonia app (assembly `Adas`) and runs the full RenoDXCommander.Tests suite
+# on Windows, matching the local build environment. The engine targets
+# net8.0-windows10.0.19041.0, so this must run on windows-latest.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # A scoop-installed SDK can leak MSBuildSDKsPath and break restore; keep it clear.
+      - name: Build Adas.App (Release)
+        env:
+          DOTNET_MULTILEVEL_LOOKUP: "0"
+          MSBuildSDKsPath: ""
+        run: dotnet build Adas.App/Adas.App.csproj -c Release
+
+      - name: Run tests (Release)
+        env:
+          DOTNET_MULTILEVEL_LOOKUP: "0"
+          MSBuildSDKsPath: ""
+        run: dotnet test RenoDXCommander.Tests/RenoDXCommander.Tests.csproj -c Release --no-restore

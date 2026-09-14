@@ -13,7 +13,6 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <NoWarn>NU1902;NU1903</NoWarn>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <!-- Phase 4 trimming. Only takes effect on `publish` (build/run are untouched). TrimMode=partial
@@ -48,6 +47,11 @@
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.3" />
     <!-- Diagnostics build tooling (harmless in Release, useful in Debug). -->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.2.3" Condition="'$(Configuration)' == 'Debug'" />
+    <!-- Direct pin overriding the version Avalonia 11.2.3 pulls transitively (0.20.0), which carries
+         the High-severity GHSA-xrw6-gwf8-vvr9. 0.21.0 is the patched release and a compatible 0.x
+         minor bump — no API break for Avalonia's Linux D-Bus backend (unused on this Windows TFM,
+         but pinned so the audit is clean rather than suppressed). -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
 
   <ItemGroup>

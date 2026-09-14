@@ -335,7 +335,7 @@ public sealed class Dlss5UpstreamRefreshTests
         {
             var path = Path.Combine(root, "renodx-dlss.addon64");
             File.WriteAllText(path, "existing user add-on");
-            Assert.Throws<InvalidOperationException>(() => Dlss5ComponentService.ValidateOptiScalerNrConflicts(root, null));
+            Assert.Throws<Dlss5ConflictingPipelineException>(() => Dlss5ComponentService.ValidateOptiScalerNrConflicts(root, null));
             Assert.Equal("existing user add-on", File.ReadAllText(path));
             Assert.False(Directory.Exists(Path.Combine(root, ".adas")));
         }

@@ -134,7 +134,7 @@ public sealed partial class Dlss5ComponentService
         var root = Path.GetFullPath(assessment.DeploymentPath!);
         var record = LoadRecord(root);
         if (record != null && record.Profile != Dlss5InstallProfile.StandaloneAio)
-            throw new InvalidOperationException("Remove the current DLSS 5 suite with its × button first, then select standalone AIO. Adas will not stack two rendering pipelines.");
+            throw new Dlss5ConflictingPipelineException("Remove the current DLSS 5 suite with its × button first, then select standalone AIO. Adas will not stack two rendering pipelines.");
         var addonRoot = Path.GetFullPath(ModInstallService.GetAddonDeployPath(root));
         if (!addonRoot.Equals(root, StringComparison.OrdinalIgnoreCase) && !IsPathBelow(root, addonRoot))
             throw new InvalidOperationException("AIO needs a game-local add-on folder. This game uses a shared external AddonPath; change it in ReShade before installing.");
@@ -222,7 +222,7 @@ public sealed partial class Dlss5ComponentService
         var root = Path.GetFullPath(assessment.DeploymentPath!);
         var record = LoadRecord(root);
         if (record != null && record.Profile != Dlss5InstallProfile.StandaloneAio)
-            throw new InvalidOperationException("Remove the current DLSS 5 suite with its × button first, then select standalone AIO. Adas will not stack two rendering pipelines.");
+            throw new Dlss5ConflictingPipelineException("Remove the current DLSS 5 suite with its × button first, then select standalone AIO. Adas will not stack two rendering pipelines.");
         var host = Path.Combine(root, AioHostFolder);
         ValidateAioConflicts(root, root, assessment.Mode, record);
         ValidateAioX86Conflicts(root, assessment.Mode, record);
@@ -332,7 +332,7 @@ public sealed partial class Dlss5ComponentService
             var conflict = Directory.EnumerateFiles(directory, "*.addon*").FirstOrDefault(file =>
                 IsManagedDlssAddonReference(Path.GetFileName(file)));
             if (conflict != null)
-                throw new InvalidOperationException($"Remove the other DLSS pipeline before installing AIO: {Path.GetFileName(conflict)}. Unrelated game-specific RenoDX mods are not removed.");
+                throw new Dlss5ConflictingPipelineException($"Remove the other DLSS pipeline before installing AIO: {Path.GetFileName(conflict)}. Unrelated game-specific RenoDX mods are not removed.");
             var bridgePath = Path.Combine(directory, "nvngx.dll");
             if (File.Exists(bridgePath) && (!(record?.InstalledHashes.TryGetValue(bridgePath, out var expected) ?? false)
                 || !FileHelper.ComputeSha256(bridgePath).Equals(expected, StringComparison.OrdinalIgnoreCase)))

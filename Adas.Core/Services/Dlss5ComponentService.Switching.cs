@@ -29,7 +29,7 @@ public sealed partial class Dlss5ComponentService
             var root = assessment.DeploymentPath;
             Dlss5RuntimePrerequisites.EnsureAvailable(root, assessment.Is64Bit);
             if (Dlss5SwitchJournal.Recover(root))
-                throw new InvalidOperationException("Recovered the previous interrupted switch. Its files and settings are restored. Review the game again before applying another profile.");
+                throw new Dlss5RecoveredInterruptedSwitchException("Recovered the previous interrupted switch. Its files and settings are restored. Review the game again before applying another profile.");
             var previous = LoadRecord(root);
             var cleanup = GetCleanupPlan(root, assessment.Mode, profile);
             ValidateCleanupApproval(cleanup, cleanupApproval);

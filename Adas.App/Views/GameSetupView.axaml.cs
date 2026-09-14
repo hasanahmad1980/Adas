@@ -98,6 +98,14 @@ public partial class GameSetupView : UserControl
     /// <summary>True while an install/remove runs — the only time the buttons are disabled.</summary>
     private bool _busy;
 
+    /// <summary>Focused assessment view-model (DI-constructed). Owns the latest-wins generation gate and the
+    /// pure probe/assess/route computation, so the code-behind only applies results to the UI.</summary>
+    private GameSetupViewModel? _setupVm;
+    private GameSetupViewModel? SetupVm => _setupVm ??= AppServices.Services.GetService<GameSetupViewModel>();
+
+    /// <summary>Cancels the probe for a superseded selection/refresh so it doesn't waste work applying.</summary>
+    private System.Threading.CancellationTokenSource? _assessmentCts;
+
     private readonly SetupToolItem[] _tools;
 
     private Dlss5Probe? _probe;
@@ -132,6 +140,19 @@ public partial class GameSetupView : UserControl
     {
         var card = Card;
         if (card is null) return;
+        var main = Main;
+        var vm = SetupVm;
+        if (main is null || vm is null) { RouteSummary.Text = "Compatibility service unavailable."; return; }
+
+        // Freeze this game's identity, paths and Graphics API choice for the whole assessment.
+        var op = Dlss5GameOperation.Capture(card, main.GetSingleApiOverride(card.GameName, card.Source ?? ""));
+
+        // Latest assessment wins. Bump the generation and cancel any probe still running for a previous
+        // selection/refresh, so a slow background probe can never apply its result over a newer one.
+        _assessmentCts?.Cancel();
+        var cts = _assessmentCts = new System.Threading.CancellationTokenSource();
+        var ct = cts.Token;
+        var generation = vm.BeginAssessment();
 
         if (!ReferenceEquals(_populatedCard, card))
         {
@@ -159,62 +180,34 @@ public partial class GameSetupView : UserControl
         bool hasUpscaler = false;
         string? installedRoot = null;
         Dlss5InstallRecord? installedRecord = null;
-        var main = Main;
 
+        try
+        {
         await Task.Run(() =>
         {
             try
             {
-                var compat = AppServices.Services.GetService<Dlss5CompatibilityService>();
-                if (compat is null || main is null) { summary = "Compatibility service unavailable."; return; }
-
-                probe = Dlss5Installer.ProbeFor(main, compat, card);
-                assessment = Dlss5CompatibilityService.Assess(probe, singlePlayerConfirmed: true);
-                hasUpscaler = Dlss5ToolCompatibility.HasUpscalerRuntime(assessment.DeploymentPath ?? card.InstallPath, probe.HasNativeDlss);
-
-                // Seed from an existing install of the same mode, else auto-pick from renderer/arch.
-                var installed = assessment.DeploymentPath is { } dp ? Dlss5ComponentService.LoadRecord(dp) : null;
-                var seed = installed?.Mode == assessment.Mode ? installed.Profile : Dlss5InstallProfile.MaximumQuality;
-                var pick = Dlss5RouteCatalog.Recommend(assessment, seed);
-
-                var dfc = AppServices.Services.GetService<DeepFriedChickenService>();
-                routes = Dlss5RouteCatalog.Build(assessment, pick, installed?.Profile,
-                    deepFriedChickenAvailable: dfc?.IsImported == true,
-                    installedDeepFriedChicken: installed?.DeepFriedChicken == true,
-                    installedBridgeSubstitute: installed?.BridgeSubstitute == true);
-                preferred = routes.FirstOrDefault(r => r.Installed)
-                            ?? routes.FirstOrDefault(r => r.Profile == pick && r.Supported && !r.DeepFriedChicken && !r.BridgeSubstitute)
-                            ?? routes.FirstOrDefault(r => r.Recommended)
-                            ?? routes.FirstOrDefault();
-
-                // DLSS 5 has its own on-disk record and is NOT part of the RenoDX-only `Status`; drive the
-                // badge from the record so a successful install flips it off "Available".
-                if (installed is not null)
-                {
-                    installedRoot = assessment.DeploymentPath;
-                    installedRecord = installed;
-                    dlss5Status = GameStatus.Installed;
-                    var active = routes.FirstOrDefault(r => r.Installed);
-                    dlss5Label = "Active route: "
-                        + (active?.Label ?? installed.Profile.ToString())
-                        + (string.IsNullOrWhiteSpace(installed.ComponentVersion) ? "" : $" ({installed.ComponentVersion})");
-                }
-                else
-                {
-                    dlss5Status = assessment.Mode != Dlss5DeploymentMode.None ? GameStatus.Available : GameStatus.NotInstalled;
-                }
-
-                readiness = Dlss5ReadinessText.Describe(assessment, card.InstallPath);
-                summary = installed is not null && readiness.State == Dlss5ReadinessState.Ready
-                    ? "DLSS 5 is installed on this game. Launch the game to use it — or tick a different route or tools below and press Install selected."
-                    : readiness.Headline;
+                var result = vm.Assess(op);
+                probe = result.Probe;
+                assessment = result.Assessment;
+                hasUpscaler = result.HasUpscalerRuntime;
+                routes = result.Routes;
+                preferred = result.Preferred;
+                dlss5Status = result.Dlss5Status;
+                dlss5Label = result.Dlss5Label;
+                installedRoot = result.InstalledRoot;
+                installedRecord = result.InstalledRecord;
+                readiness = result.Readiness;
+                summary = result.Summary;
             }
             catch (Exception ex) { summary = $"Couldn't check this game: {ex.Message}. You can still pick options and install."; }
-        });
+        }, ct);
 
         void Apply()
         {
-            if (!ReferenceEquals(Card, card)) return; // selection changed while probing
+            // Apply only the latest probe for the still-selected game: a superseded refresh (newer
+            // generation started) or a changed selection must not clobber current UI or progress.
+            if (!generation.IsCurrent || !ReferenceEquals(Card, card)) return;
             _probe = probe;
             _assessment = assessment;
             _hasUpscalerRuntime = hasUpscaler;
@@ -252,6 +245,11 @@ public partial class GameSetupView : UserControl
 
         if (Dispatcher.UIThread.CheckAccess()) Apply();
         else await Dispatcher.UIThread.InvokeAsync(Apply);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer refresh superseded this one before its probe started; the newer one owns the UI.
+        }
     }
 
     /// <summary>
@@ -438,6 +436,14 @@ public partial class GameSetupView : UserControl
         RemoveButton.IsEnabled = !busy;
         InstallProgress.IsVisible = busy;
         if (busy) InstallProgress.Value = 0;
+        // Keep the ray-reconstruction actions inside the same single-flight guard. Only disable here;
+        // their correct enabled state (an update is available / a backup exists) is restored by
+        // RefreshRrCardAsync after the operation, so we never wrongly re-enable them.
+        if (busy)
+        {
+            RrUpdateButton.IsEnabled = false;
+            RrRestoreButton.IsEnabled = false;
+        }
     }
 
     private async void OnInstall(object? sender, RoutedEventArgs e)
@@ -1326,6 +1332,7 @@ public partial class GameSetupView : UserControl
         var owner = this.GetVisualRoot() as Window;
         var svc = AppServices.Services.GetService<IDlssStreamlineService>();
         if (card is null || owner is null || svc is null || _rrPath is not { } path || _rrNewest is not { } newest) return;
+        if (_busy) return; // one mutating operation at a time — same guard as install/repair/remove
         if (!await DialogHost.ConfirmAsync(owner, "Update ray reconstruction?",
                 "Adas backs up the game's nvngx_dlssd.dll and replaces it with " + newest + ".\n\n"
                 + "⚠ Launchers that verify files (Steam, EA app, Battle.net) may put the original back after an update or verify.\n\n"
@@ -1334,7 +1341,7 @@ public partial class GameSetupView : UserControl
             return;
         var guard = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
         if (!guard.CanProceed) { RrText.Text = guard.Error ?? "Cancelled."; return; }
-        RrUpdateButton.IsEnabled = false;
+        SetBusy(true);
         try
         {
             var before = svc.GetFileVersion(path);
@@ -1345,7 +1352,7 @@ public partial class GameSetupView : UserControl
                 ? $"✓ Ray reconstruction updated to {after}. "
                 : "✕ The update didn't complete; the game's file is unchanged. See the log. ") + RrText.Text;
         }
-        finally { RrUpdateButton.IsEnabled = true; }
+        finally { SetBusy(false); }
     }
 
     private async void OnRrRestore(object? sender, RoutedEventArgs e)
@@ -1354,12 +1361,18 @@ public partial class GameSetupView : UserControl
         var owner = this.GetVisualRoot() as Window;
         var svc = AppServices.Services.GetService<IDlssStreamlineService>();
         if (card is null || owner is null || svc is null || _rrPath is not { } path) return;
+        if (_busy) return; // one mutating operation at a time — same guard as install/repair/remove
         var guard = await GameCloseGuard.EnsureClosedAsync(owner, card.GameName, card.InstallPath);
         if (!guard.CanProceed) { RrText.Text = guard.Error ?? "Cancelled."; return; }
-        try { svc.Restore(path); }
-        catch (Exception ex) { RrText.Text = $"✕ Restore failed: {ex.Message}"; return; }
-        await RefreshRrCardAsync(card, true);
-        RrText.Text = "✓ Original ray reconstruction restored. " + RrText.Text;
+        SetBusy(true);
+        try
+        {
+            svc.Restore(path);
+            await RefreshRrCardAsync(card, true);
+            RrText.Text = "✓ Original ray reconstruction restored. " + RrText.Text;
+        }
+        catch (Exception ex) { RrText.Text = $"✕ Restore failed: {ex.Message}"; }
+        finally { SetBusy(false); }
     }
 
     // ── Per-game DLSS 5 choices: Feeder build (#4), motion vectors (#9), FSR FG (#5) ──────────────
@@ -1692,6 +1705,11 @@ public partial class GameSetupView : UserControl
         var card = Card;
         var root = _installedRoot;
         if (card is null || root is null || _tuning is null || _populatingTuning) return;
+        if (_busy) // an install/remove/repair/RR op is writing to this same install root — don't race it
+        {
+            TuningStatus.Text = "Finish the current operation before changing tuning.";
+            return;
+        }
         try
         {
             if (_tuning.HasFeeder) Dlss5ComponentService.SaveFeederTuning(root, CollectFeederTuning());

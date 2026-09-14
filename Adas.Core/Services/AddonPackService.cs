@@ -869,7 +869,7 @@ public class AddonPackService : IAddonPackService
 
             progress?.Report(($"Extracting {safeName}...", pctBase + pctRange * 0.8));
 
-            using var archive = ArchiveFactory.Open(tempZip);
+            using var archive = ArchiveFactory.OpenArchive(tempZip);
             foreach (var archiveEntry in archive.Entries)
             {
                 if (archiveEntry.IsDirectory) continue;

@@ -151,9 +151,22 @@ public partial class MainWindow : Window
             var path = await UpdateSvc.DownloadInstallerAsync(info.DownloadUrl, progress, info.ExpectedSha256);
             if (string.IsNullOrEmpty(path))
             {
-                await DialogHost.ConfirmAsync(this, "Update failed",
-                    "The installer could not be downloaded, or it failed its checksum check and was discarded. "
-                    + "Please try again later or download it from the Adas releases page.", primaryText: "OK", closeText: "Close");
+                var hasReleasePage = !string.IsNullOrWhiteSpace(info.ReleasePageUrl);
+                var openPage = await DialogHost.ConfirmAsync(this, "Update couldn't be verified",
+                    "Adas couldn't download and verify the installer's checksum, so nothing was installed. "
+                    + (hasReleasePage
+                        ? "You can open the Adas releases page and install it manually."
+                        : "Please try again later, or install it from the Adas releases page."),
+                    primaryText: hasReleasePage ? "Open releases page" : "OK", closeText: "Close");
+                if (openPage && hasReleasePage)
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(info.ReleasePageUrl!)
+                        { UseShellExecute = true });
+                    }
+                    catch (Exception ex) { CrashReporter.Log($"[MainWindow.OnUpdate] Could not open release page — {ex.Message}"); }
+                }
                 UpdateButton.IsEnabled = true;
                 return;
             }
