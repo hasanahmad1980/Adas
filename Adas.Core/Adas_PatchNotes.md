@@ -1,3 +1,7 @@
+## Adas 3.0.13 — Full-Screen Wrapper: no more hang getting the DLL
+
+- Fixed the Full-Screen Wrapper hanging on **"Getting a signed nvngx_dlssnr.dll…"**. Adas was asking for the manifest's *newest* NR build — often an unsigned dev/SF build the wrapper rejects — and could stall on a large download. It now scans the DLSS 5 cache for a copy already on disk that the wrapper will accept (signed by NVIDIA, trusted by Windows) and uses that instantly, downloading only as a last resort. Same for `nvngx_dlss.dll`.
+
 ## Adas 3.0.12 — Full-Screen Wrapper on RTX 40/30/20
 
 - The Full-Screen Wrapper now runs DLSS 5 on **RTX 40/30/20** cards, not just RTX 50. `nvngx_dlssnr.dll` refuses to create Neural Rendering below Blackwell, so on those cards Adas starts the wrapper suspended and injects an in-process **arch-spoof shim** — the same technique NeuralScreen uses on itself — that reports Blackwell to the DLL for your primary GPU only. No file on disk is modified; on RTX 50 nothing is injected.

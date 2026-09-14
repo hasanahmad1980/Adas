@@ -42,6 +42,22 @@ public sealed partial class Dlss5ComponentService
     // Microsoft root) and the signer is NVIDIA — the leaked/altered builds fail this. Same predicate.
     private static bool IsWrapperTrustedNvidia(string path) => DlssNrRepairService.IsTrustedNvidiaSigned(path);
 
+    // Newest-first scan of an existing %LOCALAPPDATA%\RHI\<cache> tree for a copy the wrapper will
+    // accept, so a signed DLL already on disk is used without any download or manifest fetch.
+    private static string? FindCachedTrustedNvidia(string cacheSubdir, string dllName)
+    {
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "RHI", cacheSubdir);
+        if (!Directory.Exists(root)) return null;
+        try
+        {
+            return Directory.EnumerateFiles(root, dllName, SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault(IsWrapperTrustedNvidia);
+        }
+        catch { return null; }
+    }
+
     /// <summary>
     /// Warnings before launching ThioJoe's wrapper. The wrapper itself is RTX-50-only and needs
     /// driver 616.64+; on RTX 40/30/20 Adas offers an experimental in-process arch-spoof so the
@@ -105,17 +121,10 @@ public sealed partial class Dlss5ComponentService
             if (!IsWrapperTrustedNvidia(nr))
             {
                 progress?.Report("Getting a signed nvngx_dlssnr.dll…");
-                string? source = null;
-                if (streamline is not null)
-                {
-                    try
-                    {
-                        if (streamline.DlssnrVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
-                        var cached = await streamline.EnsureNewestDlssnrCachedAsync().ConfigureAwait(false);
-                        if (cached is not null && IsWrapperTrustedNvidia(cached)) source = cached;
-                    }
-                    catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] DLSS cache runtime unavailable: {ex.Message}"); }
-                }
+                // Prefer any already-cached signed copy (fast, offline). Only download as a last
+                // resort — and never force the manifest's "newest", which is often an unsigned dev/SF
+                // build the wrapper would reject anyway.
+                string? source = FindCachedTrustedNvidia("DLSS-NR", "nvngx_dlssnr.dll");
                 if (source is null)
                 {
                     try
@@ -125,6 +134,17 @@ public sealed partial class Dlss5ComponentService
                             .FirstOrDefault(IsWrapperTrustedNvidia);
                     }
                     catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] NeuralScreen runtime unavailable: {ex.Message}"); }
+                }
+                if (source is null && streamline is not null)
+                {
+                    try
+                    {
+                        progress?.Report("Downloading a signed nvngx_dlssnr.dll…");
+                        if (streamline.DlssnrVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
+                        var cached = await streamline.EnsureNewestDlssnrCachedAsync().ConfigureAwait(false);
+                        if (cached is not null && IsWrapperTrustedNvidia(cached)) source = cached;
+                    }
+                    catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] DLSS cache runtime unavailable: {ex.Message}"); }
                 }
                 if (source is null)
                     throw new FileNotFoundException(
@@ -139,6 +159,10 @@ public sealed partial class Dlss5ComponentService
             if (!IsWrapperTrustedNvidia(sr) && streamline is not null)
             {
                 DeleteIfExists(sr);
+                progress?.Report("Getting a signed nvngx_dlss.dll…");
+                var cachedSr = FindCachedTrustedNvidia("DLSS", "nvngx_dlss.dll");
+                if (cachedSr is not null) { File.Copy(cachedSr, sr, overwrite: true); }
+                else
                 try
                 {
                     if (streamline.DlssVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
