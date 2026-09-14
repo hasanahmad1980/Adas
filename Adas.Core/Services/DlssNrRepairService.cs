@@ -279,6 +279,18 @@ public sealed class DlssNrRepairService
            && string.Equals(current.Signer, preview.Signer, StringComparison.OrdinalIgnoreCase)
            && current.SignatureValid == preview.SignatureValid;
 
+    /// <summary>True when Windows trusts the file's Authenticode signature and the signer is NVIDIA.</summary>
+    internal static bool IsTrustedNvidiaSigned(string path)
+    {
+        try
+        {
+            if (!File.Exists(path) || !AuthenticodeVerifier.IsTrusted(path)) return false;
+            using var certificate = new X509Certificate2(X509Certificate.CreateFromSignedFile(path));
+            return certificate.Subject.Contains("NVIDIA Corporation", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
     private static class AuthenticodeVerifier
     {
         private static readonly Guid GenericVerifyV2 = new("00AAC56B-CD44-11D0-8CC2-00C04FC295EE");

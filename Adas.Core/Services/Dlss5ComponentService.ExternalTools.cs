@@ -38,6 +38,10 @@ public sealed partial class Dlss5ComponentService
     internal const string FullScreenWrapperMinimumDriver = "616.64";
     private static readonly SemaphoreSlim FullScreenWrapperCacheLock = new(1, 1);
 
+    // The wrapper accepts an NGX DLL only when Windows trusts its Authenticode signature (chain to a
+    // Microsoft root) and the signer is NVIDIA — the leaked/altered builds fail this. Same predicate.
+    private static bool IsWrapperTrustedNvidia(string path) => DlssNrRepairService.IsTrustedNvidiaSigned(path);
+
     /// <summary>Warnings before launching ThioJoe's wrapper: it needs an RTX 50 GPU and driver 616.64 or newer.</summary>
     public static IReadOnlyList<string> FullScreenWrapperWarnings(string? gpuName, string? driverVersion)
     {
@@ -87,42 +91,57 @@ public sealed partial class Dlss5ComponentService
             }
 
             var nr = Path.Combine(toolDirectory, "nvngx_dlssnr.dll");
-            if (!IsUsableRuntimeFile(nr))
+            // The wrapper opens the DLL and demands a signature Windows trusts whose chain reaches a
+            // Microsoft root AND whose signer is NVIDIA. NeuralScreen ships the leaked/altered 310.8.0
+            // build (Authenticode HashMismatch), which the wrapper rejects with "is not the correct
+            // file". So require an untouched NVIDIA-signed copy, and prefer the DLSS manifest cache
+            // (genuine NVIDIA files) over the NeuralScreen bundle.
+            if (!IsWrapperTrustedNvidia(nr))
             {
-                progress?.Report("Getting nvngx_dlssnr.dll…");
+                progress?.Report("Getting a signed nvngx_dlssnr.dll…");
                 string? source = null;
-                try
-                {
-                    var neuralScreen = await EnsureNeuralScreenAsync(cancellationToken).ConfigureAwait(false);
-                    source = Directory.EnumerateFiles(neuralScreen, "nvngx_dlssnr.dll", SearchOption.AllDirectories).FirstOrDefault(IsUsableRuntimeFile);
-                }
-                catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] NeuralScreen runtime unavailable: {ex.Message}"); }
-                if (source is null && streamline is not null)
+                if (streamline is not null)
                 {
                     try
                     {
                         if (streamline.DlssnrVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
-                        source = await streamline.EnsureNewestDlssnrCachedAsync().ConfigureAwait(false);
+                        var cached = await streamline.EnsureNewestDlssnrCachedAsync().ConfigureAwait(false);
+                        if (cached is not null && IsWrapperTrustedNvidia(cached)) source = cached;
                     }
                     catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] DLSS cache runtime unavailable: {ex.Message}"); }
                 }
                 if (source is null)
-                    throw new FileNotFoundException("Adas couldn't get nvngx_dlssnr.dll for the wrapper. Put a copy in " + toolDirectory + " and try again.");
+                {
+                    try
+                    {
+                        var neuralScreen = await EnsureNeuralScreenAsync(cancellationToken).ConfigureAwait(false);
+                        source = Directory.EnumerateFiles(neuralScreen, "nvngx_dlssnr.dll", SearchOption.AllDirectories)
+                            .FirstOrDefault(IsWrapperTrustedNvidia);
+                    }
+                    catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] NeuralScreen runtime unavailable: {ex.Message}"); }
+                }
+                if (source is null)
+                    throw new FileNotFoundException(
+                        "Adas couldn't find an NVIDIA-signed nvngx_dlssnr.dll, which the wrapper requires. "
+                        + "The DLSS 5 cache and NeuralScreen bundles only hold the leaked (unsigned) build. "
+                        + "Copy a genuine nvngx_dlssnr.dll from a DLSS 5 game or the NVIDIA DLSS SDK into "
+                        + toolDirectory + " and try again.");
                 File.Copy(source, nr, overwrite: true);
             }
 
             var sr = Path.Combine(toolDirectory, "nvngx_dlss.dll");
-            if (!File.Exists(sr) && streamline is not null)
+            if (!IsWrapperTrustedNvidia(sr) && streamline is not null)
             {
+                DeleteIfExists(sr);
                 try
                 {
                     if (streamline.DlssVersions.Count == 0) await streamline.FetchManifestAsync().ConfigureAwait(false);
-                    if (await streamline.EnsureNewestDlssCachedAsync().ConfigureAwait(false) is { } dlss && File.Exists(dlss))
+                    if (await streamline.EnsureNewestDlssCachedAsync().ConfigureAwait(false) is { } dlss && IsWrapperTrustedNvidia(dlss))
                         File.Copy(dlss, sr, overwrite: true);
                 }
                 catch (Exception ex) { _crashReporter.Log($"[FullScreenWrapper] nvngx_dlss.dll unavailable: {ex.Message}"); }
             }
-            if (!File.Exists(sr)) notes.Add("nvngx_dlss.dll wasn't available, so the super resolution options are off.");
+            if (!IsWrapperTrustedNvidia(sr)) notes.Add("A signed nvngx_dlss.dll wasn't available, so the super resolution options are off.");
         }
         finally { FullScreenWrapperCacheLock.Release(); }
 
