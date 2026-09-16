@@ -11,7 +11,7 @@ public sealed class Dlss5UpstreamRefreshTests
     {
         Assert.Equal("1.16.0-beta.2", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
-        Assert.Equal("0.13.16", Dlss5ComponentService.OneClickVersion);
+        Assert.Equal("0.13.17", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, false));
         Assert.False(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.Dx11Feeder, true));
