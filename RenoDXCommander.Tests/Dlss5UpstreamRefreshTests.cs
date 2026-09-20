@@ -9,7 +9,7 @@ public sealed class Dlss5UpstreamRefreshTests
     [Fact]
     public void RequestedUpstreamOptionsArePinnedAndRendererScoped()
     {
-        Assert.Equal("1.16.0-beta.4", Dlss5ComponentService.BundledFeederBetaVersion);
+        Assert.Equal("1.16.0-beta.5", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
         Assert.Equal("0.13.20", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
@@ -31,17 +31,17 @@ public sealed class Dlss5UpstreamRefreshTests
         => Assert.Equal(expected, VulkanLayerService.IsEnabledRegistryValue(registryValue));
 
     [Fact]
-    public void BundledFeederBetaPayloadIsTheMatched1160Beta4Set()
+    public void BundledFeederBetaPayloadIsTheMatched1160Beta5Set()
     {
         var assetRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5");
         var expected = new[]
         {
-            "dlss5-feed-1.16.0-beta.4.addon64",
-            "dlss5-feed-1.16.0-beta.4.addon32",
-            "dlss5-feed-host64-1.16.0-beta.4.exe",
-            "DLSS5_Feed-1.16.0-beta.4.fx",
-            "feed-vk-layer-1.16.0-beta.4-x64.zip",
-            "feed-vk-layer-1.16.0-beta.4-x86.zip",
+            "dlss5-feed-1.16.0-beta.5.addon64",
+            "dlss5-feed-1.16.0-beta.5.addon32",
+            "dlss5-feed-host64-1.16.0-beta.5.exe",
+            "DLSS5_Feed-1.16.0-beta.5.fx",
+            "feed-vk-layer-1.16.0-beta.5-x64.zip",
+            "feed-vk-layer-1.16.0-beta.5-x86.zip",
         };
 
         foreach (var name in expected)
@@ -273,7 +273,7 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.4", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.5", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.15.1", true)]
-    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 1.16.0-beta.4", false)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 1.16.0-beta.5", false)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 1.7.24", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.3", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.7-experimental.1", true)]
