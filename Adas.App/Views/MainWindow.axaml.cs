@@ -371,7 +371,7 @@ public partial class MainWindow : Window
 
         var confirm = await DialogHost.ConfirmAsync(this, "Update all installs",
             $"Adas will re-run the install for {stale.Count} game(s) pinned to an older component version. "
-            + "Each game's current route and settings are kept; this just refreshes the components to the versions Adas now ships.\n\n"
+            + "Each game's current route is kept; this re-deploys the components at the versions Adas now ships.\n\n"
             + "Close any of these games before continuing.",
             primaryText: "Update all", closeText: "Cancel");
         if (!confirm) return;
@@ -388,7 +388,15 @@ public partial class MainWindow : Window
                 vm.SubStatusText = $"Updating {card.GameName}…";
                 try
                 {
-                    var outcome = await Dlss5Installer.RepairAsync(vm, this, card, progress);
+                    // Re-run the game's *recorded* route so the components are re-deployed and the record's
+                    // ComponentVersion is rewritten to the current one — that is what clears the stale flag.
+                    // (Repair only fixes the ReShade config and never bumps the version, so it can't update.)
+                    var route = await Task.Run(() => ResolveInstalledRoute(card));
+                    if (route is null) continue;
+                    var outcome = await Dlss5Installer.InstallAsync(vm, this, card, route.Value.Profile, progress,
+                        deepFriedChicken: route.Value.DeepFriedChicken,
+                        bridgeSubstitute: route.Value.BridgeSubstitute,
+                        forceProfile: true, risksConfirmed: true);
                     if (outcome.Ran) updated++;
                 }
                 catch (Exception ex) { CrashReporter.Log($"[MainWindow.OnUpdateAll] {card.GameName} — {ex.Message}"); }
@@ -405,6 +413,20 @@ public partial class MainWindow : Window
             UpdateAllButton.IsEnabled = true;
             RefreshUpdateAllButton();
         }
+    }
+
+    /// <summary>
+    /// Reads the DLSS 5 install record for a game and returns the route it was installed with, so an
+    /// update can re-run exactly that route. Returns null when no record can be located.
+    /// </summary>
+    private static (Dlss5InstallProfile Profile, bool DeepFriedChicken, bool BridgeSubstitute)? ResolveInstalledRoute(GameCardViewModel card)
+    {
+        if (string.IsNullOrWhiteSpace(card.InstallPath)) return null;
+        var record = Dlss5ComponentService.LoadRecord(card.InstallPath)
+            ?? Dlss5ComponentService.LoadRecord(ModInstallService.GetAddonDeployPath(card.InstallPath));
+        if (record is null && Dlss5ComponentService.FindInstalledDeploymentPath(card.InstallPath) is { } root)
+            record = Dlss5ComponentService.LoadRecord(root);
+        return record is null ? null : (record.Profile, record.DeepFriedChicken, record.BridgeSubstitute);
     }
 
     private async void OnRefresh(object? sender, RoutedEventArgs e)
