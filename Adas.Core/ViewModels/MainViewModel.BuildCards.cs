@@ -1159,36 +1159,7 @@ public partial class MainViewModel
             // RenoDX-only `Status`. Surface it on its own card status so the library chip and setup
             // page reflect a completed install. Records live under the install root or the addon
             // deploy path, depending on the route.
-            if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
-            {
-                // A present game can always be set up for DLSS 5, so surface "Available" as the
-                // default; a found record promotes it to "Installed" below. This drives the primary
-                // library chip, so it stays a call-to-action instead of a dull "Not installed".
-                newCard.Dlss5Status = GameStatus.Available;
-                try
-                {
-                    var dlss5Rec = Dlss5ComponentService.LoadRecord(installPath)
-                        ?? Dlss5ComponentService.LoadRecord(ModInstallService.GetAddonDeployPath(installPath));
-                    // Records are usually written under the *resolved* deployment folder (often an exe
-                    // subfolder), not the raw install root. Use the same cached resolver the setup pane
-                    // reaches through Probe, so the card doesn't read "Not installed" and then flip to
-                    // "Installed" ~2s later once the pane re-probes and writes the status back.
-                    if (dlss5Rec == null
-                        && Dlss5ComponentService.FindInstalledDeploymentPath(installPath) is { } deployPath)
-                        dlss5Rec = Dlss5ComponentService.LoadRecord(deployPath);
-                    if (dlss5Rec != null)
-                    {
-                        newCard.Dlss5Status = GameStatus.Installed;
-                        newCard.HasComponentUpdate = Dlss5ComponentService.IsComponentUpdateAvailable(dlss5Rec);
-                        newCard.Dlss5InstalledLabel = "Active route: " + dlss5Rec.Profile
-                            + (string.IsNullOrWhiteSpace(dlss5Rec.ComponentVersion) ? "" : $" ({dlss5Rec.ComponentVersion})");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _crashReporter.Log($"[BuildCards] DLSS 5 record scan for '{game.Name}' failed — {ex.Message}");
-                }
-            }
+            RefreshCardDlss5State(newCard, installPath, useDeepResolve: true);
 
             // ── DLSS / Streamline detection ──────────────────────────────────────
             LogPhase("DofFix+CardInit");
@@ -1385,5 +1356,51 @@ public partial class MainViewModel
         _addonFileCache = new Dictionary<string, string>(newAddonFileCache, StringComparer.OrdinalIgnoreCase);
 
         return cards;
+    }
+
+    /// <summary>
+    /// Re-reads a single game's DLSS 5 on-disk record and updates just that card's DLSS 5 state
+    /// (<see cref="GameCardViewModel.Dlss5Status"/>, <see cref="GameCardViewModel.HasComponentUpdate"/>,
+    /// <see cref="GameCardViewModel.Dlss5InstalledLabel"/>) in place — no full library rescan.
+    /// Called both during card build (from BuildCards / CacheLoad) and after an install/update/repair/remove
+    /// so a single-game operation refreshes only that game. Keep this the single source of truth for the
+    /// card's DLSS 5 detection so card-build and setup-pane detection stay in sync.
+    /// <paramref name="useDeepResolve"/> enables the BFS <c>FindInstalledDeploymentPath</c> fallback; pass
+    /// <c>false</c> on the startup cache-load path where only the two cheap direct record reads should run.
+    /// </summary>
+    public void RefreshCardDlss5State(GameCardViewModel card, string? installPath, bool useDeepResolve = true)
+    {
+        if (string.IsNullOrEmpty(installPath) || !Directory.Exists(installPath))
+            return;
+
+        // A present game can always be set up for DLSS 5, so surface "Available" as the default; a found
+        // record promotes it to "Installed" below. This drives the primary library chip, so it stays a
+        // call-to-action instead of a dull "Not installed". On a post-remove refresh the record is gone,
+        // so the card correctly falls back to "Available".
+        card.Dlss5Status = GameStatus.Available;
+        card.HasComponentUpdate = false;
+        card.Dlss5InstalledLabel = null;
+        try
+        {
+            var dlss5Rec = Dlss5ComponentService.LoadRecord(installPath)
+                ?? Dlss5ComponentService.LoadRecord(ModInstallService.GetAddonDeployPath(installPath));
+            // Records are usually written under the *resolved* deployment folder (often an exe subfolder),
+            // not the raw install root. Use the same cached resolver the setup pane reaches through Probe,
+            // so the card doesn't read "Not installed" and then flip to "Installed" ~2s later.
+            if (dlss5Rec == null && useDeepResolve
+                && Dlss5ComponentService.FindInstalledDeploymentPath(installPath) is { } deployPath)
+                dlss5Rec = Dlss5ComponentService.LoadRecord(deployPath);
+            if (dlss5Rec != null)
+            {
+                card.Dlss5Status = GameStatus.Installed;
+                card.HasComponentUpdate = Dlss5ComponentService.IsComponentUpdateAvailable(dlss5Rec);
+                card.Dlss5InstalledLabel = "Active route: " + dlss5Rec.Profile
+                    + (string.IsNullOrWhiteSpace(dlss5Rec.ComponentVersion) ? "" : $" ({dlss5Rec.ComponentVersion})");
+            }
+        }
+        catch (Exception ex)
+        {
+            _crashReporter.Log($"[RefreshCardDlss5State] DLSS 5 record scan for '{card.GameName}' failed — {ex.Message}");
+        }
     }
 }

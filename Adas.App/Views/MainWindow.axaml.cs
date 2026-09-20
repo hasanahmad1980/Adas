@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         // Library toolbar
         RefreshButton.Click += OnRefresh;
         RescanButton.Click += OnRescan;
+        ScanFolderMenuItem.Click += OnAddFolder;
         EmptyScanButton.Click += OnRescan;
         UpdateButton.Click += OnUpdate;
         UpdateAllButton.Click += OnUpdateAll;
@@ -397,12 +398,18 @@ public partial class MainWindow : Window
                         deepFriedChicken: route.Value.DeepFriedChicken,
                         bridgeSubstitute: route.Value.BridgeSubstitute,
                         forceProfile: true, risksConfirmed: true);
-                    if (outcome.Ran) updated++;
+                    if (outcome.Ran)
+                    {
+                        updated++;
+                        // Refresh only this game's DLSS 5 state (re-reads its record) instead of rescanning
+                        // the whole library — the badge/count clears from the freshly-rewritten record.
+                        vm.RefreshCardDlss5State(card, card.InstallPath);
+                        card.NotifyAll();
+                    }
                 }
                 catch (Exception ex) { CrashReporter.Log($"[MainWindow.OnUpdateAll] {card.GameName} — {ex.Message}"); }
             }
 
-            try { await vm.RefreshAsync(); } catch { /* refresh best-effort */ }
             vm.StatusText = updated == stale.Count
                 ? $"Updated {updated} game(s)."
                 : $"Updated {updated} of {stale.Count} game(s); see the log for the rest.";
@@ -442,6 +449,51 @@ public partial class MainWindow : Window
         if (Vm is { } vm)
         {
             try { await vm.FullRefreshAsync(null); } catch (Exception ex) { vm.StatusText = $"Rescan failed: {ex.Message}"; }
+        }
+    }
+
+    /// <summary>
+    /// "Add a specific folder…" — lets the user pick one or more folders to add as games without a full
+    /// system scan. Each picked folder becomes a manually-added game (built in place via
+    /// <see cref="MainViewModel.AddManualGame"/>), so only the new cards are added — the library is not rescanned.
+    /// </summary>
+    private async void OnAddFolder(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm || StorageProvider is not { } sp) return;
+
+        try
+        {
+            var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+            {
+                Title = "Select one or more game folders",
+                AllowMultiple = true,
+            });
+            if (folders.Count == 0) return;
+
+            var added = 0;
+            foreach (var folder in folders)
+            {
+                var path = folder.Path.LocalPath;
+                if (string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(path)) continue;
+                var name = new System.IO.DirectoryInfo(path).Name;
+                if (string.IsNullOrWhiteSpace(name)) name = path;
+                vm.AddManualGame(new DetectedGame
+                {
+                    Name = name,
+                    InstallPath = path,
+                    Source = "Manual",
+                    IsManuallyAdded = true,
+                });
+                added++;
+            }
+
+            vm.StatusText = added == 0
+                ? "No folders added."
+                : added == 1 ? "Added 1 folder to your library." : $"Added {added} folders to your library.";
+        }
+        catch (Exception ex)
+        {
+            vm.StatusText = $"Add folder failed: {ex.Message}";
         }
     }
 

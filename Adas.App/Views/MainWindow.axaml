@@ -147,9 +147,17 @@
                                     <TextBlock Text="Refresh" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="RescanButton" Grid.Column="5" Classes="accent"
+                            <SplitButton x:Name="RescanButton" Grid.Column="5" Classes="accent"
                                     Content="Scan for games" AutomationProperties.Name="Scan the whole system for games"
-                                    TabIndex="6" ToolTip.Tip="Clear caches and re-scan the whole system" />
+                                    TabIndex="6" ToolTip.Tip="Clear caches and re-scan the whole system">
+                                <SplitButton.Flyout>
+                                    <MenuFlyout>
+                                        <MenuItem x:Name="ScanFolderMenuItem" Header="Add a specific folder…"
+                                                  AutomationProperties.Name="Add one or more game folders to your library"
+                                                  ToolTip.Tip="Pick one or more folders to add as games without a full system scan" />
+                                    </MenuFlyout>
+                                </SplitButton.Flyout>
+                            </SplitButton>
                         </Grid>
                     </Border>
 

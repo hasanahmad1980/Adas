@@ -141,7 +141,9 @@ public partial class HistoryPage : UserControl
             var outcome = await action(_main, owner, card, progress);
             if (outcome.Ran)
             {
-                try { await _main.RefreshAsync(); } catch { /* refresh best-effort */ }
+                // Refresh only the affected game's DLSS 5 state instead of rescanning the whole library.
+                _main.RefreshCardDlss5State(card, card.InstallPath);
+                card.NotifyAll();
                 await LoadAsync();
             }
             else
