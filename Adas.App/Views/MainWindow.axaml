@@ -111,7 +111,7 @@
                     <!-- Library toolbar: search · filters · count · refresh · scan -->
                     <Border Grid.Row="0" Padding="14,10" Background="{DynamicResource AdasSurfaceBrush}"
                             BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,0,1">
-                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
                             <TextBox x:Name="SearchBox" Grid.Column="0" Width="220" Watermark="Search games…"
                                      Text="{Binding SearchQuery, Mode=TwoWay}" VerticalAlignment="Center"
                                      AutomationProperties.Name="Search games" TabIndex="1" />
@@ -126,7 +126,18 @@
                             </StackPanel>
                             <TextBlock x:Name="LibraryCount" Grid.Column="2" Classes="muted" VerticalAlignment="Center"
                                        HorizontalAlignment="Right" Margin="12,0" />
-                            <Button x:Name="RefreshButton" Grid.Column="3" Classes="subtle" Margin="0,0,8,0"
+                            <Button x:Name="UpdateAllButton" Grid.Column="3" Classes="subtle" Margin="0,0,8,0"
+                                    IsVisible="False" AutomationProperties.Name="Update all games with an older component version"
+                                    ToolTip.Tip="Re-run the install for every game pinned to an older component version">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Path Data="{StaticResource IconDownload}" Fill="{DynamicResource AdasWarnBrush}"
+                                          Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                                    <TextBlock x:Name="UpdateAllText" Text="Update all" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AdasWarnBrush}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="RefreshButton" Grid.Column="4" Classes="subtle" Margin="0,0,8,0"
                                     AutomationProperties.Name="Re-check installed games" TabIndex="5"
                                     ToolTip.Tip="Re-check the games already in your library">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -136,7 +147,7 @@
                                     <TextBlock Text="Refresh" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="RescanButton" Grid.Column="4" Classes="accent"
+                            <Button x:Name="RescanButton" Grid.Column="5" Classes="accent"
                                     Content="Scan for games" AutomationProperties.Name="Scan the whole system for games"
                                     TabIndex="6" ToolTip.Tip="Clear caches and re-scan the whole system" />
                         </Grid>
@@ -204,6 +215,14 @@
                                                             IsVisible="{Binding IsDlss5Installed}">
                                                         <TextBlock Text="DLSS 5" Foreground="White" FontSize="12" FontWeight="SemiBold" />
                                                     </Border>
+                                                    <Border CornerRadius="5" Padding="9,4"
+                                                            Background="{DynamicResource AdasWarnBgStrongBrush}"
+                                                            BorderBrush="{DynamicResource AdasWarnBorderBrush}" BorderThickness="1"
+                                                            IsVisible="{Binding HasComponentUpdate}"
+                                                            ToolTip.Tip="Adas ships a newer component version than this install has.">
+                                                        <TextBlock Text="Update available" Foreground="{DynamicResource AdasWarnBrush}"
+                                                                   FontSize="12" FontWeight="SemiBold" />
+                                                    </Border>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -249,6 +268,67 @@
 
                 <!-- Secondary page host (Tools / Installed / Settings) -->
                 <ContentControl x:Name="PageHost" IsVisible="False" />
+
+                <!-- First-run onboarding (shown once, over the Library page) -->
+                <Border x:Name="FirstRunOverlay" IsVisible="False" Background="#D80E1116">
+                    <Border Classes="card" MaxWidth="640" Margin="24"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel Spacing="18">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Welcome to Adas" Classes="h1" />
+                                <TextBlock Classes="muted"
+                                           Text="Three steps to DLSS 5 neural rendering in your games." />
+                            </StackPanel>
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource AdasAccentBrush}"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="1" Foreground="White" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="We'll scan your games" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                   Text="Adas finds installed games from Steam, Epic, Xbox and more." />
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource AdasAccentBrush}"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="2" Foreground="White" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Pick a game and press Install" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                   Text="Adas chooses the recommended route and sets everything up." />
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource AdasAccentBrush}"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="3" Foreground="White" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Play, then press Verify" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                                   Text="Confirm DLSS 5 is working and share your result." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                                <Button x:Name="FirstRunDismissButton" Classes="ghost" Content="Skip"
+                                        AutomationProperties.Name="Dismiss the welcome guide" />
+                                <Button x:Name="FirstRunScanButton" Classes="accent" Content="Scan for games"
+                                        AutomationProperties.Name="Scan for games and dismiss the welcome guide" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Border>
             </Panel>
 
             <!-- Update banner (revealed when a newer Adas release is found) -->

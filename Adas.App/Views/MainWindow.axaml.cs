@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private bool _hasDriverWarning;
     private bool _overlayDismissed;
     private string _currentPage = "Library";
+    private int _updatableCount;
+    private bool _updatingAll;
 
     public MainWindow()
     {
@@ -44,6 +46,11 @@ public partial class MainWindow : Window
         RescanButton.Click += OnRescan;
         EmptyScanButton.Click += OnRescan;
         UpdateButton.Click += OnUpdate;
+        UpdateAllButton.Click += OnUpdateAll;
+
+        // First-run onboarding overlay.
+        FirstRunDismissButton.Click += (_, _) => DismissFirstRun();
+        FirstRunScanButton.Click += (_, _) => { DismissFirstRun(); OnRescan(this, new RoutedEventArgs()); };
 
         // Filter segments
         FilterAll.IsChecked = true;
@@ -200,6 +207,21 @@ public partial class MainWindow : Window
             var searching = !string.IsNullOrWhiteSpace(Vm?.SearchQuery);
             EmptyStateText.Text = searching ? "No games match your search" : "No games found";
         }
+
+        RefreshUpdateAllButton();
+    }
+
+    /// <summary>Shows "Update all (N)" when N games are pinned to a component version older than Adas ships.</summary>
+    private void RefreshUpdateAllButton()
+    {
+        var stale = 0;
+        if (Vm?.AllCards is { } cards)
+            foreach (var c in cards)
+                if (c.HasComponentUpdate) stale++;
+
+        _updatableCount = stale;
+        UpdateAllButton.IsVisible = stale > 0;
+        UpdateAllText.Text = stale == 1 ? "Update 1" : $"Update all ({stale})";
     }
 
     private void UpdateOverlay()
@@ -223,6 +245,9 @@ public partial class MainWindow : Window
         _initialized = true;
 
         _ = PopulateHealthBannerAsync();
+
+        try { if (!UiLayoutStore.LoadFirstRunDone()) FirstRunOverlay.IsVisible = true; }
+        catch { /* onboarding is best-effort */ }
 
         if (Vm is { } vm)
         {
@@ -321,6 +346,64 @@ public partial class MainWindow : Window
         {
             CrashReporter.Log($"[MainWindow.OnUpdate] {ex.Message}");
             UpdateButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Hides the first-run overlay and records that it has been seen.</summary>
+    private void DismissFirstRun()
+    {
+        FirstRunOverlay.IsVisible = false;
+        try { UiLayoutStore.SaveFirstRunDone(true); } catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Re-runs the DLSS 5 install (repair path) for every game whose recorded component version is older
+    /// than the one Adas now ships, so a user who updated Adas can bring all their installs current.
+    /// </summary>
+    private async void OnUpdateAll(object? sender, RoutedEventArgs e)
+    {
+        if (_updatingAll || Vm is not { } vm) return;
+
+        var stale = new System.Collections.Generic.List<GameCardViewModel>();
+        foreach (var c in vm.AllCards)
+            if (c.HasComponentUpdate) stale.Add(c);
+        if (stale.Count == 0) return;
+
+        var confirm = await DialogHost.ConfirmAsync(this, "Update all installs",
+            $"Adas will re-run the install for {stale.Count} game(s) pinned to an older component version. "
+            + "Each game's current route and settings are kept; this just refreshes the components to the versions Adas now ships.\n\n"
+            + "Close any of these games before continuing.",
+            primaryText: "Update all", closeText: "Cancel");
+        if (!confirm) return;
+
+        _updatingAll = true;
+        UpdateAllButton.IsEnabled = false;
+        var progress = new Progress<(string message, double percent)>(u => vm.StatusText = u.message);
+
+        try
+        {
+            var updated = 0;
+            foreach (var card in stale)
+            {
+                vm.SubStatusText = $"Updating {card.GameName}…";
+                try
+                {
+                    var outcome = await Dlss5Installer.RepairAsync(vm, this, card, progress);
+                    if (outcome.Ran) updated++;
+                }
+                catch (Exception ex) { CrashReporter.Log($"[MainWindow.OnUpdateAll] {card.GameName} — {ex.Message}"); }
+            }
+
+            try { await vm.RefreshAsync(); } catch { /* refresh best-effort */ }
+            vm.StatusText = updated == stale.Count
+                ? $"Updated {updated} game(s)."
+                : $"Updated {updated} of {stale.Count} game(s); see the log for the rest.";
+        }
+        finally
+        {
+            _updatingAll = false;
+            UpdateAllButton.IsEnabled = true;
+            RefreshUpdateAllButton();
         }
     }
 

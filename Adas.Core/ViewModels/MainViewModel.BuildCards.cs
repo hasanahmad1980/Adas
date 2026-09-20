@@ -1179,6 +1179,7 @@ public partial class MainViewModel
                     if (dlss5Rec != null)
                     {
                         newCard.Dlss5Status = GameStatus.Installed;
+                        newCard.HasComponentUpdate = Dlss5ComponentService.IsComponentUpdateAvailable(dlss5Rec);
                         newCard.Dlss5InstalledLabel = "Active route: " + dlss5Rec.Profile
                             + (string.IsNullOrWhiteSpace(dlss5Rec.ComponentVersion) ? "" : $" ({dlss5Rec.ComponentVersion})");
                     }

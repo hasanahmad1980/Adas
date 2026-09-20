@@ -108,6 +108,13 @@ public partial class GameCardViewModel : ObservableObject
     [ObservableProperty] private string? _dlss5InstalledLabel;
     public bool IsDlss5Installed => Dlss5Status == GameStatus.Installed;
 
+    /// <summary>
+    /// True when a DLSS 5 install is present but pinned to a component version older than the one Adas
+    /// now ships (per <see cref="RenoDXCommander.Services.Dlss5ComponentService.IsComponentUpdateAvailable"/>).
+    /// Drives the "Update available" card badge and the command-bar "Update all" action.
+    /// </summary>
+    [ObservableProperty] private bool _hasComponentUpdate;
+
     // ── DLL Naming Override ─────────────────────────────────────────────────────
     [ObservableProperty] private bool _dllOverrideEnabled = false;
 
