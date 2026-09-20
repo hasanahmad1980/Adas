@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -9,21 +8,21 @@ using Avalonia.Interactivity;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
 
-namespace Adas.App.Views;
+namespace Adas.App.Views.Pages;
 
 /// <summary>
-/// Installed overview ("History"): one row per game that currently has any Adas component deployed,
-/// with a per-component summary. The engine keeps no persisted swap-history log, so this is derived
-/// live from the card component flags plus a <see cref="Dlss5ComponentService.LoadRecord"/> probe for
-/// DLSS 5 neural installs. Avalonia rebuild of the WinUI Swapper-style history view.
+/// Installed overview page: one row per game that currently has any Adas component deployed, with a
+/// per-component summary. The engine keeps no persisted swap-history log, so this is derived live from
+/// the card component flags plus a <see cref="Dlss5ComponentService.LoadRecord"/> probe for DLSS 5
+/// neural installs. Hosted in the MainWindow page host.
 /// </summary>
-public partial class HistoryWindow : Window
+public partial class HistoryPage : UserControl
 {
     private readonly MainViewModel? _main;
 
-    public HistoryWindow() : this(null) { }
+    public HistoryPage() : this(null) { }
 
-    public HistoryWindow(MainViewModel? main)
+    public HistoryPage(MainViewModel? main)
     {
         InitializeComponent();
         _main = main;
@@ -40,10 +39,6 @@ public partial class HistoryWindow : Window
         foreach (var card in cards)
         {
             var flags = ComponentSummary(card);
-            if (string.IsNullOrEmpty(flags) && card.InstalledRecord is null)
-            {
-                // No component flag set — still worth probing for a DLSS 5 record below only if a path exists.
-            }
             snapshot.Add((card.GameName, card.Source, card.InstallPath, flags));
         }
 

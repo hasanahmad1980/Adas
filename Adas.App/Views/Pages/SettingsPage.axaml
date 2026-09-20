@@ -1,16 +1,12 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:RenoDXCommander.ViewModels"
-        x:Class="Adas.App.Views.SettingsWindow"
-        x:DataType="vm:SettingsViewModel"
-        Width="560" Height="680"
-        WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource AdasBackgroundBrush}"
-        Title="Adas — Settings">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RenoDXCommander.ViewModels"
+             x:Class="Adas.App.Views.Pages.SettingsPage"
+             x:DataType="vm:SettingsViewModel"
+             Background="{DynamicResource AdasBackgroundBrush}">
 
     <ScrollViewer Padding="22">
-        <StackPanel Spacing="16">
-            <TextBlock Text="Settings" Classes="h1" />
+        <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
 
             <Border Classes="card">
                 <StackPanel Spacing="10">
@@ -160,10 +156,7 @@
                 </StackPanel>
             </Border>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                <TextBlock x:Name="SavedHint" Classes="muted" VerticalAlignment="Center" Text="Changes are saved when you close this window." />
-                <Button x:Name="CloseButton" Classes="accent" Content="Done" />
-            </StackPanel>
+            <TextBlock Classes="muted" Text="Changes are saved automatically when you leave this page." />
         </StackPanel>
     </ScrollViewer>
-</Window>
+</UserControl>

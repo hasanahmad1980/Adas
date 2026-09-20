@@ -7,22 +7,21 @@ using RenoDXCommander.Abstractions;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
 
-namespace Adas.App.Views;
+namespace Adas.App.Views.Pages;
 
 /// <summary>
-/// Global settings editor. Binds two-way to the app's single <see cref="SettingsViewModel"/>
+/// Global settings editor page. Binds two-way to the app's single <see cref="SettingsViewModel"/>
 /// instance so edits mutate live state; the owning <see cref="MainViewModel"/> persists them via
-/// SaveSettingsPublic when the window closes. Avalonia rebuild of the WinUI Settings page: update
-/// channels + per-component skip flags, behaviour, shaders, ReShade/DXVK/OptiScaler defaults, the
-/// frame limiter, screenshots, HDR/resolution, Nexus, and diagnostics.
+/// SaveSettingsPublic when the user navigates away from this page (MainWindow.NavigateTo). Hosted in
+/// the MainWindow page host.
 /// </summary>
-public partial class SettingsWindow : Window
+public partial class SettingsPage : UserControl
 {
     private readonly MainViewModel? _main;
 
-    public SettingsWindow() : this(null) { }
+    public SettingsPage() : this(null) { }
 
-    public SettingsWindow(MainViewModel? main)
+    public SettingsPage(MainViewModel? main)
     {
         InitializeComponent();
         _main = main;
@@ -35,8 +34,6 @@ public partial class SettingsWindow : Window
 
         AddonsButton.Click += OnChooseAddons;
         ScreenshotFolderButton.Click += OnChooseScreenshotFolder;
-        CloseButton.Click += OnClose;
-        Closed += (_, _) => _main?.SaveSettingsPublic();
 
         UpdateAddonsHint();
 
@@ -49,11 +46,11 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnClose(object? sender, RoutedEventArgs e) => Close();
+    private Window? OwnerWindow => TopLevel.GetTopLevel(this) as Window;
 
     private async void OnChooseScreenshotFolder(object? sender, RoutedEventArgs e)
     {
-        if (_main is null || StorageProvider is not { } sp) return;
+        if (_main is null || TopLevel.GetTopLevel(this)?.StorageProvider is not { } sp) return;
         var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
         {
             Title = "Select the screenshot folder",
@@ -65,11 +62,11 @@ public partial class SettingsWindow : Window
 
     private async void OnChooseAddons(object? sender, RoutedEventArgs e)
     {
-        if (_main is null) return;
+        if (_main is null || OwnerWindow is not { } owner) return;
         var svc = AppServices.Services.GetService<IAddonPackService>();
         if (svc is null) { AddonsHint.Text = "Add-on service unavailable."; return; }
 
-        var result = await AddonSelectionDialog.ShowAsync(this, svc, _main.Settings.EnabledGlobalAddons);
+        var result = await AddonSelectionDialog.ShowAsync(owner, svc, _main.Settings.EnabledGlobalAddons);
         if (result is null) return; // cancelled
 
         _main.Settings.EnabledGlobalAddons = result;

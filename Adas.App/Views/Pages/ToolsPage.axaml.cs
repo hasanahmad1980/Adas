@@ -1,30 +1,31 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Abstractions;
 using RenoDXCommander.Services;
 using RenoDXCommander.ViewModels;
 
-namespace Adas.App.Views;
+namespace Adas.App.Views.Pages;
 
 /// <summary>
-/// Standalone Tools window: NeuralScreen launch, Universal MFG unlock into the selected game,
-/// and a savable diagnostics report. Reuses the engine services directly — no VM coupling — so
-/// these paths match what the retired WinUI shell exposed.
+/// Tools page: NeuralScreen launch, Universal MFG unlock into the selected game, and a savable
+/// diagnostics report. Reuses the engine services directly — no VM coupling — so these paths match
+/// what the retired WinUI shell exposed. Hosted in the MainWindow page host; owner-window lookups go
+/// through <see cref="TopLevel.GetTopLevel"/> instead of <c>this</c>.
 /// </summary>
-public partial class ToolsWindow : Window
+public partial class ToolsPage : UserControl
 {
     private readonly MainViewModel? _main;
     private string? _lastReport;
 
-    public ToolsWindow() : this(null) { }
+    public ToolsPage() : this(null) { }
 
-    public ToolsWindow(MainViewModel? main)
+    public ToolsPage(MainViewModel? main)
     {
         InitializeComponent();
         _main = main;
@@ -48,6 +49,8 @@ public partial class ToolsWindow : Window
             MfgButton.IsEnabled = false;
         }
     }
+
+    private Window? OwnerWindow => TopLevel.GetTopLevel(this) as Window;
 
     private async void OnNeuralScreen(object? sender, RoutedEventArgs e)
     {
@@ -73,8 +76,8 @@ public partial class ToolsWindow : Window
         {
             var warnings = await Task.Run(() => Dlss5ComponentService.FullScreenWrapperWarnings(
                 Dlss5CompatibilityService.DetectedGpuName, Dlss5CompatibilityService.DetectedDriverVersion));
-            if (warnings.Count > 0
-                && !await Shell.DialogHost.ConfirmAsync(this, "Launch Full-Screen Wrapper?",
+            if (warnings.Count > 0 && OwnerWindow is { } owner
+                && !await Shell.DialogHost.ConfirmAsync(owner, "Launch Full-Screen Wrapper?",
                     string.Join("\n\n", warnings.Select(w => "⚠ " + w)), "Launch anyway", "Cancel"))
             {
                 Output.Text = "Cancelled.";
@@ -119,8 +122,8 @@ public partial class ToolsWindow : Window
     private async void OnMfgRemove(object? sender, RoutedEventArgs e)
     {
         var card = _main?.SelectedGame;
-        if (card is null || _mfgPlan?.TargetFolder is not { } dir) return;
-        var guard = await Shell.GameCloseGuard.EnsureClosedAsync(this, card.GameName, dir);
+        if (card is null || _mfgPlan?.TargetFolder is not { } dir || OwnerWindow is not { } owner) return;
+        var guard = await Shell.GameCloseGuard.EnsureClosedAsync(owner, card.GameName, dir);
         if (!guard.CanProceed) { Output.Text = guard.Error ?? "Cancelled."; return; }
         var svc = AppServices.Services.GetService<RtxMfgUnlockService>();
         Output.Text = svc?.Uninstall(dir) == true ? "Universal MFG unlock removed; any original file restored." : "Removal failed — see log.";
@@ -143,8 +146,8 @@ public partial class ToolsWindow : Window
             Output.Text = "No free proxy filename was found for this game; nothing was installed.";
             return;
         }
-        if (plan.Warnings.Count > 0
-            && !await Shell.DialogHost.ConfirmAsync(this, "Install Universal MFG unlock?",
+        if (plan.Warnings.Count > 0 && OwnerWindow is { } warnOwner
+            && !await Shell.DialogHost.ConfirmAsync(warnOwner, "Install Universal MFG unlock?",
                 string.Join("\n\n", plan.Warnings), "Install anyway", "Cancel"))
         {
             Output.Text = "Cancelled.";
@@ -152,7 +155,8 @@ public partial class ToolsWindow : Window
         }
         folder = target;
 
-        var guard = await Shell.GameCloseGuard.EnsureClosedAsync(this, card!.GameName, folder);
+        if (OwnerWindow is not { } owner) return;
+        var guard = await Shell.GameCloseGuard.EnsureClosedAsync(owner, card!.GameName, folder);
         if (!guard.CanProceed)
         {
             Output.Text = guard.Error ?? "Cancelled.";
@@ -198,9 +202,10 @@ public partial class ToolsWindow : Window
     private async void OnSaveDiagnostics(object? sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(_lastReport)) return;
+        if (TopLevel.GetTopLevel(this)?.StorageProvider is not { } storage) return;
         try
         {
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Save diagnostics report",
                 SuggestedFileName = $"adas-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt",

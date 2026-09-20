@@ -10,178 +10,273 @@
         Icon="/icon.ico"
         Title="Adas — DLSS 5 neural rendering">
 
-    <Grid RowDefinitions="Auto,Auto,*">
+    <!-- Single-window shell (Phase B): a left icon nav rail drives a page host. The Library page keeps
+         the library list + per-game setup split; Tools/History/Settings load as pages into PageHost. -->
+    <Grid ColumnDefinitions="Auto,*">
 
-        <!-- ── Header ─────────────────────────────────────────────── -->
-        <Border Grid.Row="0" Padding="20,16" Background="{DynamicResource AdasSurfaceBrush}"
-                BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,0,1">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Border Width="34" Height="34" CornerRadius="8" Background="{DynamicResource AdasAccentBrush}">
-                        <TextBlock Text="A" FontSize="20" FontWeight="Bold" Foreground="White"
+        <!-- ── Nav rail ───────────────────────────────────────────────────── -->
+        <Border Grid.Column="0" Width="84" Background="{DynamicResource AdasSurfaceBrush}"
+                BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="False">
+                <!-- App mark -->
+                <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,16,0,18" HorizontalAlignment="Center">
+                    <Border Width="40" Height="40" CornerRadius="10" Background="{DynamicResource AdasAccentBrush}">
+                        <TextBlock Text="A" FontSize="22" FontWeight="Bold" Foreground="White"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Adas" Classes="h1" />
-                            <TextBlock x:Name="VersionText" Classes="muted" VerticalAlignment="Bottom"
-                                       Margin="0,0,0,3" />
+                    <TextBlock x:Name="VersionText" Classes="caption" HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Nav items -->
+                <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="8,0">
+                    <ToggleButton x:Name="LibraryNav" Classes="rail" AutomationProperties.Name="Library" TabIndex="1">
+                        <StackPanel Spacing="4">
+                            <Path Data="{StaticResource IconLibrary}" Fill="{Binding $parent[ToggleButton].Foreground}"
+                                  Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center"
+                                  AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock Text="Library" FontSize="11" HorizontalAlignment="Center"
+                                       Foreground="{Binding $parent[ToggleButton].Foreground}" />
                         </StackPanel>
-                        <TextBlock Text="Automatic DLSS 5 neural-rendering setup" Classes="muted" />
-                    </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="ToolsNav" Classes="rail" AutomationProperties.Name="Tools" TabIndex="2">
+                        <StackPanel Spacing="4">
+                            <Path Data="{StaticResource IconTools}" Fill="{Binding $parent[ToggleButton].Foreground}"
+                                  Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center"
+                                  AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock Text="Tools" FontSize="11" HorizontalAlignment="Center"
+                                       Foreground="{Binding $parent[ToggleButton].Foreground}" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="HistoryNav" Classes="rail" AutomationProperties.Name="Installed overview" TabIndex="3">
+                        <StackPanel Spacing="4">
+                            <Path Data="{StaticResource IconHistory}" Fill="{Binding $parent[ToggleButton].Foreground}"
+                                  Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center"
+                                  AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock Text="Installed" FontSize="11" HorizontalAlignment="Center"
+                                       Foreground="{Binding $parent[ToggleButton].Foreground}" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton x:Name="SettingsNav" Classes="rail" AutomationProperties.Name="Settings" TabIndex="4">
+                        <StackPanel Spacing="4">
+                            <Path Data="{StaticResource IconSettings}" Fill="{Binding $parent[ToggleButton].Foreground}"
+                                  Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center"
+                                  AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock Text="Settings" FontSize="11" HorizontalAlignment="Center"
+                                       Foreground="{Binding $parent[ToggleButton].Foreground}" />
+                        </StackPanel>
+                    </ToggleButton>
                 </StackPanel>
-
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                    <TextBox x:Name="SearchBox" Width="220" Watermark="Search games…"
-                             Text="{Binding SearchQuery, Mode=TwoWay}"
-                             VerticalAlignment="Center" />
-                    <Button x:Name="UpdateButton" Content="⬆ Update" Classes="accent" IsVisible="False"
-                            ToolTip.Tip="A newer version of Adas is available" />
-                    <ToggleButton Content="Hidden" Classes="subtle"
-                                  IsChecked="{Binding Filter.ShowHidden, Mode=TwoWay}"
-                                  ToolTip.Tip="Show games you've hidden from the list" />
-                    <Button x:Name="SettingsButton" Content="Settings" Classes="subtle" />
-                    <Button x:Name="ToolsButton" Content="Tools" Classes="subtle" />
-                    <Button x:Name="HistoryButton" Content="History" Classes="subtle" />
-                    <Button x:Name="RefreshButton" Content="↻ Refresh" Classes="subtle" />
-                    <Button x:Name="RescanButton" Content="Full rescan" Classes="accent" />
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- ── Health banner ──────────────────────────────────────── -->
-        <Border Grid.Row="1" x:Name="HealthBanner" Padding="20,10"
-                Background="{DynamicResource AdasSurfaceAltBrush}"
-                BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6"
-                            VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="GPU" Classes="muted" VerticalAlignment="Center" />
-                    <TextBlock x:Name="GpuText" Text="—" Foreground="{DynamicResource AdasTextPrimaryBrush}"
-                               FontWeight="SemiBold" VerticalAlignment="Center" />
-                </StackPanel>
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6"
-                            VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="Driver" Classes="muted" VerticalAlignment="Center" />
-                    <TextBlock x:Name="DriverText" Text="—" Foreground="{DynamicResource AdasTextPrimaryBrush}"
-                               FontWeight="SemiBold" VerticalAlignment="Center" />
-                </StackPanel>
-                <!-- Fills remaining width so the (long) warning wraps instead of clipping off-screen. -->
-                <Border x:Name="DriverWarnBadge" IsVisible="False" CornerRadius="5" Padding="8,3"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource AdasWarnBgStrongBrush}" BorderBrush="{DynamicResource AdasWarnBrush}" BorderThickness="1">
-                    <TextBlock x:Name="DriverWarnText" Foreground="{DynamicResource AdasWarnBrush}" FontSize="12"
-                               TextWrapping="Wrap" />
-                </Border>
             </DockPanel>
         </Border>
 
-        <!-- ── Body: library + detail ─────────────────────────────── -->
-        <!-- Equal-growth star columns: extra window width splits 50/50 by default; the GridSplitter
-             lets the user set a custom split, which MainWindow persists and restores next launch. -->
-        <Grid Grid.Row="2" x:Name="BodyGrid">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="340" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" MinWidth="340" />
-            </Grid.ColumnDefinitions>
+        <!-- ── Content column ─────────────────────────────────────────────── -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
 
-            <!-- Library list -->
-            <Grid Grid.Column="0" RowDefinitions="*,Auto">
-                <ListBox x:Name="GamesList" Grid.Row="0" Margin="14"
-                         Background="Transparent" BorderThickness="0"
-                         ItemsSource="{Binding DisplayedGames}"
-                         SelectedItem="{Binding SelectedGame, Mode=TwoWay}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:GameCardViewModel">
-                            <Border Classes="card" Margin="0,0,0,8">
-                                <Border.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="{Binding HideButtonLabel}" Click="OnHideGameClick" />
-                                    </ContextMenu>
-                                </Border.ContextMenu>
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <!-- Cover art (Steam library portrait), hidden until fetched -->
-                                    <Border Grid.Column="0" Width="46" Height="66" CornerRadius="4"
-                                            Margin="0,0,12,0" ClipToBounds="True" Background="{DynamicResource AdasBackgroundBrush}"
-                                            IsVisible="{Binding HasArtwork}">
-                                        <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
-                                               Stretch="UniformToFill" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding GameName}" Classes="h2" />
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock Text="{Binding Source}" Classes="muted"
-                                                       VerticalAlignment="Center" />
-                                            <!-- Detected graphics API + process bitness, accurate from the scan -->
-                                            <Border CornerRadius="4" Padding="6,1" Background="{DynamicResource AdasChipBgBrush}"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding HasGraphicsApiBadge}">
-                                                <StackPanel Orientation="Horizontal" Spacing="5">
-                                                    <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="11"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource AdasAccentBrush}" />
-                                                    <TextBlock Text="{Binding BitnessLabel}" FontSize="11"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+            <!-- Top strip: page title + health pill -->
+            <Border Grid.Row="0" Padding="20,14" Background="{DynamicResource AdasSurfaceBrush}"
+                    BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="PageTitle" Grid.Column="0" Text="Library" Classes="h1"
+                               VerticalAlignment="Center" />
+                    <!-- Health pill: GPU · driver, click to reveal a driver warning if present. -->
+                    <Button x:Name="HealthPill" Grid.Column="1" Classes="ghost" Padding="12,6"
+                            AutomationProperties.Name="System health: GPU and driver">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Ellipse x:Name="HealthDot" Width="9" Height="9"
+                                     Fill="{DynamicResource AdasGoodBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="GpuText" Text="—" Foreground="{DynamicResource AdasTextPrimaryBrush}"
+                                       FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="·" Classes="muted" VerticalAlignment="Center" />
+                            <TextBlock x:Name="DriverText" Text="—" Foreground="{DynamicResource AdasTextSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Driver warning (revealed from the health pill) -->
+            <Border Grid.Row="1" x:Name="DriverWarnBadge" IsVisible="False" Padding="20,10"
+                    Background="{DynamicResource AdasWarnBgStrongBrush}"
+                    BorderBrush="{DynamicResource AdasWarnBorderBrush}" BorderThickness="0,0,0,1">
+                <TextBlock x:Name="DriverWarnText" Foreground="{DynamicResource AdasWarnBrush}" FontSize="12"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <!-- Content host -->
+            <Panel Grid.Row="2">
+
+                <!-- Library page -->
+                <Grid x:Name="LibraryRoot" RowDefinitions="Auto,*">
+
+                    <!-- Library toolbar: search · filters · count · refresh · scan -->
+                    <Border Grid.Row="0" Padding="14,10" Background="{DynamicResource AdasSurfaceBrush}"
+                            BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                            <TextBox x:Name="SearchBox" Grid.Column="0" Width="220" Watermark="Search games…"
+                                     Text="{Binding SearchQuery, Mode=TwoWay}" VerticalAlignment="Center"
+                                     AutomationProperties.Name="Search games" TabIndex="1" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="12,0,0,0"
+                                        VerticalAlignment="Center">
+                                <ToggleButton x:Name="FilterAll" Classes="segment" Content="All"
+                                              AutomationProperties.Name="Show all games" TabIndex="2" />
+                                <ToggleButton x:Name="FilterInstalled" Classes="segment" Content="Installed"
+                                              AutomationProperties.Name="Show installed games" TabIndex="3" />
+                                <ToggleButton x:Name="FilterHidden" Classes="segment" Content="Hidden"
+                                              AutomationProperties.Name="Show hidden games" TabIndex="4" />
+                            </StackPanel>
+                            <TextBlock x:Name="LibraryCount" Grid.Column="2" Classes="muted" VerticalAlignment="Center"
+                                       HorizontalAlignment="Right" Margin="12,0" />
+                            <Button x:Name="RefreshButton" Grid.Column="3" Classes="subtle" Margin="0,0,8,0"
+                                    AutomationProperties.Name="Re-check installed games" TabIndex="5"
+                                    ToolTip.Tip="Re-check the games already in your library">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Path Data="{StaticResource IconRefresh}" Fill="{DynamicResource AdasTextPrimaryBrush}"
+                                          Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                                    <TextBlock Text="Refresh" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="RescanButton" Grid.Column="4" Classes="accent"
+                                    Content="Scan for games" AutomationProperties.Name="Scan the whole system for games"
+                                    TabIndex="6" ToolTip.Tip="Clear caches and re-scan the whole system" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Body: library list + detail -->
+                    <Grid Grid.Row="1" x:Name="BodyGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="340" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" MinWidth="340" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Library list -->
+                        <Grid Grid.Column="0" RowDefinitions="*,Auto">
+                            <ListBox x:Name="GamesList" Grid.Row="0" Margin="14"
+                                     Background="Transparent" BorderThickness="0"
+                                     ItemsSource="{Binding DisplayedGames}"
+                                     SelectedItem="{Binding SelectedGame, Mode=TwoWay}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:GameCardViewModel">
+                                        <Border Classes="card" Margin="0,0,0,8">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="{Binding HideButtonLabel}" Click="OnHideGameClick" />
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <!-- Cover art (Steam library portrait), hidden until fetched -->
+                                                <Border Grid.Column="0" Width="46" Height="66" CornerRadius="4"
+                                                        Margin="0,0,12,0" ClipToBounds="True" Background="{DynamicResource AdasBackgroundBrush}"
+                                                        IsVisible="{Binding HasArtwork}">
+                                                    <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
+                                                           Stretch="UniformToFill" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding GameName}" Classes="h2" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="{Binding Source}" Classes="muted"
+                                                                   VerticalAlignment="Center" />
+                                                        <Border CornerRadius="4" Padding="6,1" Background="{DynamicResource AdasChipBgBrush}"
+                                                                VerticalAlignment="Center"
+                                                                IsVisible="{Binding HasGraphicsApiBadge}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="11"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource AdasAccentBrush}" />
+                                                                <TextBlock Text="{Binding BitnessLabel}" FontSize="11"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted"
+                                                               TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
-                                            </Border>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4"
-                                                HorizontalAlignment="Right">
-                                        <!-- Primary chip = DLSS 5 status (this is a DLSS-5 app), so it matches
-                                             the setup pane. The RenoDX-only `Status` is no longer shown here. -->
-                                        <Border CornerRadius="5" Padding="9,4"
-                                                Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
-                                            <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
-                                                       Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4"
+                                                            HorizontalAlignment="Right">
+                                                    <Border CornerRadius="5" Padding="9,4"
+                                                            Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
+                                                        <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
+                                                                   Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <Border CornerRadius="5" Padding="9,4" Background="{DynamicResource AdasAccentBrush}"
+                                                            IsVisible="{Binding IsDlss5Installed}">
+                                                        <TextBlock Text="DLSS 5" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
                                         </Border>
-                                        <Border CornerRadius="5" Padding="9,4" Background="#2A6FDB"
-                                                IsVisible="{Binding IsDlss5Installed}">
-                                            <TextBlock Text="DLSS 5" Foreground="White" FontSize="12" FontWeight="SemiBold" />
-                                        </Border>
-                                    </StackPanel>
-                                </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <!-- Empty state (shown when the filtered list is empty) -->
+                            <StackPanel x:Name="EmptyState" Grid.Row="0" IsVisible="False" Spacing="10"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconLibrary}" Fill="{DynamicResource AdasTextSecondaryBrush}"
+                                      Width="40" Height="40" Stretch="Uniform" HorizontalAlignment="Center"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                                <TextBlock x:Name="EmptyStateText" Text="No games found" Classes="h2"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="Scan your system to build the library." Classes="muted"
+                                           HorizontalAlignment="Center" />
+                                <Button x:Name="EmptyScanButton" Classes="accent" Content="Scan for games"
+                                        HorizontalAlignment="Center" />
+                            </StackPanel>
+
+                            <Border Grid.Row="1" Padding="18,10" Background="{DynamicResource AdasSurfaceBrush}"
+                                    BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,1,0,0">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource AdasTextPrimaryBrush}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding SubStatusText}" Classes="muted" VerticalAlignment="Center" />
+                                </StackPanel>
                             </Border>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                        </Grid>
 
-                <Border Grid.Row="1" Padding="18,10" Background="{DynamicResource AdasSurfaceBrush}"
-                        BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,1,0,0">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource AdasTextPrimaryBrush}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding SubStatusText}" Classes="muted" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
-            </Grid>
+                        <GridSplitter Grid.Column="1" x:Name="BodySplitter" Width="6"
+                                      Background="{DynamicResource AdasBorderBrush}"
+                                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                      ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" />
 
-            <!-- Draggable divider between library and detail. -->
-            <GridSplitter Grid.Column="1" x:Name="BodySplitter" Width="6"
-                          Background="{DynamicResource AdasBorderBrush}"
-                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" />
+                        <Border Grid.Column="2" Background="{DynamicResource AdasSurfaceBrush}"
+                                BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="1,0,0,0">
+                            <views:GameSetupView x:Name="SetupView" DataContext="{Binding SelectedGame}" />
+                        </Border>
+                    </Grid>
+                </Grid>
 
-            <!-- Detail / per-game setup -->
-            <Border Grid.Column="2" Background="{DynamicResource AdasSurfaceBrush}"
-                    BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="1,0,0,0">
-                <views:GameSetupView x:Name="SetupView" DataContext="{Binding SelectedGame}" />
+                <!-- Secondary page host (Tools / Installed / Settings) -->
+                <ContentControl x:Name="PageHost" IsVisible="False" />
+            </Panel>
+
+            <!-- Update banner (revealed when a newer Adas release is found) -->
+            <Border Grid.Row="0" x:Name="UpdateBanner" IsVisible="False" VerticalAlignment="Top"
+                    Padding="20,8" Background="{DynamicResource AdasInfoBgBrush}"
+                    BorderBrush="{DynamicResource AdasAccentBrush}" BorderThickness="0,0,0,2">
+                <DockPanel LastChildFill="False">
+                    <TextBlock x:Name="UpdateBannerText" DockPanel.Dock="Left" VerticalAlignment="Center"
+                               Foreground="{DynamicResource AdasTextPrimaryBrush}"
+                               Text="A newer version of Adas is available." />
+                    <Button x:Name="UpdateButton" DockPanel.Dock="Right" Classes="accent"
+                            Content="Update" AutomationProperties.Name="Download and install the update" />
+                </DockPanel>
+            </Border>
+
+            <!-- Loading overlay (dismissible; work continues, status shows in the bottom strip) -->
+            <Border Grid.Row="0" Grid.RowSpan="3" x:Name="LoadingOverlay" IsVisible="False"
+                    Background="#B00E1116">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+                    <ProgressBar IsIndeterminate="True" Width="220" />
+                    <TextBlock Text="{Binding StatusText}" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding SubStatusText}" Classes="muted" HorizontalAlignment="Center" />
+                    <Button x:Name="DismissOverlayButton" Classes="ghost" Content="Continue in background"
+                            HorizontalAlignment="Center"
+                            AutomationProperties.Name="Hide this overlay and keep working while the scan finishes" />
+                </StackPanel>
             </Border>
         </Grid>
-
-        <!-- ── Loading overlay ────────────────────────────────────── -->
-        <Border Grid.Row="0" Grid.RowSpan="3" IsVisible="{Binding IsLoading}"
-                Background="#B00E1116">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
-                <ProgressBar IsIndeterminate="True" Width="220" />
-                <TextBlock Text="{Binding StatusText}" HorizontalAlignment="Center"
-                           Foreground="{DynamicResource AdasTextPrimaryBrush}" />
-                <TextBlock Text="{Binding SubStatusText}" Classes="muted" HorizontalAlignment="Center" />
-            </StackPanel>
-        </Border>
     </Grid>
 </Window>

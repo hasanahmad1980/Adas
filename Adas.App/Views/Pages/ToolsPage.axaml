@@ -1,14 +1,10 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="Adas.App.Views.ToolsWindow"
-        Width="620" Height="620"
-        WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource AdasBackgroundBrush}"
-        Title="Adas — Tools">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Adas.App.Views.Pages.ToolsPage"
+             Background="{DynamicResource AdasBackgroundBrush}">
 
     <ScrollViewer Padding="22">
         <StackPanel Spacing="16">
-            <TextBlock Text="Tools" Classes="h1" />
 
             <Border Classes="card">
                 <StackPanel Spacing="10">
@@ -59,4 +55,4 @@
             <SelectableTextBlock x:Name="Output" Classes="muted" TextWrapping="Wrap" />
         </StackPanel>
     </ScrollViewer>
-</Window>
+</UserControl>

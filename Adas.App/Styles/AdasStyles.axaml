@@ -64,6 +64,26 @@
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
+    <!-- Nav-rail item: vertical icon + label, accent-tinted when selected -->
+    <Style Selector="ToggleButton.rail">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AdasTextSecondaryBrush}" />
+        <Setter Property="Padding" Value="0,10" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AdasRadiusSm}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.rail:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AdasSurfaceAltBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.rail:checked">
+        <Setter Property="Foreground" Value="{DynamicResource AdasAccentBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.rail:checked /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AdasSurfaceAltBrush}" />
+    </Style>
+
     <!-- Segmented toggle (Simple/Advanced, library filters) -->
     <Style Selector="ToggleButton.segment">
         <Setter Property="Background" Value="Transparent" />
