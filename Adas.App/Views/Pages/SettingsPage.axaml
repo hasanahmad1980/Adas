@@ -5,158 +5,192 @@
              x:DataType="vm:SettingsViewModel"
              Background="{DynamicResource AdasBackgroundBrush}">
 
-    <ScrollViewer Padding="22">
-        <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
+    <Grid ColumnDefinitions="200,*" RowDefinitions="*,Auto">
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Updates" Classes="h2" />
-                    <CheckBox Content="Skip the app update check on launch" IsChecked="{Binding SkipUpdateCheck, Mode=TwoWay}" />
-                    <CheckBox Content="Opt in to beta / pre-release builds" IsChecked="{Binding BetaOptIn, Mode=TwoWay}" />
-                    <CheckBox Content="Auto-update installed components" IsChecked="{Binding AutoUpdateComponents, Mode=TwoWay}" />
-                    <CheckBox Content="Auto-update DLSS DLLs" IsChecked="{Binding AutoUpdateDlss, Mode=TwoWay}" />
-                    <CheckBox Content="Auto-update Streamline" IsChecked="{Binding AutoUpdateStreamline, Mode=TwoWay}" />
-                </StackPanel>
-            </Border>
+        <!-- Sub-nav: jumps to a section in the scrolling detail pane. -->
+        <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource AdasSurfaceBrush}"
+                BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,0,1,0">
+            <ListBox x:Name="SubNav" Background="Transparent" BorderThickness="0" Margin="8"
+                     AutomationProperties.Name="Settings sections">
+                <ListBoxItem Content="Updates" />
+                <ListBoxItem Content="Behaviour" />
+                <ListBoxItem Content="Shaders" />
+                <ListBoxItem Content="Defaults" />
+                <ListBoxItem Content="OptiScaler" />
+                <ListBoxItem Content="Skip updates" />
+                <ListBoxItem Content="HDR &amp; resolution" />
+                <ListBoxItem Content="Frame limiter" />
+                <ListBoxItem Content="Screenshots" />
+                <ListBoxItem Content="Nexus Mods" />
+                <ListBoxItem Content="Diagnostics" />
+            </ListBox>
+        </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Behaviour" Classes="h2" />
-                    <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
-                    <CheckBox Content="Close to system tray" IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
-                    <CheckBox Content="Show recent games menu" IsChecked="{Binding RecentGamesMenu, Mode=TwoWay}" />
-                    <CheckBox Content="Show the drag-and-drop helper" IsChecked="{Binding DropHelperEnabled, Mode=TwoWay}" />
-                </StackPanel>
-            </Border>
+        <ScrollViewer x:Name="DetailScroll" Grid.Row="0" Grid.Column="1" Padding="22">
+            <StackPanel Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Shaders" Classes="h2" />
-                    <CheckBox Content="Use a custom shader selection" IsChecked="{Binding UseCustomShaders, Mode=TwoWay}" />
-                    <CheckBox Content="Disable global shaders" IsChecked="{Binding GlobalShadersOff, Mode=TwoWay}" />
-                    <CheckBox Content="Cache all shaders locally" IsChecked="{Binding CacheAllShaders, Mode=TwoWay}" />
-                    <CheckBox Content="Group ReShade effect files with tabs instead of a tree" IsChecked="{Binding RsVariableListUseTabs, Mode=TwoWay}" />
-                    <Button x:Name="AddonsButton" Classes="subtle" Content="RenoDX add-ons…" HorizontalAlignment="Left" />
-                    <TextBlock x:Name="AddonsHint" Classes="muted" TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Defaults" Classes="h2" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="ReShade channel" Classes="muted" />
-                        <ComboBox x:Name="ReShadeChannelCombo" HorizontalAlignment="Stretch"
-                                  SelectedItem="{Binding ReShadeChannel, Mode=TwoWay}" />
+                <Border x:Name="SecUpdates" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Updates" Classes="h2" />
+                        <CheckBox Content="Skip the app update check on launch" IsChecked="{Binding SkipUpdateCheck, Mode=TwoWay}" />
+                        <CheckBox Content="Opt in to beta / pre-release builds" IsChecked="{Binding BetaOptIn, Mode=TwoWay}" />
+                        <CheckBox Content="Auto-update installed components" IsChecked="{Binding AutoUpdateComponents, Mode=TwoWay}" />
+                        <CheckBox Content="Auto-update DLSS DLLs" IsChecked="{Binding AutoUpdateDlss, Mode=TwoWay}" />
+                        <CheckBox Content="Auto-update Streamline" IsChecked="{Binding AutoUpdateStreamline, Mode=TwoWay}" />
                     </StackPanel>
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="DXVK variant" Classes="muted" />
-                        <ComboBox x:Name="DxvkVariantCombo" HorizontalAlignment="Stretch"
-                                  SelectedItem="{Binding DxvkVariant, Mode=TwoWay}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="OptiScaler defaults" Classes="h2" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="GPU type" Classes="muted" />
-                        <ComboBox x:Name="OsGpuTypeCombo" HorizontalAlignment="Stretch"
-                                  SelectedItem="{Binding OsGpuType, Mode=TwoWay}" />
+                <Border x:Name="SecBehaviour" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Behaviour" Classes="h2" />
+                        <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
+                        <CheckBox Content="Close to system tray" IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
+                        <CheckBox Content="Show recent games menu" IsChecked="{Binding RecentGamesMenu, Mode=TwoWay}" />
+                        <CheckBox Content="Show the drag-and-drop helper" IsChecked="{Binding DropHelperEnabled, Mode=TwoWay}" />
                     </StackPanel>
-                    <CheckBox Content="Use DLSS inputs" IsChecked="{Binding OsDlssInputs, Mode=TwoWay}" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Overlay hotkey" Classes="muted" />
-                        <TextBox Text="{Binding OsHotkey, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Skip updates per component" Classes="h2" />
-                    <CheckBox Content="RenoDX" IsChecked="{Binding GlobalSkipRdxUpdates, Mode=TwoWay}" />
-                    <CheckBox Content="ReShade" IsChecked="{Binding GlobalSkipRsUpdates, Mode=TwoWay}" />
-                    <CheckBox Content="ReLimiter" IsChecked="{Binding GlobalSkipUlUpdates, Mode=TwoWay}" />
-                    <CheckBox Content="Display Commander" IsChecked="{Binding GlobalSkipDcUpdates, Mode=TwoWay}" />
-                    <CheckBox Content="OptiScaler" IsChecked="{Binding GlobalSkipOsUpdates, Mode=TwoWay}" />
-                    <CheckBox Content="REFramework" IsChecked="{Binding GlobalSkipRefUpdates, Mode=TwoWay}" />
-                </StackPanel>
-            </Border>
+                <Border x:Name="SecShaders" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Shaders" Classes="h2" />
+                        <CheckBox Content="Use a custom shader selection" IsChecked="{Binding UseCustomShaders, Mode=TwoWay}" />
+                        <CheckBox Content="Disable global shaders" IsChecked="{Binding GlobalShadersOff, Mode=TwoWay}" />
+                        <CheckBox Content="Cache all shaders locally" IsChecked="{Binding CacheAllShaders, Mode=TwoWay}" />
+                        <CheckBox Content="Group ReShade effect files with tabs instead of a tree" IsChecked="{Binding RsVariableListUseTabs, Mode=TwoWay}" />
+                        <Button x:Name="AddonsButton" Classes="subtle" Content="RenoDX add-ons…" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="AddonsHint" Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="HDR &amp; resolution" Classes="h2" />
-                    <CheckBox Content="Auto-toggle Windows HDR when launching a game" IsChecked="{Binding HdrAutoToggle, Mode=TwoWay}" />
-                    <CheckBox Content="Auto-switch display resolution when launching a game" IsChecked="{Binding ResolutionAutoToggle, Mode=TwoWay}" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Target resolution (e.g. 3840x2160)" Classes="muted" />
-                        <TextBox Text="{Binding ResolutionTarget, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" />
-                    </StackPanel>
-                    <CheckBox Content="Set the RenoDX peak brightness (nits) on install" IsChecked="{Binding PeakNitsEnabled, Mode=TwoWay}" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Peak brightness (nits)" Classes="muted" />
-                        <NumericUpDown Value="{Binding PeakNits, Mode=TwoWay}" Minimum="0" Maximum="10000"
-                                       Increment="100" Width="200" HorizontalAlignment="Left" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Frame limiter (ReLimiter)" Classes="h2" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Target FPS (0 = off)" Classes="muted" />
-                        <NumericUpDown Value="{Binding UlTargetFps, Mode=TwoWay}" Minimum="0" Maximum="1000"
-                                       Increment="1" Width="200" HorizontalAlignment="Left" />
-                    </StackPanel>
-                    <CheckBox Content="Hook DLSS frame generation" IsChecked="{Binding UlDlssHooks, Mode=TwoWay}" />
-                    <CheckBox Content="Share presets across games" IsChecked="{Binding UlSharedPresets, Mode=TwoWay}" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="On-screen-display hotkey" Classes="muted" />
-                        <TextBox Text="{Binding UlOsdHotkey, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Screenshots" Classes="h2" />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Screenshot folder" Classes="muted" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBox x:Name="ScreenshotPathBox" Text="{Binding ScreenshotPath, Mode=TwoWay}"
-                                     Width="320" Watermark="Default (game folder)" />
-                            <Button x:Name="ScreenshotFolderButton" Classes="subtle" Content="Browse…" />
+                <Border x:Name="SecDefaults" Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Defaults" Classes="h2" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="ReShade channel" Classes="muted" />
+                            <ComboBox x:Name="ReShadeChannelCombo" HorizontalAlignment="Stretch"
+                                      SelectedItem="{Binding ReShadeChannel, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="DXVK variant" Classes="muted" />
+                            <ComboBox x:Name="DxvkVariantCombo" HorizontalAlignment="Stretch"
+                                      SelectedItem="{Binding DxvkVariant, Mode=TwoWay}" />
                         </StackPanel>
                     </StackPanel>
-                    <CheckBox Content="Use a per-game screenshot subfolder" IsChecked="{Binding PerGameScreenshotFolders, Mode=TwoWay}" />
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Nexus Mods" Classes="h2" />
-                    <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="Your personal Nexus API key, stored locally in Adas settings and used only to download mods you have access to." />
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="API key" Classes="muted" />
-                        <TextBox x:Name="NexusKeyBox" Text="{Binding NexusApiKey, Mode=TwoWay}" PasswordChar="•"
-                                 Watermark="Paste your Nexus API key" />
+                <Border x:Name="SecOptiScaler" Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="OptiScaler defaults" Classes="h2" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="GPU type" Classes="muted" />
+                            <ComboBox x:Name="OsGpuTypeCombo" HorizontalAlignment="Stretch"
+                                      SelectedItem="{Binding OsGpuType, Mode=TwoWay}" />
+                        </StackPanel>
+                        <CheckBox Content="Use DLSS inputs" IsChecked="{Binding OsDlssInputs, Mode=TwoWay}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Overlay hotkey" Classes="muted" />
+                            <TextBox Text="{Binding OsHotkey, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" />
+                        </StackPanel>
                     </StackPanel>
-                    <TextBlock x:Name="NexusStatus" Classes="muted" />
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Diagnostics" Classes="h2" />
-                    <CheckBox Content="Verbose logging" IsChecked="{Binding VerboseLogging, Mode=TwoWay}" />
-                </StackPanel>
-            </Border>
+                <Border x:Name="SecSkip" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Skip updates per component" Classes="h2" />
+                        <CheckBox Content="RenoDX" IsChecked="{Binding GlobalSkipRdxUpdates, Mode=TwoWay}" />
+                        <CheckBox Content="ReShade" IsChecked="{Binding GlobalSkipRsUpdates, Mode=TwoWay}" />
+                        <CheckBox Content="ReLimiter" IsChecked="{Binding GlobalSkipUlUpdates, Mode=TwoWay}" />
+                        <CheckBox Content="Display Commander" IsChecked="{Binding GlobalSkipDcUpdates, Mode=TwoWay}" />
+                        <CheckBox Content="OptiScaler" IsChecked="{Binding GlobalSkipOsUpdates, Mode=TwoWay}" />
+                        <CheckBox Content="REFramework" IsChecked="{Binding GlobalSkipRefUpdates, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
 
-            <TextBlock Classes="muted" Text="Changes are saved automatically when you leave this page." />
-        </StackPanel>
-    </ScrollViewer>
+                <Border x:Name="SecHdr" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="HDR &amp; resolution" Classes="h2" />
+                        <CheckBox Content="Auto-toggle Windows HDR when launching a game" IsChecked="{Binding HdrAutoToggle, Mode=TwoWay}" />
+                        <CheckBox Content="Auto-switch display resolution when launching a game" IsChecked="{Binding ResolutionAutoToggle, Mode=TwoWay}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Target resolution (e.g. 3840x2160)" Classes="muted" />
+                            <TextBox Text="{Binding ResolutionTarget, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" />
+                        </StackPanel>
+                        <CheckBox Content="Set the RenoDX peak brightness (nits) on install" IsChecked="{Binding PeakNitsEnabled, Mode=TwoWay}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Peak brightness (nits)" Classes="muted" />
+                            <NumericUpDown Value="{Binding PeakNits, Mode=TwoWay}" Minimum="0" Maximum="10000"
+                                           Increment="100" Width="200" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="SecFrameLimiter" Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Frame limiter (ReLimiter)" Classes="h2" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Target FPS (0 = off)" Classes="muted" />
+                            <NumericUpDown Value="{Binding UlTargetFps, Mode=TwoWay}" Minimum="0" Maximum="1000"
+                                           Increment="1" Width="200" HorizontalAlignment="Left" />
+                        </StackPanel>
+                        <CheckBox Content="Hook DLSS frame generation" IsChecked="{Binding UlDlssHooks, Mode=TwoWay}" />
+                        <CheckBox Content="Share presets across games" IsChecked="{Binding UlSharedPresets, Mode=TwoWay}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="On-screen-display hotkey" Classes="muted" />
+                            <TextBox Text="{Binding UlOsdHotkey, Mode=TwoWay}" Width="160" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="SecScreenshots" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Screenshots" Classes="h2" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Screenshot folder" Classes="muted" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBox x:Name="ScreenshotPathBox" Text="{Binding ScreenshotPath, Mode=TwoWay}"
+                                         Width="320" Watermark="Default (game folder)" />
+                                <Button x:Name="ScreenshotFolderButton" Classes="subtle" Content="Browse…" />
+                            </StackPanel>
+                        </StackPanel>
+                        <CheckBox Content="Use a per-game screenshot subfolder" IsChecked="{Binding PerGameScreenshotFolders, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="SecNexus" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Nexus Mods" Classes="h2" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="Your personal Nexus API key, stored locally in Adas settings and used only to download mods you have access to." />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="API key" Classes="muted" />
+                            <TextBox x:Name="NexusKeyBox" Text="{Binding NexusApiKey, Mode=TwoWay}" PasswordChar="•"
+                                     Watermark="Paste your Nexus API key" />
+                        </StackPanel>
+                        <TextBlock x:Name="NexusStatus" Classes="muted" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="SecDiagnostics" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Diagnostics" Classes="h2" />
+                        <CheckBox Content="Verbose logging" IsChecked="{Binding VerboseLogging, Mode=TwoWay}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Sticky footer: explicit Save / Cancel. Edits are also saved when you leave the page. -->
+        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Padding="20,12"
+                Background="{DynamicResource AdasSurfaceBrush}"
+                BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock x:Name="SettingsStatus" Grid.Column="0" Classes="muted" VerticalAlignment="Center"
+                           Text="Changes are saved when you leave this page." />
+                <Button x:Name="CancelButton" Grid.Column="1" Classes="subtle" Margin="0,0,8,0"
+                        Content="Revert" AutomationProperties.Name="Discard changes and reload saved settings" />
+                <Button x:Name="SaveButton" Grid.Column="2" Classes="accent"
+                        Content="Save" AutomationProperties.Name="Save settings now" />
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

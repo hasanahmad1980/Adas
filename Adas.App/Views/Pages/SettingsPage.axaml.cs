@@ -2,6 +2,7 @@ using System;
 using Adas.App.Shell;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using RenoDXCommander.Abstractions;
 using RenoDXCommander.Services;
@@ -11,13 +12,15 @@ namespace Adas.App.Views.Pages;
 
 /// <summary>
 /// Global settings editor page. Binds two-way to the app's single <see cref="SettingsViewModel"/>
-/// instance so edits mutate live state; the owning <see cref="MainViewModel"/> persists them via
-/// SaveSettingsPublic when the user navigates away from this page (MainWindow.NavigateTo). Hosted in
-/// the MainWindow page host.
+/// instance so edits mutate live state. A left sub-nav jumps to each section; a sticky footer offers
+/// explicit Save (persist now) and Revert (reload the last-saved values from disk). Edits are also
+/// persisted when the user navigates away (MainWindow.NavigateTo → SaveSettingsPublic), so Revert only
+/// discards changes made since the page was last saved. Hosted in the MainWindow page host.
 /// </summary>
 public partial class SettingsPage : UserControl
 {
     private readonly MainViewModel? _main;
+    private Control[] _sections = Array.Empty<Control>();
 
     public SettingsPage() : this(null) { }
 
@@ -32,8 +35,18 @@ public partial class SettingsPage : UserControl
 
         if (main is not null) DataContext = main.Settings;
 
+        // Sub-nav order must match the ListBoxItem order in the XAML.
+        _sections = new Control[]
+        {
+            SecUpdates, SecBehaviour, SecShaders, SecDefaults, SecOptiScaler,
+            SecSkip, SecHdr, SecFrameLimiter, SecScreenshots, SecNexus, SecDiagnostics,
+        };
+        SubNav.SelectionChanged += OnSubNavChanged;
+
         AddonsButton.Click += OnChooseAddons;
         ScreenshotFolderButton.Click += OnChooseScreenshotFolder;
+        SaveButton.Click += OnSaveClick;
+        CancelButton.Click += OnRevertClick;
 
         UpdateAddonsHint();
 
@@ -47,6 +60,34 @@ public partial class SettingsPage : UserControl
     }
 
     private Window? OwnerWindow => TopLevel.GetTopLevel(this) as Window;
+
+    private void OnSubNavChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var i = SubNav.SelectedIndex;
+        if (i >= 0 && i < _sections.Length)
+            _sections[i].BringIntoView();
+    }
+
+    private void OnSaveClick(object? sender, RoutedEventArgs e)
+    {
+        _main?.SaveSettingsPublic();
+        SettingsStatus.Text = "Saved.";
+    }
+
+    private void OnRevertClick(object? sender, RoutedEventArgs e)
+    {
+        if (_main is null) return;
+        try
+        {
+            var dict = SettingsViewModel.LoadSettingsFile();
+            _main.Settings.LoadSettingsFromDict(dict);
+            SettingsStatus.Text = "Reverted to the last saved settings.";
+        }
+        catch (Exception ex)
+        {
+            SettingsStatus.Text = $"Could not revert: {ex.Message}";
+        }
+    }
 
     private async void OnChooseScreenshotFolder(object? sender, RoutedEventArgs e)
     {

@@ -5,9 +5,11 @@
              Background="{DynamicResource AdasBackgroundBrush}">
 
     <Grid RowDefinitions="Auto,*" Margin="22">
-        <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
             <TextBlock x:Name="Subtitle" Classes="muted"
                        Text="Every game with Adas components currently deployed." />
+            <TextBox x:Name="SearchBox" Watermark="Filter by name, source or component…"
+                     AutomationProperties.Name="Filter installed games" />
         </StackPanel>
 
         <ScrollViewer Grid.Row="1">
@@ -19,15 +21,20 @@
                         <DataTemplate x:DataType="shell:InstalledEntry">
                             <Border Classes="card" Margin="0,0,0,8">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <StackPanel Grid.Column="0" Spacing="2">
+                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding GameName}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
                                         <TextBlock Text="{Binding Source}" Classes="muted" />
                                         <TextBlock Text="{Binding Summary}" Classes="muted" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" Classes="subtle" Content="Open folder"
-                                            Tag="{Binding InstallPath}" Click="OnOpenFolder"
-                                            VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Classes="subtle" Content="Open folder"
+                                                Tag="{Binding InstallPath}" Click="OnOpenFolder" />
+                                        <Button Classes="subtle" Content="Repair"
+                                                Tag="{Binding}" Click="OnRepair" />
+                                        <Button Classes="danger" Content="Remove"
+                                                Tag="{Binding}" Click="OnRemove" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

@@ -3,56 +3,73 @@
              x:Class="Adas.App.Views.Pages.ToolsPage"
              Background="{DynamicResource AdasBackgroundBrush}">
 
-    <ScrollViewer Padding="22">
-        <StackPanel Spacing="16">
+    <DockPanel>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="NeuralScreen" Classes="h2" />
-                    <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="Launch the standalone DLSS Neural Rendering test window to confirm NR works on this PC, independent of any game." />
-                    <Button x:Name="NeuralScreenButton" Classes="accent" Content="Launch NeuralScreen"
-                            HorizontalAlignment="Left" />
-                </StackPanel>
-            </Border>
+        <!-- Collapsible shared log, pinned to the bottom. -->
+        <Expander DockPanel.Dock="Bottom" x:Name="OutputExpander" Header="Output log"
+                  Margin="22,0,22,16" HorizontalAlignment="Stretch">
+            <ScrollViewer MaxHeight="220">
+                <SelectableTextBlock x:Name="Output" Classes="muted" TextWrapping="Wrap" />
+            </ScrollViewer>
+        </Expander>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Full-Screen Wrapper for DLSS5" Classes="h2" />
-                    <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="ThioJoe's signed single-exe tool: applies DLSS 5 to the whole screen or one window using Windows screen capture, with a click-through output window on top. It changes no game files, and has full model controls plus side-by-side screenshot and video capture. It only sees the final image, so results look different from a game with native DLSS 5. The wrapper needs driver 616.64+. DLSS 5 Neural Rendering requires an RTX 50-series GPU — on RTX 40/30/20 the wrapper opens but Neural Rendering won't initialize (its compute kernel is Blackwell-only). Adas downloads the official release and supplies a signed nvngx_dlssnr.dll." />
-                    <Button x:Name="WrapperButton" Classes="subtle" Content="Launch Full-Screen Wrapper"
-                            HorizontalAlignment="Left" />
-                </StackPanel>
-            </Border>
+        <ScrollViewer Padding="22">
+            <WrapPanel Orientation="Horizontal">
+                <WrapPanel.Styles>
+                    <Style Selector="Border.tile">
+                        <Setter Property="Width" Value="340" />
+                        <Setter Property="Margin" Value="0,0,16,16" />
+                        <Setter Property="VerticalAlignment" Value="Top" />
+                    </Style>
+                </WrapPanel.Styles>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Universal MFG unlock" Classes="h2" />
-                    <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="Unlocks DLSS Multi Frame Generation on RTX 40 cards for games that ship their own DLSS Frame Generation. Adas places it beside the game exe under a DLL name the exe imports and nothing else uses, so it never overwrites the game's or another mod's files. In game, press Backspace for the menu." />
-                    <TextBlock x:Name="MfgTarget" Classes="muted" TextWrapping="Wrap" />
-                    <TextBlock x:Name="MfgPlan" TextWrapping="Wrap" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="MfgButton" Classes="subtle" Content="Install MFG unlock into selected game" />
-                        <Button x:Name="MfgRemoveButton" Classes="subtle" Content="Remove" IsVisible="False" />
+                <Border Classes="card tile">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="NeuralScreen" Classes="h2" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="Launch the standalone DLSS Neural Rendering test window to confirm NR works on this PC, independent of any game." />
+                        <Button x:Name="NeuralScreenButton" Classes="accent" Content="Launch NeuralScreen"
+                                HorizontalAlignment="Left" />
                     </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <Border Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Diagnostics report" Classes="h2" />
-                    <TextBlock Classes="muted" TextWrapping="Wrap"
-                               Text="Generate a full system + install diagnostics report (GPU, driver, detected games, DLSS 5 state) you can save or share." />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="DiagButton" Classes="subtle" Content="Generate report" />
-                        <Button x:Name="SaveDiagButton" Classes="subtle" Content="Save to file…" IsEnabled="False" />
+                <Border Classes="card tile">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Full-Screen Wrapper for DLSS5" Classes="h2" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="ThioJoe's signed single-exe tool: applies DLSS 5 to the whole screen or one window using Windows screen capture, with a click-through output window on top. It changes no game files, and has full model controls plus side-by-side screenshot and video capture. It only sees the final image, so results look different from a game with native DLSS 5. The wrapper needs driver 616.64+. DLSS 5 Neural Rendering requires an RTX 50-series GPU — on RTX 40/30/20 the wrapper opens but Neural Rendering won't initialize (its compute kernel is Blackwell-only). Adas downloads the official release and supplies a signed nvngx_dlssnr.dll." />
+                        <Button x:Name="WrapperButton" Classes="subtle" Content="Launch Full-Screen Wrapper"
+                                HorizontalAlignment="Left" />
                     </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <SelectableTextBlock x:Name="Output" Classes="muted" TextWrapping="Wrap" />
-        </StackPanel>
-    </ScrollViewer>
+                <Border Classes="card tile">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Universal MFG unlock" Classes="h2" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="Unlocks DLSS Multi Frame Generation on RTX 40 cards for games that ship their own DLSS Frame Generation. Adas places it beside the game exe under a DLL name the exe imports and nothing else uses, so it never overwrites the game's or another mod's files. In game, press Backspace for the menu." />
+                        <TextBlock x:Name="MfgTarget" Classes="muted" TextWrapping="Wrap" />
+                        <TextBlock x:Name="MfgPlan" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="MfgButton" Classes="subtle" Content="Install MFG unlock" />
+                            <Button x:Name="MfgRemoveButton" Classes="subtle" Content="Remove" IsVisible="False" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="card tile">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Diagnostics report" Classes="h2" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="Generate a full system + install diagnostics report (GPU, driver, detected games, DLSS 5 state) you can save or share." />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="DiagButton" Classes="subtle" Content="Generate report" />
+                            <Button x:Name="SaveDiagButton" Classes="subtle" Content="Save to file…" IsEnabled="False" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            </WrapPanel>
+        </ScrollViewer>
+    </DockPanel>
 </UserControl>
