@@ -85,7 +85,42 @@ public partial class GameSetupView : UserControl
             .ToArray();
         ToolsList.ItemsSource = _tools;
 
+        // Simple / Advanced disclosure (Phase C). Simple mode hides the tinkerer surfaces; the
+        // recommended route stays selected so Install still works. Mode persists across launches.
+        ModeSimpleButton.Click += (_, _) => SetSetupMode(advanced: false);
+        ModeAdvancedButton.Click += (_, _) => SetSetupMode(advanced: true);
+        _advancedMode = UiLayoutStore.LoadAdvancedSetupMode();
+        ApplyMode();
+
         DataContextChanged += (_, _) => _ = RefreshAssessmentAsync();
+    }
+
+    /// <summary>True when the setup pane shows the full Advanced surface; false for Simple mode.</summary>
+    private bool _advancedMode;
+
+    private void SetSetupMode(bool advanced)
+    {
+        if (_advancedMode != advanced)
+        {
+            _advancedMode = advanced;
+            UiLayoutStore.SaveAdvancedSetupMode(advanced);
+        }
+        ApplyMode();
+    }
+
+    /// <summary>
+    /// Shows or hides the advanced-only surfaces for the current mode. Each advanced card's own
+    /// visibility is still driven by state elsewhere; gating the group container means a collapsed
+    /// group hides them regardless, so Simple mode never leaks a tuning/tips/RR card.
+    /// </summary>
+    private void ApplyMode()
+    {
+        ModeSimpleButton.IsChecked = !_advancedMode;
+        ModeAdvancedButton.IsChecked = _advancedMode;
+        GraphicsCard.IsVisible = _advancedMode;
+        RoutesPanel.IsVisible = _advancedMode;
+        ToolsSection.IsVisible = _advancedMode;
+        AdvancedCards.IsVisible = _advancedMode;
     }
 
     /// <summary>True while combos are being seeded from the card, so SelectionChanged handlers

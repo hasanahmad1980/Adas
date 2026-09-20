@@ -15,130 +15,181 @@
                        HorizontalAlignment="Center" />
         </StackPanel>
 
-        <ScrollViewer IsVisible="{Binding $parent[UserControl].DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"
-                      HorizontalScrollBarVisibility="Disabled" Padding="22">
-            <StackPanel Spacing="18">
+        <!-- Selected-game view: scrolling content above a pinned action bar. -->
+        <DockPanel IsVisible="{Binding $parent[UserControl].DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
 
-                <!-- Title + status (with cover art) -->
-                <Grid ColumnDefinitions="Auto,*">
-                    <!-- Cover art (Steam library portrait), hidden until fetched -->
-                    <Border Grid.Column="0" Width="92" Height="138" CornerRadius="6"
-                            Margin="0,0,14,0" ClipToBounds="True" Background="{DynamicResource AdasBackgroundBrush}"
-                            VerticalAlignment="Top" IsVisible="{Binding HasArtwork}">
-                        <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
-                               Stretch="UniformToFill" />
-                    </Border>
-                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding GameName}" Classes="h1" TextWrapping="Wrap" />
-                        <WrapPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding Source}" Classes="muted" VerticalAlignment="Center"
-                                       Margin="0,0,8,0" />
-                            <Border CornerRadius="5" Padding="8,3" Margin="0,0,8,4"
-                                    Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
-                                <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
-                                           Foreground="White" FontSize="12" FontWeight="SemiBold" />
-                            </Border>
-                            <!-- Detected graphics API + process bitness, accurate from the scan -->
-                            <Border CornerRadius="5" Padding="8,3" Margin="0,0,8,4" Background="{DynamicResource AdasChipBgBrush}"
-                                    VerticalAlignment="Center" IsVisible="{Binding HasGraphicsApiBadge}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AdasAccentBrush}" />
-                                    <TextBlock Text="{Binding BitnessLabel}" FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+            <!-- Pinned action bar (Phase C): the primary Install button and its progress/result stay
+                 visible instead of wrapping mid-page. -->
+            <Border DockPanel.Dock="Bottom" Padding="22,12" Background="{DynamicResource AdasSurfaceBrush}"
+                    BorderBrush="{DynamicResource AdasBorderBrush}" BorderThickness="0,1,0,0">
+                <StackPanel Spacing="8">
+                    <WrapPanel x:Name="ActionArea" Orientation="Horizontal"
+                               AutomationProperties.Name="Setup actions">
+                        <Button x:Name="InstallButton" Classes="accent large" Margin="0,0,8,8"
+                                Content="Install selected" MinWidth="150" TabIndex="7"
+                                AutomationProperties.Name="Install selected DLSS 5 route and tools" />
+                        <Button x:Name="PreviewButton" Classes="subtle" Margin="0,0,8,8"
+                                Content="What will happen?" TabIndex="8"
+                                AutomationProperties.Name="Preview every file the selected route would change"
+                                ToolTip.Tip="List every file the selected DLSS 5 route would write, back up and remove — without changing anything." />
+                        <Button x:Name="RepairButton" Classes="subtle" Margin="0,0,8,8"
+                                Content="Repair DLSS 5" IsVisible="{Binding IsDlss5Installed}" TabIndex="9"
+                                AutomationProperties.Name="Repair the installed DLSS 5 setup"
+                                ToolTip.Tip="Re-copy any missing or changed files for the installed setup." />
+                        <Button x:Name="RemoveButton" Classes="subtle" Margin="0,0,8,8"
+                                Content="Remove DLSS 5" IsVisible="{Binding IsDlss5Installed}" TabIndex="10"
+                                AutomationProperties.Name="Remove DLSS 5 and restore original files"
+                                ToolTip.Tip="Uninstall DLSS 5 from this game and restore the original files." />
+                        <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
+                                Content="Open game folder" TabIndex="11"
+                                AutomationProperties.Name="Open the game folder in Explorer" />
+                    </WrapPanel>
+                    <TextBlock x:Name="InstallHint" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+                    <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100"
+                                 AutomationProperties.Name="Install progress" />
+                    <ScrollViewer MaxHeight="130" HorizontalScrollBarVisibility="Disabled">
+                        <SelectableTextBlock x:Name="InstallResult" Classes="muted" TextWrapping="Wrap"
+                                             IsVisible="False"
+                                             AutomationProperties.LiveSetting="Assertive"
+                                             AutomationProperties.Name="Install result" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="22">
+                <StackPanel Spacing="18">
+
+                    <!-- Title + status (with cover art) -->
+                    <Grid ColumnDefinitions="Auto,*">
+                        <!-- Cover art (Steam library portrait), hidden until fetched -->
+                        <Border Grid.Column="0" Width="92" Height="138" CornerRadius="6"
+                                Margin="0,0,14,0" ClipToBounds="True" Background="{DynamicResource AdasBackgroundBrush}"
+                                VerticalAlignment="Top" IsVisible="{Binding HasArtwork}">
+                            <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
+                                   Stretch="UniformToFill" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding GameName}" Classes="h1" TextWrapping="Wrap" />
+                            <WrapPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Source}" Classes="muted" VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <Border CornerRadius="5" Padding="8,3" Margin="0,0,8,4"
+                                        Background="{Binding Dlss5Status, Converter={StaticResource GameStatusColorConverter}}">
+                                    <TextBlock Text="{Binding Dlss5Status, Converter={StaticResource GameStatusTextConverter}}"
+                                               Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                </Border>
+                                <!-- Detected graphics API + process bitness, accurate from the scan -->
+                                <Border CornerRadius="5" Padding="8,3" Margin="0,0,8,4" Background="{DynamicResource AdasChipBgBrush}"
+                                        VerticalAlignment="Center" IsVisible="{Binding HasGraphicsApiBadge}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasAccentBrush}" />
+                                        <TextBlock Text="{Binding BitnessLabel}" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </WrapPanel>
+                            <TextBlock Text="{Binding Dlss5InstalledLabel}" Classes="muted" TextWrapping="Wrap"
+                                       IsVisible="{Binding Dlss5InstalledLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <TextBlock Text="{Binding WikiStatusLabel}" Classes="muted" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
+
+                            <!-- Simple / Advanced mode toggle (Phase C). Persisted in UiLayoutStore. -->
+                            <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,8,0,0">
+                                <ToggleButton x:Name="ModeSimpleButton" Classes="segment" Content="Simple"
+                                              AutomationProperties.Name="Simple setup mode" />
+                                <ToggleButton x:Name="ModeAdvancedButton" Classes="segment" Content="Advanced"
+                                              AutomationProperties.Name="Advanced setup mode with every control" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Graphics API: the one thing every install depends on. Advanced mode only. -->
+                    <Border x:Name="GraphicsCard" Classes="card">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Graphics" Classes="h2" />
+                            <Grid ColumnDefinitions="*,12,*">
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock x:Name="ApiComboLabel" Text="Graphics API" Classes="muted" />
+                                    <ComboBox x:Name="ApiCombo" HorizontalAlignment="Stretch" TabIndex="1"
+                                              AutomationProperties.LabeledBy="{Binding #ApiComboLabel}"
+                                              AutomationProperties.Name="Graphics API" />
                                 </StackPanel>
-                            </Border>
-                        </WrapPanel>
-                        <TextBlock Text="{Binding Dlss5InstalledLabel}" Classes="muted" TextWrapping="Wrap"
-                                   IsVisible="{Binding Dlss5InstalledLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                        <TextBlock Text="{Binding WikiStatusLabel}" Classes="muted" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding InstallPathDisplay}" Classes="muted" TextWrapping="Wrap" />
-                    </StackPanel>
-                </Grid>
-
-                <!-- Graphics API: the one thing every install depends on, always visible and editable -->
-                <Border Classes="card">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Graphics" Classes="h2" />
-                        <Grid ColumnDefinitions="*,12,*">
-                            <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock x:Name="ApiComboLabel" Text="Graphics API" Classes="muted" />
-                                <ComboBox x:Name="ApiCombo" HorizontalAlignment="Stretch" TabIndex="1"
-                                          AutomationProperties.LabeledBy="{Binding #ApiComboLabel}"
-                                          AutomationProperties.Name="Graphics API" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Spacing="4">
-                                <TextBlock x:Name="BitnessComboLabel" Text="Bitness" Classes="muted" />
-                                <ComboBox x:Name="BitnessCombo" HorizontalAlignment="Stretch" TabIndex="2"
-                                          AutomationProperties.LabeledBy="{Binding #BitnessComboLabel}"
-                                          AutomationProperties.Name="Process bitness" />
-                            </StackPanel>
-                        </Grid>
-                        <TextBlock x:Name="ApiEvidenceText" Classes="muted" FontSize="12" TextWrapping="Wrap"
-                                   Text="Detecting…" />
-                    </StackPanel>
-                </Border>
-
-                <!-- DLSS 5 + tools: pick what you want, one Install button. Nothing here is ever greyed out. -->
-                <Border Classes="card">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Set up" Classes="h2" />
-
-                        <!-- Plain-language readiness banner: headline, things to know, one-click fix -->
-                        <Border x:Name="ReadinessBanner" CornerRadius="6" Padding="12,10" BorderThickness="1"
-                                Background="{DynamicResource AdasInfoBgBrush}" BorderBrush="{DynamicResource AdasInfoBorderBrush}"
-                                AutomationProperties.LiveSetting="Polite"
-                                AutomationProperties.Name="Setup readiness">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <TextBlock x:Name="ReadinessIcon" Grid.Column="0" Text="…" FontSize="18"
-                                           Margin="0,0,10,0" VerticalAlignment="Top"
-                                           AutomationProperties.AccessibilityView="Raw" />
-                                <StackPanel Grid.Column="1" Spacing="6">
-                                    <TextBlock x:Name="RouteSummary" Text="Checking this game…" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="ProblemsText" TextWrapping="Wrap" IsVisible="False"
-                                               Foreground="{DynamicResource AdasTextSecondaryBrush}" />
-                                    <Button x:Name="ChooseFolderInlineButton" Classes="accent" IsVisible="False"
-                                            Content="Choose game folder…" HorizontalAlignment="Left" TabIndex="3"
-                                            AutomationProperties.Name="Choose game folder" />
-                                    <TextBlock x:Name="AutoSetupText" Classes="muted" FontSize="12" TextWrapping="Wrap"
-                                               IsVisible="False" />
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock x:Name="BitnessComboLabel" Text="Bitness" Classes="muted" />
+                                    <ComboBox x:Name="BitnessCombo" HorizontalAlignment="Stretch" TabIndex="2"
+                                              AutomationProperties.LabeledBy="{Binding #BitnessComboLabel}"
+                                              AutomationProperties.Name="Process bitness" />
                                 </StackPanel>
                             </Grid>
-                        </Border>
+                            <TextBlock x:Name="ApiEvidenceText" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                       Text="Detecting…" />
+                        </StackPanel>
+                    </Border>
 
-                        <!-- 1. DLSS 5 route -->
-                        <CheckBox x:Name="InstallDlss5Check" IsChecked="True" FontWeight="SemiBold"
-                                  Content="Install DLSS 5" TabIndex="4"
-                                  AutomationProperties.Name="Install DLSS 5" />
-                        <StackPanel x:Name="RoutesPanel" Spacing="6" Margin="26,0,0,0">
-                            <TextBlock x:Name="RoutesHeader" Text="Route — ★ is what Adas recommends; you can pick any"
-                                       Classes="muted" FontSize="12" />
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <TextBlock x:Name="CommunityHeader" Classes="muted" FontSize="12" TextWrapping="Wrap"
-                                           VerticalAlignment="Center" Text="Checking results from other players…" />
-                                <CheckBox x:Name="CommunityGpuOnlyCheck" Content="Only my GPU" FontSize="12" IsVisible="False"
-                                          AutomationProperties.Name="Show community results for my GPU only" />
+                    <!-- DLSS 5 + tools: pick what you want, one Install button. Nothing here is ever greyed out. -->
+                    <Border Classes="card">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Set up" Classes="h2" />
+
+                            <!-- Plain-language readiness banner: headline, things to know, one-click fix -->
+                            <Border x:Name="ReadinessBanner" CornerRadius="6" Padding="12,10" BorderThickness="1"
+                                    Background="{DynamicResource AdasInfoBgBrush}" BorderBrush="{DynamicResource AdasInfoBorderBrush}"
+                                    AutomationProperties.LiveSetting="Polite"
+                                    AutomationProperties.Name="Setup readiness">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock x:Name="ReadinessIcon" Grid.Column="0" Text="…" FontSize="18"
+                                               Margin="0,0,10,0" VerticalAlignment="Top"
+                                               AutomationProperties.AccessibilityView="Raw" />
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <TextBlock x:Name="RouteSummary" Text="Checking this game…" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="ProblemsText" TextWrapping="Wrap" IsVisible="False"
+                                                   Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+                                        <Button x:Name="ChooseFolderInlineButton" Classes="accent" IsVisible="False"
+                                                Content="Choose game folder…" HorizontalAlignment="Left" TabIndex="3"
+                                                AutomationProperties.Name="Choose game folder" />
+                                        <TextBlock x:Name="AutoSetupText" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                                   IsVisible="False" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- 1. DLSS 5 route -->
+                            <CheckBox x:Name="InstallDlss5Check" IsChecked="True" FontWeight="SemiBold"
+                                      Content="Install DLSS 5" TabIndex="4"
+                                      AutomationProperties.Name="Install DLSS 5" />
+                            <StackPanel x:Name="RoutesPanel" Spacing="6" Margin="26,0,0,0">
+                                <TextBlock x:Name="RoutesHeader" Text="Route — ★ is what Adas recommends; you can pick any"
+                                           Classes="muted" FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock x:Name="CommunityHeader" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                               VerticalAlignment="Center" Text="Checking results from other players…" />
+                                    <CheckBox x:Name="CommunityGpuOnlyCheck" Content="Only my GPU" FontSize="12" IsVisible="False"
+                                              AutomationProperties.Name="Show community results for my GPU only" />
+                                </StackPanel>
+                                <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0" TabIndex="5"
+                                         AutomationProperties.Name="DLSS 5 route — starred is recommended; any can be selected">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="svc:RouteOption">
+                                            <StackPanel Spacing="2" Margin="0,3">
+                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
+                                                           Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
+                                                <TextBlock Text="{Binding CommunityText}" FontSize="12" TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource AdasLinkBrush}"
+                                                           IsVisible="{Binding CommunityText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock x:Name="RouteNotesText" FontSize="12" TextWrapping="Wrap" IsVisible="False"
+                                           Foreground="{DynamicResource AdasWarnBrush}" />
                             </StackPanel>
-                            <ListBox x:Name="RoutesList" Background="Transparent" BorderThickness="0" TabIndex="5"
-                                     AutomationProperties.Name="DLSS 5 route — starred is recommended; any can be selected">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="svc:RouteOption">
-                                        <StackPanel Spacing="2" Margin="0,3">
-                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource AdasTextPrimaryBrush}" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
-                                                       Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
-                                            <TextBlock Text="{Binding CommunityText}" FontSize="12" TextWrapping="Wrap"
-                                                       Foreground="{DynamicResource AdasLinkBrush}"
-                                                       IsVisible="{Binding CommunityText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                            <TextBlock x:Name="RouteNotesText" FontSize="12" TextWrapping="Wrap" IsVisible="False"
-                                       Foreground="{DynamicResource AdasWarnBrush}" />
+
+                            <!-- Driver warning stays visible in Simple mode too (it applies to any route). -->
                             <Border x:Name="DriverWarningBanner" IsVisible="False"
                                     CornerRadius="6" Padding="10,8" Background="{DynamicResource AdasWarnBgStrongBrush}"
                                     BorderBrush="{DynamicResource AdasWarnBorderBrush}" BorderThickness="1">
@@ -148,249 +199,224 @@
                                                Foreground="{DynamicResource AdasWarnBrush}" FontSize="12" />
                                 </StackPanel>
                             </Border>
-                        </StackPanel>
 
-                        <!-- 2. Tools -->
-                        <TextBlock Text="Also install" FontWeight="SemiBold" Margin="0,6,0,0"
-                                   Foreground="{DynamicResource AdasTextPrimaryBrush}" />
-                        <ItemsControl x:Name="ToolsList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="views:SetupToolItem">
-                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4">
-                                        <StackPanel Grid.Column="0" Spacing="2">
-                                            <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding CheckBoxText}" />
-                                            <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12"
-                                                       TextWrapping="Wrap" Margin="26,0,0,0" />
-                                            <TextBlock Text="{Binding NotesText}" FontSize="12" TextWrapping="Wrap"
-                                                       Margin="26,0,0,0" Foreground="{Binding NotesBrush}"
-                                                       IsVisible="{Binding NotesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                        </StackPanel>
-                                        <Button Grid.Column="1" Classes="subtle" Content="Remove" VerticalAlignment="Top"
-                                                Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}" />
+                            <!-- 2. Tools (Advanced mode only; Simple mode summarizes via AutoSetupText) -->
+                            <StackPanel x:Name="ToolsSection" Spacing="0">
+                                <TextBlock Text="Also install" FontWeight="SemiBold" Margin="0,6,0,0"
+                                           Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                                <ItemsControl x:Name="ToolsList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="views:SetupToolItem">
+                                            <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding CheckBoxText}" />
+                                                    <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12"
+                                                               TextWrapping="Wrap" Margin="26,0,0,0" />
+                                                    <TextBlock Text="{Binding NotesText}" FontSize="12" TextWrapping="Wrap"
+                                                               Margin="26,0,0,0" Foreground="{Binding NotesBrush}"
+                                                               IsVisible="{Binding NotesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="subtle" Content="Remove" VerticalAlignment="Top"
+                                                        Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <StackPanel x:Name="FsrFgPanel" Spacing="2" Margin="0,2,0,0">
+                                    <CheckBox x:Name="FsrFgCheck" TabIndex="6"
+                                              AutomationProperties.Name="OptiScaler option: FSR 3.1 frame generation, 2x, DirectX 12 only"
+                                              Content="OptiScaler option: FSR 3.1 frame generation (2x, DirectX 12 only)" />
+                                    <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
+                                               Text="Turns on the FSR 3.1 frame-generation files OptiScaler ships, fed by OptiScaler's upscaler — works on any RTX card. Off by default. Turn the game's own frame generation off, and expect some added input latency." />
+                                    <TextBlock x:Name="FsrFgNote" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
+                                               Foreground="{DynamicResource AdasWarnBrush}" IsVisible="False" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Advanced-only cards. Gated as a group by mode; each card's own visibility is still
+                         driven by state in code-behind, so a collapsed group hides them regardless. -->
+                    <StackPanel x:Name="AdvancedCards" Spacing="18">
+
+                        <!-- Tuning: controls for the settings Adas already writes (Feeder cfg / AIO ini) -->
+                        <Border x:Name="TuningCard" Classes="card" IsVisible="False">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Tuning" Classes="h2" />
+                                <TextBlock x:Name="TuningIntro" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                <WrapPanel x:Name="PresetButtons" Orientation="Horizontal">
+                                    <Button x:Name="PresetQualityButton" Classes="subtle" Margin="0,0,8,8" Content="Quality" />
+                                    <Button x:Name="PresetBalancedButton" Classes="subtle" Margin="0,0,8,8" Content="Balanced" />
+                                    <Button x:Name="PresetPerformanceButton" Classes="subtle" Margin="0,0,8,8" Content="Performance" />
+                                    <Button x:Name="PresetCustomButton" Classes="subtle" Margin="0,0,8,8" Content="My profile" />
+                                    <Button x:Name="SaveCustomButton" Classes="subtle" Margin="0,0,8,8" Content="Save as my profile" />
+                                </WrapPanel>
+
+                                <StackPanel x:Name="FeederTuningPanel" Spacing="6">
+                                    <TextBlock x:Name="WorkAreaLabel" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AdasTextPrimaryBrush}" />
+                                    <Slider x:Name="WorkAreaSlider" Minimum="50" Maximum="100" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" Value="100" />
+                                    <TextBlock x:Name="WorkAreaNote" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                    <CheckBox x:Name="FsrExpandCheck" Content="FSR 1 expand-back (crisper at 50–75%)" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Sharpness" Classes="muted" VerticalAlignment="Center" Width="80" />
+                                        <Slider x:Name="SharpnessSlider" Minimum="0" Maximum="1" TickFrequency="0.05"
+                                                IsSnapToTickEnabled="True" Width="220" />
+                                        <TextBlock x:Name="SharpnessValue" Classes="muted" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Aim for" Classes="muted" VerticalAlignment="Center" />
+                                        <TextBox x:Name="TargetFpsBox" Width="70" Watermark="60" />
+                                        <TextBlock Text="fps — I get" Classes="muted" VerticalAlignment="Center" />
+                                        <TextBox x:Name="CurrentFpsBox" Width="70" Watermark="40" />
+                                        <TextBlock Text="fps now" Classes="muted" VerticalAlignment="Center" />
+                                        <Button x:Name="AimFpsButton" Classes="subtle" Content="Suggest" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel x:Name="AioTuningPanel" Spacing="6">
+                                    <CheckBox x:Name="AioNeuralCheck" Content="Neural rendering" />
+                                    <CheckBox x:Name="AioFrameGenCheck" Content="Frame generation (needs nvngx_dlssg.dll)" />
+                                    <Grid ColumnDefinitions="120,*,50" RowDefinitions="Auto,Auto,Auto">
+                                        <TextBlock Grid.Row="0" Text="Intensity" Classes="muted" VerticalAlignment="Center" />
+                                        <Slider Grid.Row="0" Grid.Column="1" x:Name="AioIntensitySlider" Minimum="0" Maximum="2"
+                                                TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" x:Name="AioIntensityValue" Classes="muted" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="1" Text="Local tone" Classes="muted" VerticalAlignment="Center" />
+                                        <Slider Grid.Row="1" Grid.Column="1" x:Name="AioToneSlider" Minimum="0" Maximum="2"
+                                                TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                                        <TextBlock Grid.Row="1" Grid.Column="2" x:Name="AioToneValue" Classes="muted" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="2" Text="Local structure" Classes="muted" VerticalAlignment="Center" />
+                                        <Slider Grid.Row="2" Grid.Column="1" x:Name="AioStructureSlider" Minimum="0" Maximum="2"
+                                                TickFrequency="0.05" IsSnapToTickEnabled="True" />
+                                        <TextBlock Grid.Row="2" Grid.Column="2" x:Name="AioStructureValue" Classes="muted" VerticalAlignment="Center" />
                                     </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                                </StackPanel>
 
-                        <StackPanel x:Name="FsrFgPanel" Spacing="2" Margin="0,2,0,0">
-                            <CheckBox x:Name="FsrFgCheck" TabIndex="6"
-                                      AutomationProperties.Name="OptiScaler option: FSR 3.1 frame generation, 2x, DirectX 12 only"
-                                      Content="OptiScaler option: FSR 3.1 frame generation (2x, DirectX 12 only)" />
-                            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
-                                       Text="Turns on the FSR 3.1 frame-generation files OptiScaler ships, fed by OptiScaler's upscaler — works on any RTX card. Off by default. Turn the game's own frame generation off, and expect some added input latency." />
-                            <TextBlock x:Name="FsrFgNote" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
-                                       Foreground="{DynamicResource AdasWarnBrush}" IsVisible="False" />
-                        </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="ApplyTuningButton" Classes="accent" Content="Apply" />
+                                    <TextBlock x:Name="TuningStatus" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
 
-                        <!-- 3. One button -->
-                        <WrapPanel x:Name="ActionArea" Orientation="Horizontal"
-                                   AutomationProperties.Name="Setup actions">
-                            <Button x:Name="InstallButton" Classes="accent" Margin="0,0,8,8"
-                                    Content="Install selected" MinWidth="150" TabIndex="7"
-                                    AutomationProperties.Name="Install selected DLSS 5 route and tools" />
-                            <Button x:Name="PreviewButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="What will happen?" TabIndex="8"
-                                    AutomationProperties.Name="Preview every file the selected route would change"
-                                    ToolTip.Tip="List every file the selected DLSS 5 route would write, back up and remove — without changing anything." />
-                            <Button x:Name="RepairButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Repair DLSS 5" IsVisible="{Binding IsDlss5Installed}" TabIndex="9"
-                                    AutomationProperties.Name="Repair the installed DLSS 5 setup"
-                                    ToolTip.Tip="Re-copy any missing or changed files for the installed setup." />
-                            <Button x:Name="RemoveButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Remove DLSS 5" IsVisible="{Binding IsDlss5Installed}" TabIndex="10"
-                                    AutomationProperties.Name="Remove DLSS 5 and restore original files"
-                                    ToolTip.Tip="Uninstall DLSS 5 from this game and restore the original files." />
-                            <Button x:Name="OpenFolderButton" Classes="subtle" Margin="0,0,8,8"
-                                    Content="Open game folder" TabIndex="11"
-                                    AutomationProperties.Name="Open the game folder in Explorer" />
-                        </WrapPanel>
-                        <TextBlock x:Name="InstallHint" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="False" />
+                        <!-- Hotkeys and tips for the installed setup -->
+                        <Border x:Name="TipsCard" Classes="card" IsVisible="False">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Hotkeys &amp; tips" Classes="h2" />
+                                <TextBlock x:Name="TipsText" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+                            </StackPanel>
+                        </Border>
 
-                        <ProgressBar x:Name="InstallProgress" IsVisible="False" Maximum="100"
-                                     AutomationProperties.Name="Install progress" />
-                        <SelectableTextBlock x:Name="InstallResult" Classes="muted" TextWrapping="Wrap"
-                                             IsVisible="False"
-                                             AutomationProperties.LiveSetting="Assertive"
-                                             AutomationProperties.Name="Install result" />
+                        <!-- Ray reconstruction DLL update (only for games that ship nvngx_dlssd.dll) -->
+                        <Border x:Name="RrCard" Classes="card" IsVisible="False">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Ray reconstruction" Classes="h2" />
+                                <TextBlock x:Name="RrText" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource AdasTextSecondaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="RrUpdateButton" Classes="subtle" Content="Update ray reconstruction" IsVisible="False"
+                                            AutomationProperties.Name="Update ray reconstruction DLL" />
+                                    <Button x:Name="RrRestoreButton" Classes="subtle" Content="Restore original" IsVisible="False"
+                                            AutomationProperties.Name="Restore the original ray reconstruction DLL" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Advanced per-game overrides -->
+                        <Expander x:Name="AdvancedExpander" Header="Advanced options — most people can skip this" Classes="card">
+                            <StackPanel Spacing="12" Margin="0,8,0,0">
+                                <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto">
+                                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="ReShade channel" Classes="muted" />
+                                        <ComboBox x:Name="ReShadeCombo" HorizontalAlignment="Stretch" />
+                                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                                   Text="Which ReShade build to install. Default = Adas picks (the signed stable build — leave this unless you have a reason). Stable = force the official release. Nightly = newest unsigned build; more fixes, less tested. Custom = a build you provide." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="DXVK variant" Classes="muted" />
+                                        <ComboBox x:Name="DxvkCombo" HorizontalAlignment="Stretch" />
+                                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                                   Text="DXVK translates DirectX to Vulkan (only used on Vulkan/translated routes). Default = Adas picks. Stable = official DXVK. Development = newest upstream build; least tested. LiliumHdr = the HDR fork that adds HDR output to DX9/11 games." />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,12,*">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="DLSS5-Feeder build" Classes="muted" />
+                                        <ComboBox x:Name="FeederChannelCombo" HorizontalAlignment="Stretch" />
+                                        <TextBox x:Name="FeederTagBox" Watermark="Release tag, e.g. v1.15.0" IsVisible="False" />
+                                        <TextBlock x:Name="FeederChannelNote" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="Motion vectors (Feeder routes)" Classes="muted" />
+                                        <ComboBox x:Name="MotionProviderCombo" HorizontalAlignment="Stretch" />
+                                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                                   Text="Where the Feeder reads motion from. Automatic = LumeniteFX Kernel (what the Feeder is tuned on), or VORT Motion on OpenGL, where LumeniteFX reads nothing. Adas installs the chosen provider and places it above DLSS5_Feed. Takes effect on the next Install." />
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Deep Fried Chicken" Classes="muted" />
+                                    <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                               Text="An alternative neural consumer by Alexander, used in place of RenoDX. Its licence forbids redistribution, so Adas can't bundle it — import the author's official release (.zip or the extracted folder) once. It's verified and cached, then it appears as a DLSS 5 route above (or just pick that route and press Install — Adas asks for it)." />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="ImportDfcButton" Classes="subtle" Content="Import…" />
+                                        <TextBlock x:Name="DfcStatusText" Classes="muted" FontSize="11"
+                                                   VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="RenoDX shader packs" Classes="muted" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ComboBox x:Name="ShaderModeCombo" Width="160" />
+                                        <Button x:Name="ChoosePacksButton" Classes="subtle" Content="Choose packs…" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Game folder" Classes="muted" />
+                                    <TextBlock x:Name="FolderText" Classes="muted" TextWrapping="Wrap" Text="Using detected folder." />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="ChangeFolderButton" Classes="subtle" Content="Change…" />
+                                        <Button x:Name="ResetFolderButton" Classes="subtle" Content="Reset" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
                     </StackPanel>
-                </Border>
 
-                <!-- Tuning: controls for the settings Adas already writes (Feeder cfg / AIO ini) -->
-                <Border x:Name="TuningCard" Classes="card" IsVisible="False">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Tuning" Classes="h2" />
-                        <TextBlock x:Name="TuningIntro" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-                        <WrapPanel x:Name="PresetButtons" Orientation="Horizontal">
-                            <Button x:Name="PresetQualityButton" Classes="subtle" Margin="0,0,8,8" Content="Quality" />
-                            <Button x:Name="PresetBalancedButton" Classes="subtle" Margin="0,0,8,8" Content="Balanced" />
-                            <Button x:Name="PresetPerformanceButton" Classes="subtle" Margin="0,0,8,8" Content="Performance" />
-                            <Button x:Name="PresetCustomButton" Classes="subtle" Margin="0,0,8,8" Content="My profile" />
-                            <Button x:Name="SaveCustomButton" Classes="subtle" Margin="0,0,8,8" Content="Save as my profile" />
-                        </WrapPanel>
-
-                        <StackPanel x:Name="FeederTuningPanel" Spacing="6">
-                            <TextBlock x:Name="WorkAreaLabel" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AdasTextPrimaryBrush}" />
-                            <Slider x:Name="WorkAreaSlider" Minimum="50" Maximum="100" TickFrequency="5"
-                                    IsSnapToTickEnabled="True" Value="100" />
-                            <TextBlock x:Name="WorkAreaNote" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-                            <CheckBox x:Name="FsrExpandCheck" Content="FSR 1 expand-back (crisper at 50–75%)" />
+                    <!-- Verify / diagnose (both modes) -->
+                    <Border Classes="card">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Verify" Classes="h2" />
+                            <TextBlock Text="Installed it? Play the game for a minute, close it, then click below to check that DLSS 5 is really working."
+                                       Classes="muted" TextWrapping="Wrap" />
+                            <Button x:Name="DiagnoseButton" Classes="subtle"
+                                    Content="Check if it's working" HorizontalAlignment="Left"
+                                    AutomationProperties.Name="Check whether DLSS 5 is actually running" />
+                            <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap"
+                                                 AutomationProperties.LiveSetting="Polite"
+                                                 AutomationProperties.Name="Diagnosis result" />
+                            <StackPanel x:Name="AioFixPanel" Spacing="6" IsVisible="False" />
+                            <TextBlock Text="Help other players: share whether it worked. Adas opens a filled-in GitHub issue that you check and submit yourself; nothing is sent automatically."
+                                       Classes="muted" TextWrapping="Wrap" FontSize="12" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="Sharpness" Classes="muted" VerticalAlignment="Center" Width="80" />
-                                <Slider x:Name="SharpnessSlider" Minimum="0" Maximum="1" TickFrequency="0.05"
-                                        IsSnapToTickEnabled="True" Width="220" />
-                                <TextBlock x:Name="SharpnessValue" Classes="muted" VerticalAlignment="Center" />
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="Aim for" Classes="muted" VerticalAlignment="Center" />
-                                <TextBox x:Name="TargetFpsBox" Width="70" Watermark="60" />
-                                <TextBlock Text="fps — I get" Classes="muted" VerticalAlignment="Center" />
-                                <TextBox x:Name="CurrentFpsBox" Width="70" Watermark="40" />
-                                <TextBlock Text="fps now" Classes="muted" VerticalAlignment="Center" />
-                                <Button x:Name="AimFpsButton" Classes="subtle" Content="Suggest" />
+                                <Button x:Name="ShareWorkedButton" Classes="subtle" Content="It worked — share"
+                                        AutomationProperties.Name="Share that it worked" />
+                                <Button x:Name="ShareFailedButton" Classes="subtle" Content="It didn't — share"
+                                        AutomationProperties.Name="Share that it didn't work" />
                             </StackPanel>
                         </StackPanel>
+                    </Border>
 
-                        <StackPanel x:Name="AioTuningPanel" Spacing="6">
-                            <CheckBox x:Name="AioNeuralCheck" Content="Neural rendering" />
-                            <CheckBox x:Name="AioFrameGenCheck" Content="Frame generation (needs nvngx_dlssg.dll)" />
-                            <Grid ColumnDefinitions="120,*,50" RowDefinitions="Auto,Auto,Auto">
-                                <TextBlock Grid.Row="0" Text="Intensity" Classes="muted" VerticalAlignment="Center" />
-                                <Slider Grid.Row="0" Grid.Column="1" x:Name="AioIntensitySlider" Minimum="0" Maximum="2"
-                                        TickFrequency="0.05" IsSnapToTickEnabled="True" />
-                                <TextBlock Grid.Row="0" Grid.Column="2" x:Name="AioIntensityValue" Classes="muted" VerticalAlignment="Center" />
-                                <TextBlock Grid.Row="1" Text="Local tone" Classes="muted" VerticalAlignment="Center" />
-                                <Slider Grid.Row="1" Grid.Column="1" x:Name="AioToneSlider" Minimum="0" Maximum="2"
-                                        TickFrequency="0.05" IsSnapToTickEnabled="True" />
-                                <TextBlock Grid.Row="1" Grid.Column="2" x:Name="AioToneValue" Classes="muted" VerticalAlignment="Center" />
-                                <TextBlock Grid.Row="2" Text="Local structure" Classes="muted" VerticalAlignment="Center" />
-                                <Slider Grid.Row="2" Grid.Column="1" x:Name="AioStructureSlider" Minimum="0" Maximum="2"
-                                        TickFrequency="0.05" IsSnapToTickEnabled="True" />
-                                <TextBlock Grid.Row="2" Grid.Column="2" x:Name="AioStructureValue" Classes="muted" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="ApplyTuningButton" Classes="accent" Content="Apply" />
-                            <TextBlock x:Name="TuningStatus" Classes="muted" FontSize="12" TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Hotkeys and tips for the installed setup -->
-                <Border x:Name="TipsCard" Classes="card" IsVisible="False">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Hotkeys &amp; tips" Classes="h2" />
-                        <TextBlock x:Name="TipsText" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource AdasTextSecondaryBrush}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Ray reconstruction DLL update (only for games that ship nvngx_dlssd.dll) -->
-                <Border x:Name="RrCard" Classes="card" IsVisible="False">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Ray reconstruction" Classes="h2" />
-                        <TextBlock x:Name="RrText" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource AdasTextSecondaryBrush}" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="RrUpdateButton" Classes="subtle" Content="Update ray reconstruction" IsVisible="False"
-                                    AutomationProperties.Name="Update ray reconstruction DLL" />
-                            <Button x:Name="RrRestoreButton" Classes="subtle" Content="Restore original" IsVisible="False"
-                                    AutomationProperties.Name="Restore the original ray reconstruction DLL" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Advanced per-game overrides -->
-                <Expander Header="Advanced options — most people can skip this" Classes="card">
-                    <StackPanel Spacing="12" Margin="0,8,0,0">
-                        <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto">
-                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
-                                <TextBlock Text="ReShade channel" Classes="muted" />
-                                <ComboBox x:Name="ReShadeCombo" HorizontalAlignment="Stretch" />
-                                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
-                                           Text="Which ReShade build to install. Default = Adas picks (the signed stable build — leave this unless you have a reason). Stable = force the official release. Nightly = newest unsigned build; more fixes, less tested. Custom = a build you provide." />
-                            </StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4">
-                                <TextBlock Text="DXVK variant" Classes="muted" />
-                                <ComboBox x:Name="DxvkCombo" HorizontalAlignment="Stretch" />
-                                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
-                                           Text="DXVK translates DirectX to Vulkan (only used on Vulkan/translated routes). Default = Adas picks. Stable = official DXVK. Development = newest upstream build; least tested. LiliumHdr = the HDR fork that adds HDR output to DX9/11 games." />
-                            </StackPanel>
-                        </Grid>
-
-                        <Grid ColumnDefinitions="*,12,*">
-                            <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="DLSS5-Feeder build" Classes="muted" />
-                                <ComboBox x:Name="FeederChannelCombo" HorizontalAlignment="Stretch" />
-                                <TextBox x:Name="FeederTagBox" Watermark="Release tag, e.g. v1.15.0" IsVisible="False" />
-                                <TextBlock x:Name="FeederChannelNote" Classes="muted" FontSize="11" TextWrapping="Wrap" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Spacing="4">
-                                <TextBlock Text="Motion vectors (Feeder routes)" Classes="muted" />
-                                <ComboBox x:Name="MotionProviderCombo" HorizontalAlignment="Stretch" />
-                                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
-                                           Text="Where the Feeder reads motion from. Automatic = LumeniteFX Kernel (what the Feeder is tuned on), or VORT Motion on OpenGL, where LumeniteFX reads nothing. Adas installs the chosen provider and places it above DLSS5_Feed. Takes effect on the next Install." />
-                            </StackPanel>
-                        </Grid>
-
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Deep Fried Chicken" Classes="muted" />
-                            <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
-                                       Text="An alternative neural consumer by Alexander, used in place of RenoDX. Its licence forbids redistribution, so Adas can't bundle it — import the author's official release (.zip or the extracted folder) once. It's verified and cached, then it appears as a DLSS 5 route above (or just pick that route and press Install — Adas asks for it)." />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="ImportDfcButton" Classes="subtle" Content="Import…" />
-                                <TextBlock x:Name="DfcStatusText" Classes="muted" FontSize="11"
-                                           VerticalAlignment="Center" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="RenoDX shader packs" Classes="muted" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ComboBox x:Name="ShaderModeCombo" Width="160" />
-                                <Button x:Name="ChoosePacksButton" Classes="subtle" Content="Choose packs…" />
-                            </StackPanel>
-                        </StackPanel>
-
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Game folder" Classes="muted" />
-                            <TextBlock x:Name="FolderText" Classes="muted" TextWrapping="Wrap" Text="Using detected folder." />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="ChangeFolderButton" Classes="subtle" Content="Change…" />
-                                <Button x:Name="ResetFolderButton" Classes="subtle" Content="Reset" />
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </Expander>
-
-                <!-- Verify / diagnose -->
-                <Border Classes="card">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Verify" Classes="h2" />
-                        <TextBlock Text="Installed it? Play the game for a minute, close it, then click below to check that DLSS 5 is really working."
-                                   Classes="muted" TextWrapping="Wrap" />
-                        <Button x:Name="DiagnoseButton" Classes="subtle"
-                                Content="Check if it's working" HorizontalAlignment="Left"
-                                AutomationProperties.Name="Check whether DLSS 5 is actually running" />
-                        <SelectableTextBlock x:Name="DiagnoseResult" Classes="muted" TextWrapping="Wrap"
-                                             AutomationProperties.LiveSetting="Polite"
-                                             AutomationProperties.Name="Diagnosis result" />
-                        <StackPanel x:Name="AioFixPanel" Spacing="6" IsVisible="False" />
-                        <TextBlock Text="Help other players: share whether it worked. Adas opens a filled-in GitHub issue that you check and submit yourself; nothing is sent automatically."
-                                   Classes="muted" TextWrapping="Wrap" FontSize="12" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="ShareWorkedButton" Classes="subtle" Content="👍 It worked — share"
-                                    AutomationProperties.Name="Share that it worked" />
-                            <Button x:Name="ShareFailedButton" Classes="subtle" Content="👎 It didn't — share"
-                                    AutomationProperties.Name="Share that it didn't work" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-
-            </StackPanel>
-        </ScrollViewer>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Panel>
 </UserControl>
