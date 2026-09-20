@@ -285,7 +285,7 @@ public partial class GameSetupView : UserControl
         if (probe.GraphicsApi == GraphicsApiType.Unknown)
         {
             ApiEvidenceText.Text = "⚠ Adas couldn't detect the graphics API. Pick it above — or press Install and Adas will ask." + canUse;
-            ApiEvidenceText.Foreground = Brush("#E3B341");
+            ApiEvidenceText.Foreground = ThemeBrush("AdasWarnBrush");
             return;
         }
 
@@ -294,7 +294,7 @@ public partial class GameSetupView : UserControl
         ApiEvidenceText.Text = $"Using {label} ({how}). {probe.GraphicsApiEvidence}".TrimEnd()
                                + (manual ? "" : canUse)
                                + (probe.GraphicsApiIsBestGuess && !manual ? " Wrong? Change Graphics API above." : "");
-        ApiEvidenceText.Foreground = probe.GraphicsApiIsBestGuess && !manual ? Brush("#E3B341") : Brush("#9BA6B4");
+        ApiEvidenceText.Foreground = probe.GraphicsApiIsBestGuess && !manual ? ThemeBrush("AdasWarnBrush") : ThemeBrush("AdasTextSecondaryBrush");
     }
 
     private RouteOption? SelectedRoute => InstallDlss5Check.IsChecked == true ? RoutesList.SelectedItem as RouteOption : null;
@@ -353,10 +353,10 @@ public partial class GameSetupView : UserControl
             } + n.Text));
             item.NotesBrush = Dlss5ToolCompatibility.Worst(notes) switch
             {
-                ToolNoteLevel.Good => Brush("#3FB950"),
-                ToolNoteLevel.Caution => Brush("#E3B341"),
-                ToolNoteLevel.Conflict => Brush("#F0883E"),
-                _ => Brush("#9BA6B4"),
+                ToolNoteLevel.Good => ThemeBrush("AdasGoodBrush"),
+                ToolNoteLevel.Caution => ThemeBrush("AdasWarnBrush"),
+                ToolNoteLevel.Conflict => ThemeBrush("AdasConflictBrush"),
+                _ => ThemeBrush("AdasTextSecondaryBrush"),
             };
         }
 
@@ -395,11 +395,11 @@ public partial class GameSetupView : UserControl
         _readiness = readiness;
         (ReadinessIcon.Text, ReadinessBanner.Background, ReadinessBanner.BorderBrush) = readiness?.State switch
         {
-            Dlss5ReadinessState.Ready => ("✓", Brush("#12261A"), Brush("#2E6B3F")),
-            Dlss5ReadinessState.NeedsGameFolder => ("📁", Brush("#2B2410"), Brush("#8A6D2F")),
-            Dlss5ReadinessState.NeedsGraphicsApi => ("?", Brush("#2B2410"), Brush("#8A6D2F")),
-            Dlss5ReadinessState.Warnings => ("⚠", Brush("#2B2410"), Brush("#8A6D2F")),
-            _ => ("⚠", Brush("#1A2230"), Brush("#2F3B4E")),
+            Dlss5ReadinessState.Ready => ("✓", ThemeBrush("AdasGoodBgBrush"), ThemeBrush("AdasGoodBorderBrush")),
+            Dlss5ReadinessState.NeedsGameFolder => ("📁", ThemeBrush("AdasWarnBgBrush"), ThemeBrush("AdasWarnBorderBrush")),
+            Dlss5ReadinessState.NeedsGraphicsApi => ("?", ThemeBrush("AdasWarnBgBrush"), ThemeBrush("AdasWarnBorderBrush")),
+            Dlss5ReadinessState.Warnings => ("⚠", ThemeBrush("AdasWarnBgBrush"), ThemeBrush("AdasWarnBorderBrush")),
+            _ => ("⚠", ThemeBrush("AdasInfoBgBrush"), ThemeBrush("AdasInfoBorderBrush")),
         };
 
         var problems = readiness?.Problems ?? Array.Empty<string>();
@@ -411,7 +411,11 @@ public partial class GameSetupView : UserControl
         AutoSetupText.IsVisible = !string.IsNullOrEmpty(readiness?.AutoSetupText);
     }
 
-    private static Avalonia.Media.IBrush Brush(string hex) => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex));
+    /// <summary>Resolves a named theme brush from application resources, so status colours stay in
+    /// one place (App.axaml tokens) instead of inline hex. Falls back to transparent if missing.</summary>
+    private static Avalonia.Media.IBrush ThemeBrush(string key)
+        => Avalonia.Application.Current?.FindResource(key) as Avalonia.Media.IBrush
+           ?? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Colors.Transparent);
 
     /// <summary>
     /// Shows the known-bad-driver pre-flight warning for the selected route, keyed to the assessed

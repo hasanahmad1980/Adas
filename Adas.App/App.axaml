@@ -35,6 +35,45 @@
         <SolidColorBrush x:Key="AdasBadBrush" Color="{StaticResource AdasBad}" />
         <SolidColorBrush x:Key="AdasTextPrimaryBrush" Color="{StaticResource AdasTextPrimary}" />
         <SolidColorBrush x:Key="AdasTextSecondaryBrush" Color="{StaticResource AdasTextSecondary}" />
+
+        <!-- Semantic tokens (Phase A). These replace the inline hex literals that used to be
+             scattered through the views and code-behind, so surfaces, banners and status
+             colours are defined once and follow the theme. -->
+        <Color x:Key="AdasSurfaceRaised">#232A36</Color>
+        <Color x:Key="AdasAccentHover">#5E97F6</Color>
+        <Color x:Key="AdasConflict">#F0883E</Color>
+        <Color x:Key="AdasLink">#58A6FF</Color>
+        <!-- Banner fills + borders, one pair per state -->
+        <Color x:Key="AdasInfoBg">#1A2230</Color>
+        <Color x:Key="AdasInfoBorder">#2F3B4E</Color>
+        <Color x:Key="AdasGoodBg">#12261A</Color>
+        <Color x:Key="AdasGoodBorder">#2E6B3F</Color>
+        <Color x:Key="AdasWarnBg">#2B2410</Color>
+        <Color x:Key="AdasWarnBorder">#8A6D2F</Color>
+        <Color x:Key="AdasWarnBgStrong">#3A2A00</Color>
+
+        <SolidColorBrush x:Key="AdasSurfaceRaisedBrush" Color="{StaticResource AdasSurfaceRaised}" />
+        <SolidColorBrush x:Key="AdasAccentHoverBrush" Color="{StaticResource AdasAccentHover}" />
+        <SolidColorBrush x:Key="AdasConflictBrush" Color="{StaticResource AdasConflict}" />
+        <SolidColorBrush x:Key="AdasLinkBrush" Color="{StaticResource AdasLink}" />
+        <SolidColorBrush x:Key="AdasChipBgBrush" Color="{StaticResource AdasSurfaceRaised}" />
+        <SolidColorBrush x:Key="AdasInfoBgBrush" Color="{StaticResource AdasInfoBg}" />
+        <SolidColorBrush x:Key="AdasInfoBorderBrush" Color="{StaticResource AdasInfoBorder}" />
+        <SolidColorBrush x:Key="AdasGoodBgBrush" Color="{StaticResource AdasGoodBg}" />
+        <SolidColorBrush x:Key="AdasGoodBorderBrush" Color="{StaticResource AdasGoodBorder}" />
+        <SolidColorBrush x:Key="AdasWarnBgBrush" Color="{StaticResource AdasWarnBg}" />
+        <SolidColorBrush x:Key="AdasWarnBorderBrush" Color="{StaticResource AdasWarnBorder}" />
+        <SolidColorBrush x:Key="AdasWarnBgStrongBrush" Color="{StaticResource AdasWarnBgStrong}" />
+
+        <!-- Scale tokens -->
+        <CornerRadius x:Key="AdasRadiusSm">6</CornerRadius>
+        <CornerRadius x:Key="AdasRadiusMd">12</CornerRadius>
+        <CornerRadius x:Key="AdasRadiusLg">16</CornerRadius>
+        <Thickness x:Key="AdasSpaceXs">4</Thickness>
+        <Thickness x:Key="AdasSpaceSm">8</Thickness>
+        <Thickness x:Key="AdasSpaceMd">12</Thickness>
+        <Thickness x:Key="AdasSpaceLg">16</Thickness>
+        <Thickness x:Key="AdasSpaceXl">24</Thickness>
     </Application.Resources>
 
     <Application.Styles>

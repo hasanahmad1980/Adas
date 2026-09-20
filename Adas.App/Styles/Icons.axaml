@@ -1,0 +1,23 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Single vector icon language for the app (Phase A). Each entry is a StreamGeometry
+         drawn on a 24×24 canvas, referenced from a Path's Data. Using geometries instead of
+         an icon NuGet keeps the dependency set unchanged and lets us drop emoji out of
+         accessible names — glyphs render as Paths with AccessibilityView="Raw" while the
+         real name sits on the parent control. Path strings are Material-style outlines. -->
+
+    <StreamGeometry x:Key="IconLibrary">M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z</StreamGeometry>
+    <StreamGeometry x:Key="IconTools">M22 19l-7-7 2-2c1 1 3 1 4 0 1-1 1-3 0-4l-3 3-2-2 3-3c-1-1-3-1-4 0-1 1-1 3 0 4l-9 9 2 2 6-6 7 7 1-1z</StreamGeometry>
+    <StreamGeometry x:Key="IconHistory">M13 3a9 9 0 100 18 9 9 0 000-18zm0 2a7 7 0 110 14 7 7 0 010-14zm-1 3v5l4 2 .7-1.4L13 11.5V8h-1z</StreamGeometry>
+    <StreamGeometry x:Key="IconSettings">M12 8a4 4 0 100 8 4 4 0 000-8zm0 2a2 2 0 110 4 2 2 0 010-4zm7 2l2-1.5-1.5-2.6-2.4 1a6.9 6.9 0 00-1.7-1l-.4-2.6H9.9l-.4 2.6c-.6.2-1.2.6-1.7 1l-2.4-1L3.9 10.5 5.9 12l-2 1.5 1.5 2.6 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4.2l.4-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 1.5-2.6L19 12z</StreamGeometry>
+    <StreamGeometry x:Key="IconRefresh">M12 4V1L8 5l4 4V6a6 6 0 11-6 6H4a8 8 0 108-8z</StreamGeometry>
+    <StreamGeometry x:Key="IconSearch">M15.5 14h-.8l-.3-.3a6.5 6.5 0 10-.7.7l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 110-9 4.5 4.5 0 010 9z</StreamGeometry>
+    <StreamGeometry x:Key="IconCheck">M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z</StreamGeometry>
+    <StreamGeometry x:Key="IconWarning">M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z</StreamGeometry>
+    <StreamGeometry x:Key="IconChevronDown">M7.4 8.6L12 13.2l4.6-4.6L18 10l-6 6-6-6z</StreamGeometry>
+    <StreamGeometry x:Key="IconChevronRight">M8.6 7.4L13.2 12l-4.6 4.6L10 18l6-6-6-6z</StreamGeometry>
+    <StreamGeometry x:Key="IconFolder">M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z</StreamGeometry>
+    <StreamGeometry x:Key="IconDownload">M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z</StreamGeometry>
+
+</ResourceDictionary>

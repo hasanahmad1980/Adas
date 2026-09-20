@@ -23,7 +23,7 @@
                 <Grid ColumnDefinitions="Auto,*">
                     <!-- Cover art (Steam library portrait), hidden until fetched -->
                     <Border Grid.Column="0" Width="92" Height="138" CornerRadius="6"
-                            Margin="0,0,14,0" ClipToBounds="True" Background="#0E1116"
+                            Margin="0,0,14,0" ClipToBounds="True" Background="{DynamicResource AdasBackgroundBrush}"
                             VerticalAlignment="Top" IsVisible="{Binding HasArtwork}">
                         <Image Source="{Binding ArtworkImagePath, Converter={StaticResource PathToBitmapConverter}}"
                                Stretch="UniformToFill" />
@@ -39,7 +39,7 @@
                                            Foreground="White" FontSize="12" FontWeight="SemiBold" />
                             </Border>
                             <!-- Detected graphics API + process bitness, accurate from the scan -->
-                            <Border CornerRadius="5" Padding="8,3" Margin="0,0,8,4" Background="#232A36"
+                            <Border CornerRadius="5" Padding="8,3" Margin="0,0,8,4" Background="{DynamicResource AdasChipBgBrush}"
                                     VerticalAlignment="Center" IsVisible="{Binding HasGraphicsApiBadge}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock Text="{Binding GraphicsApiLabel}" FontSize="12" FontWeight="SemiBold"
@@ -86,7 +86,7 @@
 
                         <!-- Plain-language readiness banner: headline, things to know, one-click fix -->
                         <Border x:Name="ReadinessBanner" CornerRadius="6" Padding="12,10" BorderThickness="1"
-                                Background="#1A2230" BorderBrush="#2F3B4E"
+                                Background="{DynamicResource AdasInfoBgBrush}" BorderBrush="{DynamicResource AdasInfoBorderBrush}"
                                 AutomationProperties.LiveSetting="Polite"
                                 AutomationProperties.Name="Setup readiness">
                             <Grid ColumnDefinitions="Auto,*">
@@ -131,21 +131,21 @@
                                             <TextBlock Text="{Binding StatusText}" FontSize="12" TextWrapping="Wrap"
                                                        Foreground="{Binding Converter={StaticResource RouteStatusBrushConverter}}" />
                                             <TextBlock Text="{Binding CommunityText}" FontSize="12" TextWrapping="Wrap"
-                                                       Foreground="#58A6FF"
+                                                       Foreground="{DynamicResource AdasLinkBrush}"
                                                        IsVisible="{Binding CommunityText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
                             <TextBlock x:Name="RouteNotesText" FontSize="12" TextWrapping="Wrap" IsVisible="False"
-                                       Foreground="#E3B341" />
+                                       Foreground="{DynamicResource AdasWarnBrush}" />
                             <Border x:Name="DriverWarningBanner" IsVisible="False"
-                                    CornerRadius="6" Padding="10,8" Background="#3A2A00"
-                                    BorderBrush="#8A6D2F" BorderThickness="1">
+                                    CornerRadius="6" Padding="10,8" Background="{DynamicResource AdasWarnBgStrongBrush}"
+                                    BorderBrush="{DynamicResource AdasWarnBorderBrush}" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="⚠" Foreground="#F0B429" VerticalAlignment="Top" />
+                                    <TextBlock Text="⚠" Foreground="{DynamicResource AdasWarnBrush}" VerticalAlignment="Top" />
                                     <TextBlock x:Name="DriverWarningText" TextWrapping="Wrap"
-                                               Foreground="#F5D77E" FontSize="12" />
+                                               Foreground="{DynamicResource AdasWarnBrush}" FontSize="12" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -179,7 +179,7 @@
                             <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
                                        Text="Turns on the FSR 3.1 frame-generation files OptiScaler ships, fed by OptiScaler's upscaler — works on any RTX card. Off by default. Turn the game's own frame generation off, and expect some added input latency." />
                             <TextBlock x:Name="FsrFgNote" FontSize="12" TextWrapping="Wrap" Margin="26,0,0,0"
-                                       Foreground="#E3B341" IsVisible="False" />
+                                       Foreground="{DynamicResource AdasWarnBrush}" IsVisible="False" />
                         </StackPanel>
 
                         <!-- 3. One button -->
