@@ -457,6 +457,36 @@ public partial class GameDetectionService : IGameDetectionService
         return null;
     }
 
+    public IReadOnlyList<GameCandidate> FindGameCandidates(string root)
+    {
+        var results = new List<GameCandidate>();
+        if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return results;
+        try
+        {
+            // If the picked folder itself directly holds an executable, the user picked a single game
+            // folder — return just that.
+            if (Directory.GetFiles(root, "*.exe").Length > 0)
+            {
+                results.Add(new GameCandidate(Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar)), root));
+                return results;
+            }
+
+            // Otherwise treat the pick as a games-library root: each immediate subfolder that contains an
+            // executable (within a few levels, junk folders skipped) is a candidate game.
+            foreach (var sub in Directory.GetDirectories(root))
+            {
+                if (IsSkippedFolder(sub)) continue;
+                if (FindShallowExeFolder(sub) != null)
+                    results.Add(new GameCandidate(Path.GetFileName(sub), sub));
+            }
+        }
+        catch (Exception ex) { CrashReporter.Log($"[GameDetectionService] Candidate scan error — {ex.Message}"); }
+
+        return results
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private string? FindShallowExeFolder(string root)
     {
         var queue = new Queue<(string path, int depth)>();

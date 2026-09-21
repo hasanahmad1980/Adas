@@ -453,9 +453,11 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// "Add a specific folder…" — lets the user pick one or more folders to add as games without a full
-    /// system scan. Each picked folder becomes a manually-added game (built in place via
-    /// <see cref="MainViewModel.AddManualGame"/>), so only the new cards are added — the library is not rescanned.
+    /// "Add a specific folder…" — lets the user pick one or more folders, scans each for game candidates
+    /// (a folder that directly holds an .exe is one game; otherwise each immediate subfolder that contains
+    /// an .exe is a candidate), then presents a checklist of the games found. Each confirmed folder becomes
+    /// a manually-added game built in place via <see cref="MainViewModel.AddManualGame"/> — only the new
+    /// cards are added, the library is not rescanned.
     /// </summary>
     private async void OnAddFolder(object? sender, RoutedEventArgs e)
     {
@@ -465,31 +467,49 @@ public partial class MainWindow : Window
         {
             var folders = await sp.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
             {
-                Title = "Select one or more game folders",
+                Title = "Select a game folder or a folder that contains your games",
                 AllowMultiple = true,
             });
             if (folders.Count == 0) return;
 
-            var added = 0;
-            foreach (var folder in folders)
+            var detection = AppServices.Services.GetService<IGameDetectionService>();
+            if (detection is null) { vm.StatusText = "Game detection service unavailable."; return; }
+
+            vm.StatusText = "Scanning folder(s) for games…";
+
+            // Scan each picked root for candidate game folders (off the UI thread), de-duplicated by path.
+            var roots = folders.Select(f => f.Path.LocalPath).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+            var candidates = await Task.Run(() =>
             {
-                var path = folder.Path.LocalPath;
-                if (string.IsNullOrWhiteSpace(path) || !System.IO.Directory.Exists(path)) continue;
-                var name = new System.IO.DirectoryInfo(path).Name;
-                if (string.IsNullOrWhiteSpace(name)) name = path;
+                var seen = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var found = new System.Collections.Generic.List<GameCandidate>();
+                foreach (var root in roots)
+                    foreach (var c in detection.FindGameCandidates(root))
+                        if (seen.Add(c.Path)) found.Add(c);
+                return found;
+            });
+
+            if (candidates.Count == 0)
+            {
+                vm.StatusText = "No games found in the selected folder(s).";
+                return;
+            }
+
+            var chosen = await GameCandidateSelectionDialog.ShowAsync(this, candidates);
+            if (chosen is null || chosen.Count == 0) { vm.StatusText = "No games added."; return; }
+
+            foreach (var c in chosen)
                 vm.AddManualGame(new DetectedGame
                 {
-                    Name = name,
-                    InstallPath = path,
+                    Name = c.Name,
+                    InstallPath = c.Path,
                     Source = "Manual",
                     IsManuallyAdded = true,
                 });
-                added++;
-            }
 
-            vm.StatusText = added == 0
-                ? "No folders added."
-                : added == 1 ? "Added 1 folder to your library." : $"Added {added} folders to your library.";
+            vm.StatusText = chosen.Count == 1
+                ? "Added 1 game to your library."
+                : $"Added {chosen.Count} games to your library.";
         }
         catch (Exception ex)
         {

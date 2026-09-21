@@ -17,3 +17,6 @@ public class DetectedGame
     /// <summary>Xbox/Game Pass App User Model ID (for shell:AppsFolder launch).</summary>
     public string? XboxAumid { get; set; }
 }
+
+/// <summary>A game folder discovered by scanning a user-picked directory (name + full path).</summary>
+public sealed record GameCandidate(string Name, string Path);
