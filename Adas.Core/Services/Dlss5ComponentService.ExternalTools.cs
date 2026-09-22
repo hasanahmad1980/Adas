@@ -5,11 +5,11 @@ namespace RenoDXCommander.Services;
 
 public sealed partial class Dlss5ComponentService
 {
-    internal const string NeuralScreenVersion = "2.0.2";
+    internal const string NeuralScreenVersion = "2.1.1";
     private const string NeuralScreenUrl =
-        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v2.0.2/neuralscreen-v2.0.2-full.zip";
+        "https://github.com/perseval-BLR/DLSS5-NeuralScreen/releases/download/v2.1.1/neuralscreen-v2.1.1-full.zip";
     private const string NeuralScreenSha256 =
-        "D67128285DD8EC7FE1D89EA38E7B896355DAFE2E703235BF0CCAD683E16AAE09";
+        "1541A255F15E57A0565B79B8E34B00A0F288AD60552D8EC1B1B91FE0338E1DE7";
     private static readonly SemaphoreSlim NeuralScreenCacheLock = new(1, 1);
 
     /// <summary>
@@ -215,7 +215,7 @@ public sealed partial class Dlss5ComponentService
                 {
                     await DownloadFileAsync(NeuralScreenUrl, archive, cancellationToken).ConfigureAwait(false);
                     if (!FileHelper.ComputeSha256(archive).Equals(NeuralScreenSha256, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("NeuralScreen download did not match the official v2.0.2 SHA-256. Nothing was launched.");
+                        throw new InvalidDataException("NeuralScreen download did not match the official v2.1.1 SHA-256. Nothing was launched.");
                     ZipFile.ExtractToDirectory(archive, toolDirectory, overwriteFiles: true);
                     if (!File.Exists(executable))
                         throw new FileNotFoundException("NeuralScreen.exe was not found in the extracted archive.");

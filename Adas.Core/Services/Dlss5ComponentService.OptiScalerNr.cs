@@ -6,7 +6,7 @@ public sealed partial class Dlss5ComponentService
 {
     internal const string OptiScalerNrVersion = "0.2.0";
     internal const string OptiScalerSplitVersion = "0.1.2 NR-before-SR English";
-    internal const string OptiScalerMultipassVersion = "0.8.3";
+    internal const string OptiScalerMultipassVersion = "0.8.8";
     private static readonly SemaphoreSlim OptiScalerNrCacheLock = new(1, 1);
 
     internal static bool IsOptiScalerNrProfile(Dlss5InstallProfile? profile)
@@ -94,8 +94,8 @@ public sealed partial class Dlss5ComponentService
                 "https://github.com/Markxiao94/OptiScaler-DLSSNR-NR-before-SR/releases/download/v0.1.2-nr-before-sr-english/OptiScaler-NR-before-SR-English-x64-20260903.zip"),
             Dlss5InstallProfile.OptiScalerPreSrMultipass => (
                 OptiScalerMultipassVersion, "optiscaler-multipass.zip",
-                "3F2D26FB136D964A394BF50896D082156173153A2A55B88E1995277B4DABE3C8",
-                "https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/releases/download/v0.8.3/OptiScaler-NR-v0.8.3.zip"),
+                "F11C52F6EF5C3F201352C03CE5BDBB965F2FEA5995F28013A42DFB9DABEE3A35",
+                "https://github.com/wilsjo2/OptiScaler-DLSSNR-PreSR-Multipass/releases/download/v0.8.8/OptiScaler-NR-v0.8.8.zip"),
             _ => (
                 OptiScalerNrVersion, "optiscaler-nr.zip",
                 "8EECE7A4D7DE6DE5917F0C99AC60540B2D77022E7699BBA717B0A6D9E1829BCE",

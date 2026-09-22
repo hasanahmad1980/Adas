@@ -9,7 +9,7 @@ public sealed class Dlss5UpstreamRefreshTests
     [Fact]
     public void RequestedUpstreamOptionsArePinnedAndRendererScoped()
     {
-        Assert.Equal("1.16.0-beta.6", Dlss5ComponentService.BundledFeederBetaVersion);
+        Assert.Equal("1.17.0-beta.1", Dlss5ComponentService.BundledFeederBetaVersion);
         Assert.Equal("1.0.5", Dlss5ComponentService.OpenGlBridgeVersion);
         Assert.Equal("0.13.22", Dlss5ComponentService.OneClickVersion);
         Assert.True(Dlss5ComponentService.SupportsOpenGlBridge(Dlss5DeploymentMode.OpenGlFeeder, true));
@@ -31,17 +31,17 @@ public sealed class Dlss5UpstreamRefreshTests
         => Assert.Equal(expected, VulkanLayerService.IsEnabledRegistryValue(registryValue));
 
     [Fact]
-    public void BundledFeederBetaPayloadIsTheMatched1160Beta6Set()
+    public void BundledFeederBetaPayloadIsTheMatched1170Beta1Set()
     {
         var assetRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "DLSS5");
         var expected = new[]
         {
-            "dlss5-feed-1.16.0-beta.6.addon64",
-            "dlss5-feed-1.16.0-beta.6.addon32",
-            "dlss5-feed-host64-1.16.0-beta.6.exe",
-            "DLSS5_Feed-1.16.0-beta.6.fx",
-            "feed-vk-layer-1.16.0-beta.6-x64.zip",
-            "feed-vk-layer-1.16.0-beta.6-x86.zip",
+            "dlss5-feed-1.17.0-beta.1.addon64",
+            "dlss5-feed-1.17.0-beta.1.addon32",
+            "dlss5-feed-host64-1.17.0-beta.1.exe",
+            "DLSS5_Feed-1.17.0-beta.1.fx",
+            "feed-vk-layer-1.17.0-beta.1-x64.zip",
+            "feed-vk-layer-1.17.0-beta.1-x86.zip",
         };
 
         foreach (var name in expected)
@@ -222,7 +222,7 @@ public sealed class Dlss5UpstreamRefreshTests
     [Fact]
     public void PreSrMultipassForkIsPinnedAndUsesRunBeforeSrNotSplitKeys()
     {
-        Assert.Equal("0.8.3", Dlss5ComponentService.OptiScalerMultipassVersion);
+        Assert.Equal("0.8.8", Dlss5ComponentService.OptiScalerMultipassVersion);
         Assert.True(Dlss5ComponentService.IsOptiScalerNrProfile(Dlss5InstallProfile.OptiScalerPreSrMultipass));
         Assert.True(Dlss5ComponentService.IsOptiScalerPreSrProfile(Dlss5InstallProfile.OptiScalerPreSrMultipass));
         Assert.False(Dlss5ComponentService.ShouldWriteOptiScalerSplitKeys(Dlss5InstallProfile.OptiScalerPreSrMultipass));
@@ -262,7 +262,7 @@ public sealed class Dlss5UpstreamRefreshTests
 
         var path = Path.Combine(repoRoot!, "Adas.Core", "Assets", "DLSS5", "optiscaler-multipass.zip");
         Assert.Equal(
-            "3F2D26FB136D964A394BF50896D082156173153A2A55B88E1995277B4DABE3C8",
+            "F11C52F6EF5C3F201352C03CE5BDBB965F2FEA5995F28013A42DFB9DABEE3A35",
             FileHelper.ComputeSha256(path), ignoreCase: true);
     }
 
@@ -274,7 +274,8 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.14.0-beta.5", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 0.15.1", true)]
     [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 1.16.0-beta.5", true)]
-    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 1.16.0-beta.6", false)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 1.16.0-beta.6", true)]
+    [InlineData(Dlss5InstallProfile.LatestFeederBeta, Dlss5DeploymentMode.Dx11Feeder, "Feeder 1.17.0-beta.1", false)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 1.7.24", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.3", true)]
     [InlineData(Dlss5InstallProfile.StandaloneAio, Dlss5DeploymentMode.NativeDirectX12, "Standalone AIO 2.0.7-experimental.1", true)]
@@ -290,7 +291,8 @@ public sealed class Dlss5UpstreamRefreshTests
     [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.5-nr-fixes", true)]
     [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.6", true)]
     [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.7.7", true)]
-    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.8.3", false)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.8.3", true)]
+    [InlineData(Dlss5InstallProfile.OptiScalerPreSrMultipass, Dlss5DeploymentMode.NativeDirectX12, "OptiScaler NR 0.8.8", false)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.7", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.8", true)]
     [InlineData(Dlss5InstallProfile.MaximumQuality, Dlss5DeploymentMode.NativeDirectX11, "Bridge v1.4.12", false)]
