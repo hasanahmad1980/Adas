@@ -624,8 +624,10 @@ public partial class GameSetupView : UserControl
             if (results.Count > 0) ShowResult(string.Join("\n\n", results));
             if (anyRan)
             {
+                // Refresh only this game's DLSS 5 state from its freshly-written record — the tool installs
+                // above already updated this card's component flags in place. No full library rescan.
+                main.RefreshCardDlss5State(card, card.InstallPath);
                 card.NotifyAll();
-                try { await main.RefreshAsync(); } catch { /* refresh best-effort */ }
                 if (results.Count > 0) ShowResult(string.Join("\n\n", results));
             }
             await RefreshAssessmentAsync();
@@ -841,7 +843,9 @@ public partial class GameSetupView : UserControl
             ShowResult(outcome.Message);
             if (outcome.Ran)
             {
-                try { await Main.RefreshAsync(); } catch { /* refresh best-effort */ }
+                // Refresh only this game's DLSS 5 state instead of rescanning the whole library.
+                Main.RefreshCardDlss5State(card, card.InstallPath);
+                card.NotifyAll();
                 await RefreshAssessmentAsync();
             }
         }
